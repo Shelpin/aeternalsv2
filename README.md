@@ -7,7 +7,7 @@ A comprehensive toolkit for managing, monitoring, and securing multiple Telegram
 ![Security Enhanced](https://img.shields.io/badge/Security-Enhanced-green)
 ![Real-time Monitoring](https://img.shields.io/badge/Monitoring-Real--time-orange)
 
-##  System Overview
+## 📚 System Overview
 
 The ElizaOS Multi-Agent Management System provides a robust set of scripts for handling the complete lifecycle of your ElizaOS Telegram agents:
 
@@ -170,7 +170,8 @@ The system optimizes resource usage:
 | Agent unresponsive | Restart with `./stop_agents.sh && ./start_agents.sh` |
 | Permission errors | Ensure proper permissions on `.env` and log directories |
 
-Based on the ELizaOS framwework 
+
+Based on ElizaOS 
 
 # Eliza 🤖
 
@@ -183,8 +184,6 @@ Based on the ELizaOS framwework
 📑 [Technical Report](https://arxiv.org/pdf/2501.06781) |  📖 [Documentation](https://elizaos.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
 
 </div>
-
-
 ## 📖 README Translations
 
 [中文说明](i18n/readme/README_CN.md) | [日本語の説明](i18n/readme/README_JA.md) | [한국어 설명](i18n/readme/README_KOR.md) | [Persian](i18n/readme/README_FA.md) | [Français](i18n/readme/README_FR.md) | [Português](i18n/readme/README_PTBR.md) | [Türkçe](i18n/readme/README_TR.md) | [Русский](i18n/readme/README_RU.md) | [Español](i18n/readme/README_ES.md) | [Italiano](i18n/readme/README_IT.md) | [ไทย](i18n/readme/README_TH.md) | [Deutsch](i18n/readme/README_DE.md) | [Tiếng Việt](i18n/readme/README_VI.md) | [עִברִית](i18n/readme/README_HE.md) | [Tagalog](i18n/readme/README_TG.md) | [Polski](i18n/readme/README_PL.md) | [Arabic](i18n/readme/README_AR.md) | [Hungarian](i18n/readme/README_HU.md) | [Srpski](i18n/readme/README_RS.md) | [Română](i18n/readme/README_RO.md) | [Nederlands](i18n/readme/README_NL.md) | [Ελληνικά](i18n/readme/README_GR.md)
