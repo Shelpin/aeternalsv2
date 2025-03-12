@@ -1,14 +1,3 @@
-# Eliza 🤖
-
-<div align="center">
-  <img src="./docs/static/img/eliza_banner.jpg" alt="Eliza Banner" width="100%" />
-</div>
-
-<div align="center">
-
-📑 [Technical Report](https://arxiv.org/pdf/2501.06781) |  📖 [Documentation](https://elizaos.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
-
-</div>
 
 # 🚀 ElizaOS Multi-Agent Management System
 
@@ -18,7 +7,7 @@ A comprehensive toolkit for managing, monitoring, and securing multiple Telegram
 ![Security Enhanced](https://img.shields.io/badge/Security-Enhanced-green)
 ![Real-time Monitoring](https://img.shields.io/badge/Monitoring-Real--time-orange)
 
-## 📚 System Overview
+##  System Overview
 
 The ElizaOS Multi-Agent Management System provides a robust set of scripts for handling the complete lifecycle of your ElizaOS Telegram agents:
 
@@ -180,6 +169,21 @@ The system optimizes resource usage:
 | Security warnings | Address issues found with `./monitor_agents.sh -S` |
 | Agent unresponsive | Restart with `./stop_agents.sh && ./start_agents.sh` |
 | Permission errors | Ensure proper permissions on `.env` and log directories |
+
+Based on the ELizaOS framwework 
+
+# Eliza 🤖
+
+<div align="center">
+  <img src="./docs/static/img/eliza_banner.jpg" alt="Eliza Banner" width="100%" />
+</div>
+
+<div align="center">
+
+📑 [Technical Report](https://arxiv.org/pdf/2501.06781) |  📖 [Documentation](https://elizaos.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
+
+</div>
+
 
 ## 📖 README Translations
 
