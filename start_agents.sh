@@ -266,8 +266,18 @@ start_agent() {
     export TELEGRAM_BOT_TOKEN="${token_value}"
     export HTTP_PORT="${port}"
     
-    # Save port assignment to file
-    echo "PORT=${port}" > "${PORT_DIR}/${character}.port"
+    # Save port assignment to file, preserving JSON content if it exists
+    if grep -q "^{" "${PORT_DIR}/${character}.port" 2>/dev/null; then
+        # Extract JSON part
+        json_content=$(sed -n '/^{/,$p' "${PORT_DIR}/${character}.port")
+        # Write port with JSON content
+        echo "PORT=${port}" > "${PORT_DIR}/${character}.port"
+        echo "" >> "${PORT_DIR}/${character}.port"
+        echo "$json_content" >> "${PORT_DIR}/${character}.port"
+    else
+        # Just write the port if no JSON content exists
+        echo "PORT=${port}" > "${PORT_DIR}/${character}.port"
+    fi
     chmod 640 "${PORT_DIR}/${character}.port"
     
     # Create empty log file if it doesn't exist
