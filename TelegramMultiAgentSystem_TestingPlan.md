@@ -3,6 +3,9 @@
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Prerequisites](#prerequisites)
+   - [2.1 Required Components](#21-required-components)
+   - [2.2 Configuration Prerequisites](#22-configuration-prerequisites)
+   - [2.3 Starting Point](#23-starting-point)
 3. [Component Testing](#component-testing)
    - [3.1 Relay Server Testing](#31-relay-server-testing)
    - [3.2 Agent Connection Testing](#32-agent-connection-testing)
@@ -24,11 +27,81 @@
 This document provides a comprehensive testing plan for the ElizaOS Multi-Agent Telegram System. The tests are designed to verify that all components function as expected both individually and as an integrated system.
 
 ## 2. Prerequisites
+
+### 2.1 Required Components
 - Access to the Telegram test group
 - Bot tokens for all agents configured in the system
 - Administrative access to the server running the ElizaOS system
 - ElizaOS Multi-Agent Telegram package installed and configured
 - Relay server set up and ready to run
+
+### 2.2 Configuration Prerequisites
+Before starting any testing, ensure the following configurations are properly set up:
+
+#### Environment Variables
+The main `.env` file must contain all bot tokens:
+```
+TELEGRAM_BOT_TOKEN_BitcoinMaxi420=<token>
+TELEGRAM_BOT_TOKEN_ETHMemeLord9000=<token>
+TELEGRAM_BOT_TOKEN_CodeSamurai77=<token>
+TELEGRAM_BOT_TOKEN_BagFlipper9000=<token>
+TELEGRAM_BOT_TOKEN_LindAEvangelista88=<token>
+TELEGRAM_BOT_TOKEN_VCShark99=<token>
+```
+
+#### Telegram Group ID
+Update the plugin configuration with the correct Telegram group ID (`-1002550618173` for testing):
+- This can be set in the initialization code or configuration file
+- The group must have all bots added as members with privacy settings disabled
+
+#### Relay Server Configuration
+The relay server's `.env` file needs:
+```
+RELAY_API_KEY=elizaos-secure-relay-key
+PORT=4000
+PORT_DIR=/root/eliza/ports
+```
+
+#### Agent Port Files
+Each agent's port file should contain the agent's personality configuration:
+```json
+{
+  "name": "Agent Name",
+  "botUsername": "agent_username_bot",
+  "traits": {
+    "primary": ["Trait1", "Trait2"],
+    "secondary": ["Trait3", "Trait4"]
+  },
+  "interests": ["Interest1", "Interest2", "Interest3"],
+  "typingSpeed": 300,
+  "responseDelayMultiplier": 1.0,
+  "conversationInitiationWeight": 1.0,
+  "aeternityProScore": 5
+}
+```
+
+> **Important**: Never store bot tokens in plain text in the port files or any other configuration files. Always use environment variables.
+
+#### Plugin Configuration Parameters
+The plugin requires:
+```typescript
+{
+  relayServerUrl: "http://localhost:4000", // Match the PORT in relay-server/.env
+  authToken: "elizaos-secure-relay-key",   // Match the RELAY_API_KEY in relay-server/.env
+  groupIds: [-1002550618173],              // Test group ID
+  conversationCheckIntervalMs: 30000,      // Optional
+  enabled: true                            // Optional
+}
+```
+
+### 2.3 Starting Point
+This testing plan assumes you'll be working with the existing files in the ElizaOS repository. The key starting points are:
+
+1. **Relay Server**: Start with `/root/eliza/relay-server/start-relay.sh`
+2. **Agent Initialization**: Verify each agent can be initialized through the system
+3. **Example Files**: Reference `/root/eliza/packages/telegram-multiagent/examples/` for usage examples
+
+No additional test configuration files are needed - the system should work with the properly configured environment variables and port files as described above.
 
 ## 3. Component Testing
 

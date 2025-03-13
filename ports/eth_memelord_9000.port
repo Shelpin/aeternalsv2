@@ -1,1 +1,15 @@
-3001
+PORT=3000
+
+{
+  "name": "ETH Memelord",
+  "botUsername": "eth_memelord_9000_bot",
+  "traits": {
+    "primary": ["Humorous", "Creative"],
+    "secondary": ["Enthusiastic", "Irreverent"]
+  },
+  "interests": ["Ethereum", "DeFi", "NFTs", "Memes"],
+  "typingSpeed": 350,
+  "responseDelayMultiplier": 0.8,
+  "conversationInitiationWeight": 1.5,
+  "aeternityProScore": 3
+}

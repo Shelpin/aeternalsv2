@@ -9,20 +9,27 @@ if ! command -v node &> /dev/null; then
 fi
 
 # Check if the relay server file exists
-RELAY_SERVER_FILE="../examples/relay-server.js"
+RELAY_SERVER_FILE="./server.js"
 if [ ! -f "$RELAY_SERVER_FILE" ]; then
     echo "Error: Relay server file not found at $RELAY_SERVER_FILE"
     exit 1
 fi
 
 # Check if required packages are installed
-if [ ! -d "../node_modules/express" ] || [ ! -d "../node_modules/body-parser" ] || [ ! -d "../node_modules/cors" ]; then
+if [ ! -d "node_modules/express" ] || [ ! -d "node_modules/body-parser" ] || [ ! -d "node_modules/cors" ]; then
     echo "Installing required packages..."
-    cd .. && npm install express body-parser cors
+    npm install express body-parser cors dotenv
 fi
 
-# Set the port (default: 3000)
-PORT=${1:-3000}
+# Load environment variables if .env exists
+if [ -f ".env" ]; then
+    # Use port from .env file if it exists
+    PORT=$(grep "^PORT=" .env | cut -d '=' -f2 | tr -d '[:space:]')
+    echo "Using PORT=$PORT from .env file"
+else
+    # Set the port (default: 4000)
+    PORT=${1:-4000}
+fi
 
 # Start the relay server
 echo "Starting Telegram Relay Server on port $PORT..."

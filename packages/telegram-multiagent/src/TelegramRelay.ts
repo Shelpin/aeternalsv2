@@ -50,18 +50,32 @@ export class TelegramRelay {
   private readonly pingIntervalMs = 30000; // 30 seconds
   
   /**
-   * Create a new TelegramRelay
-   * 
-   * @param config - Relay configuration
-   * @param logger - Logger instance
+   * Constructor overloads for TelegramRelay
    */
-  constructor(config: TelegramRelayConfig, logger: ElizaLogger) {
+  constructor(config: TelegramRelayConfig);
+  constructor(config: TelegramRelayConfig, logger: ElizaLogger);
+  constructor(config: TelegramRelayConfig, logger?: ElizaLogger) {
     this.config = {
-      ...config,
-      retryLimit: config.retryLimit || 3,
-      retryDelayMs: config.retryDelayMs || 5000
+      retryLimit: 3,
+      retryDelayMs: 5000,
+      ...config
     };
-    this.logger = logger;
+    
+    this.logger = logger || {
+      debug: (msg: string) => console.debug(`[DEBUG] ${msg}`),
+      info: (msg: string) => console.info(`[INFO] ${msg}`),
+      warn: (msg: string) => console.warn(`[WARN] ${msg}`),
+      error: (msg: string) => console.error(`[ERROR] ${msg}`)
+    };
+    
+    this.connected = false;
+    this.eventHandlers = new Map();
+    this.lastPingTime = 0;
+    this.messageQueue = [];
+    this.processingQueue = false;
+    this.reconnectTimeout = null;
+    this.pingInterval = null;
+    this.readonly pingIntervalMs = 30000; // 30 seconds
     
     // Start queue processing
     this.processQueue();

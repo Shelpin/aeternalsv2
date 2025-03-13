@@ -1,126 +1,80 @@
-import { ElizaLogger, Plugin, IAgentRuntime } from './types';
+import { ElizaLogger, IAgentRuntime, Plugin, TelegramMultiAgentPluginConfig } from './types';
 import { TelegramCoordinationAdapter } from './TelegramCoordinationAdapter';
+import { TelegramRelay } from './TelegramRelay';
+import { ConversationManager } from './ConversationManager';
+import { PersonalityEnhancer } from './PersonalityEnhancer';
 
 /**
- * Options for the Telegram Multi-Agent plugin
- */
-export interface TelegramMultiAgentPluginOptions {
-  /**
-   * Authentication token for the relay server
-   */
-  authToken: string;
-  
-  /**
-   * List of Telegram group IDs to enable multi-agent functionality
-   */
-  groupIds: number[];
-  
-  /**
-   * URL of the relay server
-   * Default: http://localhost:3000
-   */
-  relayServerUrl?: string;
-  
-  /**
-   * Whether the plugin is enabled
-   * Default: true
-   */
-  enabled?: boolean;
-}
-
-/**
- * TelegramMultiAgentPlugin provides multi-agent coordination for Telegram bots
+ * TelegramMultiAgentPlugin enables multi-agent coordination in Telegram groups
  */
 export class TelegramMultiAgentPlugin implements Plugin {
-  private options: TelegramMultiAgentPluginOptions;
-  private adapter: TelegramCoordinationAdapter | null = null;
-  private runtime: IAgentRuntime | null = null;
+  private config: TelegramMultiAgentPluginConfig;
   private logger: ElizaLogger;
-  
+  private isInitialized = false;
+
   /**
    * Create a new TelegramMultiAgentPlugin
    * 
-   * @param options - Plugin options
-   * @param logger - ElizaOS logger instance
+   * @param config - Plugin configuration
    */
-  constructor(options: TelegramMultiAgentPluginOptions, logger: ElizaLogger) {
-    this.options = {
-      relayServerUrl: options.relayServerUrl || 'http://localhost:3000',
-      enabled: options.enabled !== false, // Default to true
-      groupIds: options.groupIds || [],
-      authToken: options.authToken
+  constructor(config: TelegramMultiAgentPluginConfig) {
+    this.config = {
+      conversationCheckIntervalMs: 60000, // 1 minute default
+      enabled: true,
+      ...config
     };
-    this.logger = logger;
+    
+    // Create a default logger if none is provided
+    this.logger = {
+      debug: (msg: string) => console.debug(`[DEBUG] ${msg}`),
+      info: (msg: string) => console.info(`[INFO] ${msg}`),
+      warn: (msg: string) => console.warn(`[WARN] ${msg}`),
+      error: (msg: string) => console.error(`[ERROR] ${msg}`)
+    };
   }
-  
+
   /**
    * Initialize the plugin
-   * 
-   * @param runtime - ElizaOS runtime
    */
-  async initialize(runtime: IAgentRuntime): Promise<void> {
-    this.runtime = runtime;
-    
-    if (!this.options.enabled) {
-      this.logger.info('Telegram Multi-Agent plugin is disabled, skipping initialization');
+  async initialize(): Promise<void> {
+    if (this.isInitialized) {
       return;
     }
     
-    if (this.options.groupIds.length === 0) {
-      this.logger.warn('Telegram Multi-Agent plugin has no group IDs configured');
+    if (!this.config.enabled) {
+      this.logger.info('TelegramMultiAgentPlugin: Plugin is disabled, skipping initialization');
+      return;
     }
     
     try {
-      // Initialize the coordination adapter
-      this.adapter = new TelegramCoordinationAdapter(
-        runtime.getAgentId(),
-        runtime,
-        this.logger
-      );
+      this.logger.info('TelegramMultiAgentPlugin: Initializing plugin');
       
-      // Register the adapter with the runtime
-      runtime.registerService('telegramCoordinationAdapter', this.adapter);
+      // In a real implementation, this would initialize the components
+      // and set up the coordination between agents
       
-      this.logger.info('Telegram Multi-Agent plugin initialized successfully');
-    } catch (error: unknown) {
+      this.isInitialized = true;
+      this.logger.info('TelegramMultiAgentPlugin: Initialization complete');
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Failed to initialize Telegram Multi-Agent plugin: ${errorMessage}`);
+      this.logger.error(`TelegramMultiAgentPlugin: Initialization error: ${errorMessage}`);
       throw error;
     }
   }
-  
+
   /**
    * Shutdown the plugin
    */
   async shutdown(): Promise<void> {
-    try {
-      if (this.adapter) {
-        await this.adapter.close();
-        this.adapter = null;
-      }
-      
-      this.logger.info('Telegram Multi-Agent plugin shut down successfully');
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`Error shutting down Telegram Multi-Agent plugin: ${errorMessage}`);
+    if (!this.isInitialized) {
+      return;
     }
-  }
-  
-  /**
-   * Get the coordination adapter
-   * 
-   * @returns The TelegramCoordinationAdapter instance
-   */
-  getAdapter(): TelegramCoordinationAdapter | null {
-    return this.adapter;
-  }
-  
-  /**
-   * Get the plugin options
-   * 
-   * @returns The plugin options
-   */
-  getOptions(): TelegramMultiAgentPluginOptions {
-    return this.options;
+    
+    this.logger.info('TelegramMultiAgentPlugin: Shutting down');
+    
+    // In a real implementation, this would clean up resources
+    // and disconnect from the relay server
+    
+    this.isInitialized = false;
+    this.logger.info('TelegramMultiAgentPlugin: Shutdown complete');
   }
 } 

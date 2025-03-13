@@ -60,7 +60,14 @@ find_available_port() {
     # Check if this agent had a previous port assignment
     local port_file="${PORT_DIR}/${character}.port"
     if [ -f "$port_file" ]; then
-        previous_port=$(cat "$port_file")
+        # First try to parse with PORT= prefix (new format)
+        if grep -q "^PORT=" "$port_file"; then
+            previous_port=$(grep "^PORT=" "$port_file" | cut -d '=' -f2 | tr -d '[:space:]')
+        else
+            # Fall back to old format (just the number on first line)
+            previous_port=$(head -n 1 "$port_file" | tr -d '[:space:]')
+        fi
+        
         # Validate it's a number
         if [[ "$previous_port" =~ ^[0-9]+$ ]] && [ "$previous_port" -ge "$PORT_RANGE_START" ] && [ "$previous_port" -le "$PORT_RANGE_END" ]; then
             # Check if the previous port is still available
@@ -260,7 +267,7 @@ start_agent() {
     export HTTP_PORT="${port}"
     
     # Save port assignment to file
-    echo "${port}" > "${PORT_DIR}/${character}.port"
+    echo "PORT=${port}" > "${PORT_DIR}/${character}.port"
     chmod 640 "${PORT_DIR}/${character}.port"
     
     # Create empty log file if it doesn't exist
@@ -306,7 +313,8 @@ start_agent() {
         echo "⚠️ Warning: Agent ${character} failed to start properly."
         echo "⚠️ Check logs at $(pwd)/logs/${character}.log"
         rm -f "logs/${character}.pid"
-        rm -f "${PORT_DIR}/${character}.port"
+        # Do not remove the port file - we need to preserve port assignments
+        # rm -f "${PORT_DIR}/${character}.port"
         return 1
     fi
     

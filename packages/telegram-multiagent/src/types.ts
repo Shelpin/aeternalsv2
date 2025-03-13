@@ -1,6 +1,93 @@
 /**
- * Common types and interfaces for the telegram-multiagent package
+ * Common types for the telegram-multiagent package
  */
+
+// Logger interface
+export interface ElizaLogger {
+  debug(message: string): void;
+  info(message: string): void;
+  warn(message: string): void;
+  error(message: string): void;
+}
+
+// Agent runtime interface
+export interface IAgentRuntime {
+  registerPlugin(plugin: any): boolean;
+  getAgentId?(): string;
+  getService?(name: string): any;
+}
+
+// Plugin interface
+export interface Plugin {
+  initialize(): Promise<void>;
+  shutdown(): Promise<void>;
+}
+
+// Personality traits
+export interface PersonalityTraits {
+  verbosity: number;
+  formality: number;
+  positivity: number;
+  responseSpeed: number;
+  emoji: number;
+  interruption: number;
+  topicDrift: number;
+  questionFrequency: number;
+}
+
+// Personality voice
+export interface PersonalityVoice {
+  voicePatterns: string[];
+  commonEmojis: string[];
+  slang: string[];
+}
+
+// Message status
+export enum MessageStatus {
+  PENDING = 'pending',
+  SENT = 'sent',
+  FAILED = 'failed'
+}
+
+// Relay message
+export interface RelayMessage {
+  message_id: number;
+  from: {
+    id: number;
+    is_bot: boolean;
+    first_name: string;
+    username: string;
+  };
+  chat: {
+    id: number;
+    type: string;
+    title: string;
+  };
+  date: number;
+  text: string;
+  sender_agent_id?: string;
+}
+
+// Telegram relay configuration
+export interface TelegramRelayConfig {
+  relayServerUrl: string;
+  authToken: string;
+  agentId: string;
+  retryLimit?: number;
+  retryDelayMs?: number;
+}
+
+// Conversation state
+export type ConversationState = 'inactive' | 'starting' | 'active' | 'ending';
+
+// Follow-up type
+export enum FollowUpType {
+  QUESTION = 'question',
+  AGREEMENT = 'agreement',
+  DISAGREEMENT = 'disagreement',
+  ELABORATION = 'elaboration',
+  CHANGE_TOPIC = 'change_topic'
+}
 
 /**
  * Runtime interface for accessing ElizaOS core services
@@ -40,14 +127,6 @@ export interface Character {
 }
 
 /**
- * Plugin interface for ElizaOS plugin system
- */
-export interface Plugin {
-  initialize(runtime: IAgentRuntime): Promise<void>;
-  shutdown(): Promise<void>;
-}
-
-/**
  * Runtime interface for ElizaOS core
  */
 export interface Runtime {
@@ -55,14 +134,4 @@ export interface Runtime {
   registerService(name: string, service: any): void;
   getService(name: string): any;
   start(): Promise<void>;
-}
-
-/**
- * ElizaLogger interface for logging
- */
-export interface ElizaLogger {
-  debug(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
 } 

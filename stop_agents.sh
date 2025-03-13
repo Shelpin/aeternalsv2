@@ -85,7 +85,8 @@ cleanup_agent_resources() {
         # Security: Validate port is numeric
         if ! [[ "$port" =~ ^[0-9]+$ ]]; then
             echo "  - Warning: Invalid port value in port file for $character" >&2
-            rm -f "$port_file"
+            # Do not remove the port file - we want to preserve it
+            # rm -f "$port_file"
             return 1
         fi
         
@@ -111,7 +112,7 @@ cleanup_agent_resources() {
                 echo "  - Port $port successfully freed"
             fi
         fi
-        rm -f "$port_file"
+        # rm -f "$port_file"
     fi
 }
 
@@ -268,6 +269,7 @@ if [ "$PORTS_ONLY" = true ]; then
             continue
         fi
         
+        echo "🧹 Checking port $port..."
         local port_pids
         port_pids=$(lsof -i:"$port" -t 2>/dev/null)
         if [ -n "$port_pids" ]; then
@@ -378,3 +380,25 @@ fi
 
 echo "✅ All agents stopped"
 echo "📊 View agent operations log: cat $LOG_DIR/agent_operations.log"
+
+cleanup_agent_files() {
+    local character="$1"
+    
+    # Security: Validate character name
+    if ! [[ "$character" =~ ^[a-zA-Z0-9_]+$ ]]; then
+        echo "⚠️ Invalid character name format: $character" >&2
+        return 1
+    fi
+    
+    # Remove PID file and message cache
+    local pid_file="${LOG_DIR}/${character}.pid"
+    if [ -f "$pid_file" ]; then
+        rm -f "$pid_file"
+    fi
+    
+    # Keep the port file intact - DO NOT remove it
+    # local port_file="${PORT_DIR}/${character}.port"
+    # if [ -f "$port_file" ]; then
+    #     rm -f "$port_file"
+    # fi
+}

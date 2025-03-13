@@ -33,6 +33,7 @@ export class PersonalityEnhancer {
   private traits: PersonalityTraits;
   private voice: PersonalityVoice;
   private logger: ElizaLogger;
+  private interests: string[];
   
   // Default traits for agent personalities
   private defaultTraits = {
@@ -45,32 +46,73 @@ export class PersonalityEnhancer {
   };
   
   /**
-   * Create a new PersonalityEnhancer
-   * 
-   * @param agentId - ID of the agent
-   * @param runtime - ElizaOS runtime
-   * @param logger - Logger instance
+   * Constructor overloads for PersonalityEnhancer
    */
-  constructor(agentId: string, runtime: IAgentRuntime, logger: ElizaLogger) {
-    this.agentId = agentId;
-    this.runtime = runtime;
-    this.logger = logger;
-    
-    // Try to get character info from ElizaOS
+  constructor(config: {
+    agentId: string;
+    primary: string[];
+    secondary: string[];
+    interests: string[];
+  });
+  constructor(agentId: string, runtime: IAgentRuntime, logger: ElizaLogger);
+  constructor(agentIdOrConfig: string | {
+    agentId: string;
+    primary: string[];
+    secondary: string[];
+    interests: string[];
+  }, runtime?: IAgentRuntime, logger?: ElizaLogger) {
     try {
-      this.character = runtime.getCharacter();
-    } catch (error: unknown) {
+      // Handle different parameter formats
+      if (typeof agentIdOrConfig === 'string') {
+        this.agentId = agentIdOrConfig;
+        this.logger = logger || {
+          debug: console.debug,
+          info: console.info,
+          warn: console.warn,
+          error: console.error
+        };
+      } else {
+        // Object parameter format
+        this.agentId = agentIdOrConfig.agentId;
+        this.traits = this.getDefaultTraits();
+        
+        // Override with provided traits
+        if (agentIdOrConfig.primary && agentIdOrConfig.primary.length) {
+          this.applyTraitsFromPersonality(agentIdOrConfig.primary, 0.7);
+        }
+        
+        if (agentIdOrConfig.secondary && agentIdOrConfig.secondary.length) {
+          this.applyTraitsFromPersonality(agentIdOrConfig.secondary, 0.4);
+        }
+        
+        this.interests = agentIdOrConfig.interests || [];
+        
+        this.logger = {
+          debug: console.debug,
+          info: console.info,
+          warn: console.warn,
+          error: console.error
+        };
+      }
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`PersonalityEnhancer: Could not get character info: ${errorMessage}`);
+      console.error(`PersonalityEnhancer initialization error: ${errorMessage}`);
+      
+      // Set defaults
+      this.agentId = typeof agentIdOrConfig === 'string' ? agentIdOrConfig : 
+                    (agentIdOrConfig as any)?.agentId || 'unknown';
+      this.traits = this.getDefaultTraits();
+      this.interests = [];
+      this.logger = {
+        debug: console.debug,
+        info: console.info,
+        warn: console.warn,
+        error: console.error
+      };
     }
     
-    // Set personality traits
-    this.traits = this.extractTraitsFromCharacter();
-    
-    // Set voice patterns
-    this.voice = this.loadPersonalityVoice();
-    
-    this.logger.debug(`PersonalityEnhancer: Initialized for ${agentId}`);
+    // Initialize
+    this.loadPersonalityVoice();
   }
   
   /**
