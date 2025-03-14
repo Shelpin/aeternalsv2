@@ -121,10 +121,15 @@ check_port_health() {
     
     # Security: Validate content of port file
     local expected_port
-    expected_port=$(cat "$port_file")
+    if grep -q "^PORT=" "$port_file"; then
+        expected_port=$(grep "^PORT=" "$port_file" | cut -d'=' -f2 | tr -d '[:space:]')
+    else
+        expected_port=$(head -n 1 "$port_file" | tr -d '[:space:]')
+    fi
+    
     if ! [[ "$expected_port" =~ ^[0-9]+$ ]]; then
         echo "${RED}Invalid port value in port file${NC}"
-        return
+        return 1
     fi
     
     # Get actual port from process - improved for Node.js processes
@@ -263,6 +268,130 @@ check_telegram_connection() {
     echo "${YELLOW}No Telegram connection info found${NC}"
 }
 
+# Function to check relay server connection
+check_relay_connection() {
+    local character="$1"
+    local log_file="$LOG_DIR/${character}.log"
+    
+    if [ ! -f "$log_file" ]; then
+        echo "${RED}No log file found${NC}"
+        return
+    fi
+    
+    # Get the relay server URL and port from .env file
+    local relay_url=""
+    local relay_port=""
+    if [ -f .env ]; then
+        # Source the .env file in a subshell to avoid variable leakage
+        relay_url=$(
+            set -a
+            # shellcheck source=/dev/null
+            source .env
+            set +a
+            echo "${RELAY_SERVER_URL:-}"
+        )
+        relay_port=$(
+            set -a
+            # shellcheck source=/dev/null
+            source .env
+            set +a
+            echo "${RELAY_AUTH_TOKEN:-}"
+        )
+    fi
+    
+    # Look for relay server connection in logs
+    local relay_info
+    relay_info=$(grep -m 1 "Connecting to relay server" "$log_file" | tail -n 1)
+    
+    # Look for successful registrations with relay server
+    local registration_info
+    registration_info=$(grep -m 1 "registered with relay server" "$log_file" | tail -n 1)
+    
+    # Look for heartbeats to relay server
+    local recent_heartbeat
+    recent_heartbeat=$(grep "Sending heartbeat to relay" "$log_file" | tail -n 1)
+    local heartbeat_time=""
+    if [ -n "$recent_heartbeat" ]; then
+        # Extract timestamp from log entry
+        heartbeat_time=$(echo "$recent_heartbeat" | grep -o "\[[0-9-]* [0-9:]*\]" | tr -d '[]')
+        if [ -n "$heartbeat_time" ]; then
+            # Calculate time difference
+            local heartbeat_seconds
+            heartbeat_seconds=$(date -d "$heartbeat_time" +%s 2>/dev/null)
+            local current_seconds
+            current_seconds=$(date +%s)
+            local time_diff=$((current_seconds - heartbeat_seconds))
+            
+            if [ "$time_diff" -lt 300 ]; then # Less than 5 minutes
+                registration_info="Recent heartbeat detected (${time_diff}s ago)"
+            fi
+        fi
+    fi
+    
+    # Look for connection errors
+    local connection_error
+    connection_error=$(grep "Error connecting to relay server\|failed to register with relay" "$log_file" | tail -n 1)
+    
+    # Extract relay port from URL if present
+    local relay_port=""
+    if [[ "$relay_url" =~ :[0-9]+$ ]]; then
+        relay_port=$(echo "$relay_url" | grep -o ':[0-9]*' | cut -d':' -f2)
+    elif [[ "$relay_url" =~ ^http ]]; then
+        # Default ports
+        if [[ "$relay_url" =~ ^https ]]; then
+            relay_port="443"
+        else
+            relay_port="80"  # Default for HTTP
+        fi
+    fi
+    
+    # Check for network connectivity to relay server
+    local relay_reachable=false
+    if [ -n "$relay_url" ]; then
+        # Extract hostname from URL
+        local relay_host
+        relay_host=$(echo "$relay_url" | sed -e 's|^[^/]*//||' -e 's|/.*$||' -e 's|:.*$||')
+        
+        # Try to connect to the relay server
+        if [ -n "$relay_port" ] && nc -z -w2 "$relay_host" "$relay_port" 2>/dev/null; then
+            relay_reachable=true
+        fi
+    fi
+    
+    # Display connection status
+    if [ -n "$registration_info" ]; then
+        echo "${GREEN}Connected to relay server: $registration_info${NC}"
+    elif [ -n "$relay_info" ]; then
+        if [ "$relay_reachable" = true ]; then
+            echo "${YELLOW}Attempted connection to relay server, status unknown${NC}"
+        else
+            echo "${RED}Attempted connection but relay server appears unreachable${NC}"
+        fi
+    elif [ -n "$connection_error" ]; then
+        echo "${RED}Relay server connection error: ${connection_error}${NC}"
+    else
+        if [ "$relay_reachable" = true ]; then
+            echo "${YELLOW}No relay server connection info found, but relay server is reachable${NC}"
+        else
+            echo "${RED}No relay server connection info found and server appears unreachable${NC}"
+        fi
+    fi
+    
+    # Check if the agent is registered in the relay server
+    if [ -n "$relay_url" ]; then
+        local health_check
+        health_check=$(curl -s "${relay_url}/health" 2>/dev/null)
+        if [ -n "$health_check" ]; then
+            # Parse connected agents list
+            if echo "$health_check" | grep -q "$character"; then
+                echo "${GREEN}Agent appears in relay server's connected agents list${NC}"
+            else
+                echo "${YELLOW}Agent not found in relay server's connected agents list${NC}"
+            fi
+        fi
+    fi
+}
+
 # Function to check recent agent activity
 check_agent_activity() {
     local character="$1"
@@ -379,6 +508,11 @@ check_agent_health() {
         check_telegram_connection "$character"
         printf "\n"
         
+        # Relay server connection
+        printf "%-25s%-10s" "" ""
+        check_relay_connection "$character"
+        printf "\n"
+        
         # Agent activity
         check_agent_activity "$character"
         printf "\n"
@@ -389,6 +523,148 @@ check_agent_health() {
         printf "${RED}%-10s${NC}" "STOPPED"
         printf "PID file exists (PID: %s) but process is not running\n" "$pid"
         return 1
+    fi
+}
+
+# Function to check relay server status
+check_relay_server_status() {
+    echo -e "\n${YELLOW}=== Relay Server Status ===${NC}"
+    
+    # Get the relay server URL and port from .env file
+    local relay_url=""
+    local relay_auth=""
+    if [ -f .env ]; then
+        # Source the .env file in a subshell to avoid variable leakage
+        relay_url=$(
+            set -a
+            # shellcheck source=/dev/null
+            source .env
+            set +a
+            echo "${RELAY_SERVER_URL:-}"
+        )
+        relay_auth=$(
+            set -a
+            # shellcheck source=/dev/null
+            source .env
+            set +a
+            echo "${RELAY_AUTH_TOKEN:-}"
+        )
+    fi
+    
+    if [ -z "$relay_url" ]; then
+        echo -e "${RED}❌ Relay server URL not configured in .env file${NC}"
+        return 1
+    fi
+    
+    echo -e "${BLUE}Relay Server URL:${NC} $relay_url"
+    
+    # Extract port from URL if present
+    local relay_port=""
+    if [[ "$relay_url" =~ :[0-9]+(/|$) ]]; then
+        relay_port=$(echo "$relay_url" | sed -E 's/.*:([0-9]+)(\/.*)?$/\1/')
+    elif [[ "$relay_url" =~ ^https?:// ]]; then
+        # Default ports
+        if [[ "$relay_url" =~ ^https:// ]]; then
+            relay_port="443"
+        else
+            relay_port="80"  # Default for HTTP
+        fi
+    fi
+    
+    if [ -n "$relay_port" ]; then
+        if [[ "$relay_url" =~ ^https?:// ]] && [[ ! "$relay_url" =~ :[0-9]+ ]]; then
+            echo -e "${BLUE}Relay Server Port:${NC} $relay_port (default)"
+        else
+            echo -e "${BLUE}Relay Server Port:${NC} $relay_port"
+        fi
+    fi
+    
+    if [ -n "$relay_auth" ]; then
+        echo -e "${BLUE}Authentication:${NC} $(mask_token "$relay_auth")"
+    fi
+    
+    # Extract hostname from URL
+    local relay_host=""
+    if [[ "$relay_url" =~ ^https?:// ]]; then
+        relay_host=$(echo "$relay_url" | sed -E 's|^https?://([^:/]+)(:[0-9]+)?(\/.*)?$|\1|')
+    else
+        relay_host="$relay_url"  # Assume it's just a hostname
+    fi
+    
+    # If it's localhost, also check 127.0.0.1
+    local is_localhost=false
+    if [[ "$relay_host" == "localhost" ]]; then
+        is_localhost=true
+    fi
+    
+    # Check if the relay server is running
+    if [ -n "$relay_host" ]; then
+        if [ -n "$relay_port" ] && (nc -z -w2 "$relay_host" "$relay_port" 2>/dev/null || ($is_localhost && nc -z -w2 "127.0.0.1" "$relay_port" 2>/dev/null)); then
+            echo -e "${GREEN}✅ Relay server is reachable${NC}"
+            
+            # Try to get health information
+            local health_check
+            health_check=$(curl -s "${relay_url}/health" 2>/dev/null)
+            if [ -n "$health_check" ]; then
+                # Extract information from health check response
+                local uptime
+                uptime=$(echo "$health_check" | grep -o '"uptime":[0-9.]*' | cut -d':' -f2)
+                local agent_count
+                agent_count=$(echo "$health_check" | grep -o '"agents":[0-9]*' | cut -d':' -f2)
+                local agents_list
+                agents_list=$(echo "$health_check" | grep -o '"agents_list":"[^"]*"' | cut -d':' -f2 | tr -d '"')
+                
+                if [ -n "$uptime" ]; then
+                    # Format uptime nicely without bc
+                    if [ "${uptime%.*}" -lt 60 ]; then
+                        echo -e "${BLUE}Uptime:${NC} ${uptime} seconds"
+                    elif [ "${uptime%.*}" -lt 3600 ]; then
+                        # Minutes calculation without bc
+                        local minutes=$((${uptime%.*} / 60))
+                        echo -e "${BLUE}Uptime:${NC} $minutes minutes"
+                    else
+                        # Hours calculation without bc
+                        local hours=$((${uptime%.*} / 3600))
+                        echo -e "${BLUE}Uptime:${NC} $hours hours"
+                    fi
+                fi
+                
+                if [ -n "$agent_count" ]; then
+                    echo -e "${BLUE}Connected Agents:${NC} $agent_count"
+                    if [ -n "$agents_list" ]; then
+                        echo -e "${BLUE}Agent List:${NC} $agents_list"
+                    fi
+                fi
+                
+                # Check for any process running the relay server
+                local relay_pid
+                relay_pid=$(pgrep -f "node.*relay-server" | head -1)
+                if [ -n "$relay_pid" ]; then
+                    local relay_memory
+                    relay_memory=$(ps -o rss= -p "$relay_pid" | awk '{printf "%.1f", $1/1024}')
+                    local relay_cpu
+                    relay_cpu=$(ps -o %cpu= -p "$relay_pid")
+                    echo -e "${BLUE}Server Process:${NC} PID: $relay_pid, Memory: ${relay_memory}MB, CPU: ${relay_cpu}%"
+                fi
+            else
+                echo -e "${YELLOW}⚠️ Relay server is reachable but health check failed${NC}"
+            fi
+        else
+            echo -e "${RED}❌ Relay server is not reachable${NC}"
+            
+            # Check if the relay server process is running locally
+            local relay_pid
+            relay_pid=$(pgrep -f "node.*relay-server" | head -1)
+            if [ -n "$relay_pid" ]; then
+                echo -e "${YELLOW}⚠️ Relay server process is running (PID: $relay_pid) but not responding${NC}"
+                echo -e "${GRAY}  Recommended fix: Restart the relay server with './relay-server/start-relay.sh'${NC}"
+            else
+                echo -e "${RED}❌ No relay server process found${NC}"
+                echo -e "${GRAY}  Recommended fix: Start the relay server with './relay-server/start-relay.sh'${NC}"
+            fi
+        fi
+    else
+        echo -e "${RED}❌ Could not determine relay server hostname from URL${NC}"
     fi
 }
 
@@ -423,7 +699,12 @@ show_system_status() {
         local port_file="${PORT_DIR}/${character}.port"
         if [ -f "$port_file" ]; then
             local port
-            port=$(cat "$port_file")
+            if grep -q "^PORT=" "$port_file"; then
+                port=$(grep "^PORT=" "$port_file" | cut -d'=' -f2 | tr -d '[:space:]')
+            else
+                port=$(head -n 1 "$port_file" | tr -d '[:space:]')
+            fi
+            
             # Security: Validate port number
             if ! [[ "$port" =~ ^[0-9]+$ ]]; then
                 echo -e "  - ${character}: ${RED}Invalid port value${NC}"
@@ -441,6 +722,9 @@ show_system_status() {
             echo -e "  - ${character}: No port assigned"
         fi
     done
+    
+    # Check relay server status
+    check_relay_server_status
 }
 
 # Function to watch logs in real-time for multiple agents
@@ -649,6 +933,7 @@ show_usage() {
     echo "  -w, --watch    Watch logs in real-time (for all if no agent specified)"
     echo "  -a, --activity Watch only activity-related logs (messages, commands, etc.)"
     echo "  -S, --security Perform security checks on the setup"
+    echo "  -r, --relay    Check relay server status"
     echo "Available agents:"
     for agent in "${!AGENTS[@]}"; do
         echo "  - $agent"
@@ -660,6 +945,7 @@ show_usage() {
     echo "  $0 -w                      # Watch logs for all agents in real-time"
     echo "  $0 -w -a bitcoin_maxi_420  # Watch only activity logs for BitcoinMaxi"
     echo "  $0 -S                      # Perform security checks"
+    echo "  $0 -r                      # Check relay server status"
 }
 
 # Process options
@@ -669,6 +955,7 @@ SHOW_SYSTEM=false
 SECURITY_CHECK=false
 WATCH_LOGS=false
 ACTIVITY_ONLY=false
+CHECK_RELAY=false
 WATCH_AGENTS=()
 
 while [[ "${1:-}" =~ ^- ]]; do
@@ -695,6 +982,10 @@ while [[ "${1:-}" =~ ^- ]]; do
             ;;
         -a|--activity)
             ACTIVITY_ONLY=true
+            shift
+            ;;
+        -r|--relay)
+            CHECK_RELAY=true
             shift
             ;;
         -w|--watch)
@@ -732,6 +1023,12 @@ command -v lsof >/dev/null 2>&1 || { echo "❌ Error: lsof is required but not i
 # Security check mode
 if [ "$SECURITY_CHECK" = true ]; then
     security_check
+    exit 0
+fi
+
+# Check relay server only mode
+if [ "$CHECK_RELAY" = true ]; then
+    check_relay_server_status
     exit 0
 fi
 
@@ -810,6 +1107,7 @@ echo "- View activity logs: $0 -w -a"
 echo "- View logs for specific agent: $0 -w bitcoin_maxi_420"
 echo "- View error logs: $0 -e -l"
 echo "- View system status: $0 -s"
+echo "- Check relay server status: $0 -r"
 echo "- Check security: $0 -S"
 echo "- Stop agents: ./stop_agents.sh"
 echo "- Restart agents: ./stop_agents.sh && ./start_agents.sh"

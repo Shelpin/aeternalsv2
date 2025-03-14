@@ -13,8 +13,10 @@ export interface ElizaLogger {
 // Agent runtime interface
 export interface IAgentRuntime {
   registerPlugin(plugin: any): boolean;
-  getAgentId?(): string;
-  getService?(name: string): any;
+  getAgentId(): string;
+  getService(name: string): any;
+  registerService?(name: string, service: any): void;
+  getCharacter?(): Character;
 }
 
 // Plugin interface
@@ -87,16 +89,6 @@ export enum FollowUpType {
   DISAGREEMENT = 'disagreement',
   ELABORATION = 'elaboration',
   CHANGE_TOPIC = 'change_topic'
-}
-
-/**
- * Runtime interface for accessing ElizaOS core services
- */
-export interface IAgentRuntime {
-  getService(name: string): any;
-  getAgentId(): string;
-  registerService(name: string, service: any): void;
-  getCharacter(): Character;
 }
 
 /**

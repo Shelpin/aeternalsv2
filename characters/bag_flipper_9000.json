@@ -4,7 +4,8 @@
     "plugins": [
         "@elizaos-plugins/plugin-coingecko",
         "@elizaos-plugins/plugin-giphy",
-        "@elizaos-plugins/client-telegram"
+        "@elizaos-plugins/client-telegram",
+        "@elizaos/telegram-multiagent"
     ],
     "clients": ["@elizaos-plugins/client-telegram"],
     "modelProvider": "deepseek",

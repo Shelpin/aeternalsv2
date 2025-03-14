@@ -475,15 +475,35 @@ export class AgentRuntime implements IAgentRuntime {
             }
         }
 
-        // should already be initiailized
-        /*
+        // Initialize plugins
         for (const plugin of this.plugins) {
-            if (plugin.services)
-                await Promise.all(
-                    plugin.services?.map((service) => service.initialize(this)),
+            try {
+                console.log(`Attempting to initialize plugin: ${plugin.name}`);
+                if (plugin.initialize) {
+                    console.log(`Plugin ${plugin.name} has initialize method, calling it...`);
+                    await plugin.initialize();
+                    elizaLogger.success(
+                        `${this.character.name}(${this.agentId}) - Plugin ${plugin.name} initialized successfully`
+                    );
+                } else {
+                    console.log(`Plugin ${plugin.name} does not have initialize method`);
+                }
+                
+                if (plugin.services) {
+                    await Promise.all(
+                        plugin.services?.map((service) => service.initialize(this)),
+                    );
+                }
+            } catch (error) {
+                console.log(`Error initializing plugin ${plugin.name}:`, error);
+                elizaLogger.error(
+                    `${this.character.name}(${this.agentId}) - Failed to initialize plugin ${plugin.name}:`,
+                    error
                 );
+                // Don't throw error for plugin initialization failures
+                // to allow the agent to continue running
+            }
         }
-        */
 
         if (
             this.character &&

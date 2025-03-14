@@ -196,7 +196,7 @@ export class PersonalityEnhancer {
       });
     }
     
-    this.logger.debug(`PersonalityEnhancer: Extracted traits for ${this.agentId}:`, traits);
+    this.logger.debug(`PersonalityEnhancer: Extracted traits for ${this.agentId}: ${JSON.stringify(traits)}`);
     return traits;
   }
   
@@ -814,5 +814,60 @@ export class PersonalityEnhancer {
    */
   getTraits(): PersonalityTraits {
     return this.traits;
+  }
+  
+  /**
+   * Applies traits from a personality to this enhancer
+   * 
+   * @param personality - The personality to apply traits from (string or string[])
+   * @param weight - Weight to apply the traits with (0.0-1.0)
+   */
+  public applyTraitsFromPersonality(personality: string | string[], weight: number = 1.0): void {
+    const personalityStr = Array.isArray(personality) ? personality.join(' ') : personality;
+    this.logger.debug(`PersonalityEnhancer: Applying traits from ${personalityStr} with weight ${weight} for ${this.agentId}`);
+    
+    // Create a simple set of traits from the input
+    const traits = this.getDefaultTraits();
+    
+    // Simple keyword-based trait extraction
+    const text = personalityStr.toLowerCase();
+    
+    // Analyze text for personality indicators
+    if (text.includes('positive') || text.includes('optimistic') || text.includes('cheerful')) {
+      traits.positivity += 0.2;
+    }
+    if (text.includes('negative') || text.includes('pessimistic') || text.includes('critical')) {
+      traits.positivity -= 0.2;
+    }
+    if (text.includes('curious') || text.includes('inquisitive') || text.includes('exploring')) {
+      traits.questionFrequency += 0.2;
+    }
+    if (text.includes('formal') || text.includes('professional') || text.includes('serious')) {
+      traits.formality += 0.2;
+    }
+    if (text.includes('casual') || text.includes('informal') || text.includes('relaxed')) {
+      traits.formality -= 0.2;
+    }
+    if (text.includes('verbose') || text.includes('detailed') || text.includes('thorough')) {
+      traits.verbosity += 0.2;
+    }
+    if (text.includes('brief') || text.includes('concise') || text.includes('short')) {
+      traits.verbosity -= 0.2;
+    }
+    
+    // Apply the traits with the given weight
+    Object.keys(traits).forEach(key => {
+      const traitKey = key as keyof PersonalityTraits;
+      const currentValue = this.traits[traitKey] || 0;
+      const newValue = traits[traitKey] || 0;
+      
+      // Weighted average of the current and new values
+      this.traits[traitKey] = currentValue * (1 - weight) + newValue * weight;
+      
+      // Clamp to 0-1 range
+      this.traits[traitKey] = Math.max(0, Math.min(1, this.traits[traitKey]));
+    });
+    
+    this.logger.debug(`PersonalityEnhancer: Applied traits from ${personalityStr} to ${this.agentId}`);
   }
 } 

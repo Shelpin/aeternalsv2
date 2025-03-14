@@ -24,6 +24,16 @@ declare -A AGENTS=(
     ["linda_evangelista_88"]="TELEGRAM_BOT_TOKEN_LindAEvangelista88"
 )
 
+# Standard port assignments - these are the canonical ports for each agent
+declare -A STANDARD_PORTS=(
+    ["eth_memelord_9000"]=3000
+    ["bag_flipper_9000"]=3001
+    ["linda_evangelista_88"]=3002
+    ["vc_shark_99"]=3003
+    ["bitcoin_maxi_420"]=3004
+    ["code_samurai_77"]=3005
+)
+
 # Security: Function to validate input strings
 validate_input() {
     local input="$1"
@@ -45,59 +55,109 @@ check_port() {
         return 1
     fi
     
-    if lsof -i:"$port" -t >/dev/null 2>&1; then
-        return 1
-    else
-        return 0
+    # Check if port is already assigned and in a port file
+    for port_file in "$PORT_DIR"/*.port; do
+        if [ -f "$port_file" ]; then
+            local assigned_port=""
+            if grep -q "^PORT=" "$port_file"; then
+                assigned_port=$(grep "^PORT=" "$port_file" | cut -d'=' -f2 | tr -d '[:space:]')
+            else
+                assigned_port=$(head -n 1 "$port_file" | tr -d '[:space:]')
+            fi
+            
+            # Skip if not a number
+            if ! [[ "$assigned_port" =~ ^[0-9]+$ ]]; then
+                continue
+            fi
+            
+            # If this port is already assigned in a different port file
+            if [ "$assigned_port" = "$port" ] && [[ "$port_file" != *"$2.port" ]]; then
+                return 1  # Port is assigned to a different agent
+            fi
+        fi
+    done
+    
+    # Check if port is in use by any process
+    if lsof -i :"$port" > /dev/null 2>&1; then
+        return 1  # Port is in use
     fi
+    
+    return 0  # Port is available
 }
 
 # Function to find the next available port
 find_available_port() {
     local character="$1"
-    local previous_port=0
     
-    # Check if this agent had a previous port assignment
-    local port_file="${PORT_DIR}/${character}.port"
-    if [ -f "$port_file" ]; then
-        # First try to parse with PORT= prefix (new format)
-        if grep -q "^PORT=" "$port_file"; then
-            previous_port=$(grep "^PORT=" "$port_file" | cut -d '=' -f2 | tr -d '[:space:]')
+    # First priority: Check the standard assigned port for this agent
+    local standard_port="${STANDARD_PORTS[$character]}"
+    if check_port "$standard_port" "$character"; then
+        echo "🔄 Using standard port $standard_port for $character" >&2
+        echo "$standard_port"
+        return 0
+    else
+        # Check what process is using the standard port
+        local using_pid=$(lsof -i :"$standard_port" -t)
+        if [ -n "$using_pid" ]; then
+            echo "⚠️ Standard port $standard_port for $character is in use by PID $using_pid" >&2
+            
+            # Check if it's another agent
+            for other_character in "${!STANDARD_PORTS[@]}"; do
+                if [ "$other_character" != "$character" ] && [ -f "$LOG_DIR/${other_character}.pid" ]; then
+                    local other_pid=$(cat "$LOG_DIR/${other_character}.pid")
+                    if [ "$other_pid" = "$using_pid" ]; then
+                        echo "⚠️ Port $standard_port is being used by $other_character" >&2
+                        echo "⚠️ Will attempt to reclaim port by first stopping $other_character" >&2
+                        
+                        # Try to stop the other agent to reclaim our port
+                        if [ -f "./stop_agents.sh" ]; then
+                            echo "🛑 Stopping $other_character to reclaim port $standard_port..." >&2
+                            ./stop_agents.sh "$other_character"
+                            sleep 2
+                            
+                            # Check if port is now available
+                            if check_port "$standard_port" "$character"; then
+                                echo "✅ Successfully reclaimed port $standard_port for $character" >&2
+                                echo "$standard_port"
+                                return 0
+                            fi
+                        fi
+                    fi
+                fi
+            done
+        fi
+    fi
+    
+    # Second priority: Check if the port in the port file is available
+    if [ -f "${PORT_DIR}/${character}.port" ]; then
+        local previous_port=""
+        if grep -q "^PORT=" "${PORT_DIR}/${character}.port"; then
+            previous_port=$(grep "^PORT=" "${PORT_DIR}/${character}.port" | cut -d'=' -f2 | tr -d '[:space:]')
         else
-            # Fall back to old format (just the number on first line)
-            previous_port=$(head -n 1 "$port_file" | tr -d '[:space:]')
+            previous_port=$(head -n 1 "${PORT_DIR}/${character}.port" | tr -d '[:space:]')
         fi
         
-        # Validate it's a number
-        if [[ "$previous_port" =~ ^[0-9]+$ ]] && [ "$previous_port" -ge "$PORT_RANGE_START" ] && [ "$previous_port" -le "$PORT_RANGE_END" ]; then
-            # Check if the previous port is still available
-            if check_port "$previous_port"; then
+        # Security: Validate port number
+        if [[ "$previous_port" =~ ^[0-9]+$ ]]; then
+            if check_port "$previous_port" "$character"; then
                 echo "🔄 Reusing previous port $previous_port for $character" >&2
                 echo "$previous_port"
                 return 0
             else
                 echo "⚠️ Previous port $previous_port for $character is now in use by another process" >&2
-                # Try to identify what is using the port
-                local port_pid
-                port_pid=$(lsof -i:"$previous_port" -t 2>/dev/null)
-                if [ -n "$port_pid" ]; then
-                    local process_name
-                    process_name=$(ps -p "$port_pid" -o comm= 2>/dev/null)
-                    echo "   Port $previous_port is being used by process $port_pid ($process_name)" >&2
+                local using_pid=$(lsof -i :"$previous_port" -t)
+                if [ -n "$using_pid" ]; then
+                    echo "   Port $previous_port is being used by process $using_pid ($(ps -p "$using_pid" -o comm=))" >&2
                 fi
             fi
         else
-            echo "⚠️ Invalid previous port $previous_port in port file for $character" >&2
+            echo "⚠️ Invalid port value in port file for $character" >&2
         fi
     fi
     
-    # Always try to assign a deterministic port for this agent based on its position in the AGENTS array
-    # This helps ensure the same agent gets the same port in a fresh start
-    local agent_position=0
-    local total_agents=${#AGENTS[@]}
+    # Third priority: Check the standard assigned port range
     local i=0
-    
-    for agent in "${!AGENTS[@]}"; do
+    for agent in "${!STANDARD_PORTS[@]}"; do
         if [ "$agent" = "$character" ]; then
             agent_position=$i
             break
@@ -105,21 +165,12 @@ find_available_port() {
         ((i++))
     done
     
-    # Calculate preferred port based on agent position
-    local preferred_port=$((PORT_RANGE_START + agent_position))
-    
-    # Check if preferred port is available
-    if [ "$preferred_port" -ge "$PORT_RANGE_START" ] && [ "$preferred_port" -le "$PORT_RANGE_END" ]; then
-        if check_port "$preferred_port"; then
-            echo "🔄 Using preferred port $preferred_port for $character" >&2
-            echo "$preferred_port"
-            return 0
-        else
-            echo "⚠️ Preferred port $preferred_port for $character is already in use" >&2
-        fi
+    # If the standard port is in use, warn about it
+    if [ "$standard_port" -ge "$PORT_RANGE_START" ] && [ "$standard_port" -le "$PORT_RANGE_END" ]; then
+        echo "⚠️ Preferred port $standard_port for $character is already in use" >&2
     fi
     
-    # If previous or preferred port is not available, find a new one
+    # As a last resort, find any available port
     # Start from the beginning of the range
     for port in $(seq $PORT_RANGE_START $PORT_RANGE_END); do
         # Security: Validate port number
@@ -127,7 +178,20 @@ find_available_port() {
             continue
         fi
         
-        if check_port "$port"; then
+        # Skip ports assigned to other agents
+        local skip=0
+        for other_character in "${!STANDARD_PORTS[@]}"; do
+            if [ "$other_character" != "$character" ] && [ "${STANDARD_PORTS[$other_character]}" = "$port" ]; then
+                skip=1
+                break
+            fi
+        done
+        
+        if [ "$skip" -eq 1 ]; then
+            continue
+        fi
+        
+        if check_port "$port" "$character"; then
             echo "🔄 Assigning new port $port for $character" >&2
             echo "$port"
             return 0
@@ -265,6 +329,9 @@ start_agent() {
     # Export variables (only in this process, not leaked to environment)
     export TELEGRAM_BOT_TOKEN="${token_value}"
     export HTTP_PORT="${port}"
+    export RELAY_SERVER_URL="http://localhost:4000"
+    export RELAY_AUTH_TOKEN="elizaos-secure-relay-key"
+    export AGENT_ID="${character}"
     
     # Save port assignment to file, preserving JSON content if it exists
     if grep -q "^{" "${PORT_DIR}/${character}.port" 2>/dev/null; then
@@ -291,6 +358,7 @@ start_agent() {
         --isRoot \
         --characters="characters/${character}.json" \
         --clients=@elizaos-plugins/client-telegram \
+        --plugins=@elizaos/telegram-multiagent \
         --update-env \
         --log-level=debug \
         --port="${port}" >> "logs/${character}.log" 2>&1 &

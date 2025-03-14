@@ -79,8 +79,13 @@ cleanup_agent_resources() {
     
     # Clean up port file
     if [ -f "$port_file" ]; then
+        # Extract port number from file (either direct number or PORT=XXXX format)
         local port
-        port=$(cat "$port_file")
+        if grep -q "^PORT=" "$port_file"; then
+            port=$(grep "^PORT=" "$port_file" | cut -d'=' -f2 | tr -d '[:space:]')
+        else
+            port=$(head -n 1 "$port_file" | tr -d '[:space:]')
+        fi
         
         # Security: Validate port is numeric
         if ! [[ "$port" =~ ^[0-9]+$ ]]; then

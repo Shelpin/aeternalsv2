@@ -677,6 +677,12 @@ export type Plugin = {
 
     /** Optional adapters */
     adapters?: Adapter[];
+    
+    /** Optional initialize method */
+    initialize?: () => Promise<void>;
+    
+    /** Optional shutdown method */
+    shutdown?: () => Promise<void>;
 
     /** Optional post charactor processor handler */
     handlePostCharacterLoaded?: (char: Character) => Promise<Character>;
