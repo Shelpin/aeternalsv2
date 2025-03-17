@@ -1,5 +1,8 @@
 import { IAgentRuntime, ElizaLogger } from './types';
 import { PersonalityEnhancer } from './PersonalityEnhancer';
+import { SqliteDatabaseAdapter } from './SqliteAdapterProxy';
+import { telegramMultiAgentSchema } from './schema';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Conversation status enum
@@ -54,12 +57,20 @@ export interface Message {
  * Topic data structure
  */
 export interface Topic {
-  id: string;
+  id?: string;
   name: string;
   keywords: string[];
-  relevanceScore: number;
   lastDiscussed: number;
   agentInterest: Record<string, number>;
+  
+  // Additional fields for database storage
+  groupId?: string;
+  title?: string;
+  description?: string;
+  status?: string;
+  priority?: number;
+  scheduledFor?: number;
+  initiatorId?: string;
 }
 
 /**
@@ -96,6 +107,7 @@ export class TelegramCoordinationAdapter {
   private availabilityCutoffMs = 10 * 60 * 1000; // 10 minutes
   private lastBroadcastTime = 0;
   private readonly broadcastIntervalMs = 60000; // Every minute
+  private db: SqliteDatabaseAdapter | null = null;
   
   /**
    * Create a new TelegramCoordinationAdapter
@@ -103,11 +115,18 @@ export class TelegramCoordinationAdapter {
    * @param agentId - ID of the agent
    * @param runtime - ElizaOS runtime
    * @param logger - Logger instance
+   * @param dbAdapter - Optional SQLite database adapter
    */
-  constructor(agentId: string, runtime: IAgentRuntime, logger: ElizaLogger) {
+  constructor(
+    agentId: string,
+    runtime: IAgentRuntime,
+    logger: ElizaLogger,
+    dbAdapter?: SqliteDatabaseAdapter
+  ) {
     this.agentId = agentId;
     this.runtime = runtime;
     this.logger = logger;
+    this.db = dbAdapter || null;
     
     // Initialize availability
     this.knownAgents[agentId] = {
@@ -124,10 +143,79 @@ export class TelegramCoordinationAdapter {
   }
   
   /**
+   * Helper method to safely execute SQL queries
+   * @param sql SQL query string with placeholders
+   * @param params Parameters for the SQL query
+   * @returns Query result
+   */
+  private execSQL<T>(sql: string, params: any[] = []): T | undefined {
+    if (!this.db) return undefined;
+    
+    try {
+      const stmt = this.db.db.prepare(sql);
+      // We'll use a typed function that accepts a spread of parameters
+      // This avoids the "Expected 1 arguments, but got 2" error
+      return stmt.get(...params) as T;
+    } catch (error) {
+      this.logger.error(`SQL Error: ${error.toString()}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      return undefined;
+    }
+  }
+
+  /**
+   * Helper method to safely execute SQL queries that return multiple rows
+   * @param sql SQL query string with placeholders
+   * @param params Parameters for the SQL query
+   * @returns Array of query results
+   */
+  private execSQLAll<T>(sql: string, params: any[] = []): T[] {
+    if (!this.db) return [];
+    
+    try {
+      const stmt = this.db.db.prepare(sql);
+      // We'll use a typed function that accepts a spread of parameters
+      return stmt.all(...params) as T[];
+    } catch (error) {
+      this.logger.error(`SQL Error: ${error.toString()}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      return [];
+    }
+  }
+
+  /**
+   * Helper method to safely execute SQL queries with no return value
+   * @param sql SQL query string with placeholders
+   * @param params Parameters for the SQL query
+   * @returns Query result
+   */
+  private execSQLRun(sql: string, params: any[] = []): { changes: number } {
+    if (!this.db) return { changes: 0 };
+    
+    try {
+      const stmt = this.db.db.prepare(sql);
+      // We'll use a typed function that accepts a spread of parameters
+      return stmt.run(...params);
+    } catch (error) {
+      this.logger.error(`SQL Error: ${error.toString()}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      return { changes: 0 };
+    }
+  }
+  
+  /**
    * Initialize the adapter and database
    */
   public async initialize(): Promise<void> {
-    // This method is now empty as the database is no longer used
+    if (this.db) {
+      try {
+        // Initialize the database with Telegram-specific schema
+        this.db.db.exec(telegramMultiAgentSchema);
+        this.logger.info('TelegramCoordinationAdapter: Database initialized successfully');
+      } catch (error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to initialize database', error);
+        throw error;
+      }
+    } else {
+      this.logger.warn('TelegramCoordinationAdapter: No database adapter provided, operating in memory-only mode');
+    }
   }
   
   /**
@@ -137,8 +225,57 @@ export class TelegramCoordinationAdapter {
    * @returns The created conversation ID
    */
   public async createConversation(conversation: Omit<Conversation, 'participants'>): Promise<string> {
-    // This method is now empty as the database is no longer used
-    return conversation.id;
+    if (!this.db) {
+      return conversation.id;
+    }
+    
+    try {
+      const conversationId = conversation.id || uuidv4();
+      
+      // Insert topic first
+      const topicId = uuidv4();
+      const topic = {
+        topic_id: topicId,
+        group_id: conversation.groupId,
+        title: conversation.topic,
+        description: `Conversation: ${conversation.topic}`,
+        status: conversation.status.toLowerCase(),
+        priority: 5, // Default priority
+        created_at: new Date(conversation.startedAt).toISOString(),
+        scheduled_for: null,
+        started_at: new Date(conversation.startedAt).toISOString(),
+        completed_at: conversation.endedAt ? new Date(conversation.endedAt).toISOString() : null,
+        initiator_agent_id: conversation.initiatedBy
+      };
+      
+      const insertTopicSql = `
+        INSERT INTO conversation_topics (
+          topic_id, group_id, title, description, status, 
+          priority, created_at, scheduled_for, started_at, 
+          completed_at, initiator_agent_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.execSQLRun(insertTopicSql, [
+        topic.topic_id,
+        topic.group_id,
+        topic.title,
+        topic.description,
+        topic.status,
+        topic.priority,
+        topic.created_at,
+        topic.scheduled_for,
+        topic.started_at,
+        topic.completed_at,
+        topic.initiator_agent_id
+      ]);
+      
+      this.logger.info(`TelegramCoordinationAdapter: Created conversation with topic ID ${topicId}`);
+      return conversationId;
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to create conversation', error);
+      return conversation.id;
+    }
   }
   
   /**
@@ -148,7 +285,52 @@ export class TelegramCoordinationAdapter {
    * @param participant - Participant data
    */
   public async addParticipant(conversationId: string, participant: ConversationParticipant): Promise<void> {
-    // This method is now empty as the database is no longer used
+    if (!this.db) {
+      return;
+    }
+    
+    try {
+      // Find the topic_id for this conversation 
+      const topicQuery = `
+        SELECT topic_id FROM conversation_topics 
+        WHERE title LIKE ? OR topic_id = ?
+      `;
+      const topicResult = this.execSQL<{ topic_id: string }>(topicQuery, [
+        `%${conversationId}%`,
+        conversationId
+      ]);
+      
+      if (!topicResult) {
+        this.logger.warn(`TelegramCoordinationAdapter: Cannot find topic for conversation ${conversationId}`);
+        return;
+      }
+      
+      const topicId = topicResult.topic_id;
+      
+      // Add participant to conversation
+      const participantId = uuidv4();
+      const insertParticipantSql = `
+        INSERT INTO agent_conversation_participants (
+          participation_id, agent_id, topic_id, role,
+          invitation_status, invited_at, joined_at, left_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      this.execSQLRun(insertParticipantSql, [
+        participantId,
+        participant.agentId,
+        topicId,
+        'PARTICIPANT',
+        'ACCEPTED',
+        new Date().toISOString(),
+        new Date(participant.joinedAt).toISOString(),
+        participant.leftAt ? new Date(participant.leftAt).toISOString() : null
+      ]);
+      
+      this.logger.info(`TelegramCoordinationAdapter: Added participant ${participant.agentId} to conversation ${conversationId}`);
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to add participant', error);
+    }
   }
   
   /**
@@ -172,7 +354,76 @@ export class TelegramCoordinationAdapter {
    * @param message - Message data
    */
   public async recordMessage(message: Message): Promise<void> {
-    // This method is now empty as the database is no longer used
+    if (!this.db) {
+      return;
+    }
+    
+    try {
+      // Find the topic_id and group_id for this conversation
+      const topicQuery = `
+        SELECT topic_id, group_id FROM conversation_topics 
+        WHERE title LIKE ? OR topic_id = ?
+      `;
+      const topicResult = this.execSQL<{ topic_id: string, group_id: string }>(topicQuery, [
+        `%${message.conversationId}%`,
+        message.conversationId
+      ]);
+      
+      if (!topicResult) {
+        this.logger.warn(`TelegramCoordinationAdapter: Cannot find topic for conversation ${message.conversationId}`);
+        return;
+      }
+      
+      // Record the message
+      const insertMessageSql = `
+        INSERT INTO agent_message_history (
+          message_id, agent_id, group_id, topic_id,
+          content, sent_at, is_to_human, is_from_human, recipient_agent_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      const isFromHuman = message.senderId.startsWith('human_') ? 1 : 0;
+      const isToHuman = message.receiverId?.startsWith('human_') ? 1 : 0;
+      
+      this.execSQLRun(insertMessageSql, [
+        message.id,
+        message.senderId,
+        topicResult.group_id,
+        topicResult.topic_id,
+        message.content,
+        new Date(message.sentAt).toISOString(),
+        isToHuman,
+        isFromHuman,
+        message.receiverId || null
+      ]);
+      
+      // Update message metrics
+      const updateMetricsSql = `
+        INSERT OR IGNORE INTO conversation_message_metrics (
+          metric_id, topic_id, timestamp, total_messages, 
+          human_messages, agent_messages, engagement_score
+        ) VALUES (?, ?, date('now'), 1, ?, ?, 0)
+        ON CONFLICT(metric_id) DO UPDATE SET
+          total_messages = total_messages + 1,
+          human_messages = human_messages + ?,
+          agent_messages = agent_messages + ?
+      `;
+      
+      const metricId = `${topicResult.topic_id}_${new Date().toISOString().split('T')[0]}`;
+      
+      this.execSQLRun(updateMetricsSql, [
+        metricId,
+        topicResult.topic_id,
+        isFromHuman,
+        isFromHuman ? 0 : 1,
+        isFromHuman,
+        isFromHuman ? 0 : 1
+      ]);
+      
+      this.logger.info(`TelegramCoordinationAdapter: Recorded message ${message.id} in conversation ${message.conversationId}`);
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to record message', error);
+    }
   }
   
   /**
@@ -182,7 +433,32 @@ export class TelegramCoordinationAdapter {
    * @param endedAt - Timestamp when the conversation ended
    */
   public async endConversation(conversationId: string, endedAt: number): Promise<void> {
-    // This method is now empty as the database is no longer used
+    if (!this.db) {
+      return;
+    }
+    
+    try {
+      // Update the conversation topic status to completed
+      const updateTopicSql = `
+        UPDATE conversation_topics
+        SET status = 'COMPLETED', completed_at = ?
+        WHERE title LIKE ? OR topic_id = ?
+      `;
+      
+      const result = this.execSQLRun(updateTopicSql, [
+        new Date(endedAt).toISOString(),
+        `%${conversationId}%`,
+        conversationId
+      ]);
+      
+      if (result.changes === 0) {
+        this.logger.warn(`TelegramCoordinationAdapter: No conversation found with ID ${conversationId}`);
+      } else {
+        this.logger.info(`TelegramCoordinationAdapter: Ended conversation ${conversationId}`);
+      }
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to end conversation', error);
+    }
   }
   
   /**
@@ -192,8 +468,73 @@ export class TelegramCoordinationAdapter {
    * @returns Conversation data with participants
    */
   public async getConversation(conversationId: string): Promise<Conversation | null> {
-    // This method is now empty as the database is no longer used
-    return null;
+    if (!this.db) {
+      return null;
+    }
+    
+    try {
+      // Get the conversation topic
+      const topicQuery = `
+        SELECT * FROM conversation_topics 
+        WHERE title LIKE ? OR topic_id = ?
+      `;
+      
+      const topic = this.execSQL<any>(topicQuery, [
+        `%${conversationId}%`,
+        conversationId
+      ]);
+      
+      if (!topic) {
+        return null;
+      }
+      
+      // Get conversation participants
+      const participantsQuery = `
+        SELECT p.*, COUNT(m.message_id) as message_count, MAX(m.sent_at) as last_active
+        FROM agent_conversation_participants p
+        LEFT JOIN agent_message_history m ON p.agent_id = m.agent_id AND p.topic_id = m.topic_id
+        WHERE p.topic_id = ?
+        GROUP BY p.agent_id
+      `;
+      
+      const participants = this.execSQLAll<any>(participantsQuery, [topic.topic_id]);
+      
+      // Get message count
+      const messageCountQuery = `
+        SELECT COUNT(*) as count FROM agent_message_history
+        WHERE topic_id = ?
+      `;
+      
+      const messageCountResult = this.execSQL<{ count: number }>(messageCountQuery, [topic.topic_id]);
+      
+      if (!messageCountResult) {
+        return null;
+      }
+      
+      // Map database entities to Conversation interface
+      const conversation: Conversation = {
+        id: conversationId,
+        groupId: topic.group_id,
+        status: topic.status.toUpperCase() as ConversationStatus,
+        startedAt: new Date(topic.started_at).getTime(),
+        endedAt: topic.completed_at ? new Date(topic.completed_at).getTime() : undefined,
+        initiatedBy: topic.initiator_agent_id,
+        topic: topic.title,
+        messageCount: messageCountResult.count,
+        participants: participants.map(p => ({
+          agentId: p.agent_id,
+          joinedAt: new Date(p.joined_at).getTime(),
+          leftAt: p.left_at ? new Date(p.left_at).getTime() : undefined,
+          messageCount: p.message_count || 0,
+          lastActive: p.last_active ? new Date(p.last_active).getTime() : new Date(p.joined_at).getTime()
+        }))
+      };
+      
+      return conversation;
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to get conversation', error);
+      return null;
+    }
   }
   
   /**
@@ -203,8 +544,77 @@ export class TelegramCoordinationAdapter {
    * @returns Array of active conversations
    */
   public async getActiveConversations(groupId: string): Promise<Conversation[]> {
-    // This method is now empty as the database is no longer used
-    return [];
+    if (!this.db) {
+      return [];
+    }
+    
+    try {
+      // Get active topics for the group
+      const topicsQuery = `
+        SELECT * FROM conversation_topics 
+        WHERE group_id = ? AND status = 'ACTIVE'
+      `;
+      
+      const topics = this.execSQLAll<any>(topicsQuery, [groupId]);
+      
+      if (topics.length === 0) {
+        return [];
+      }
+      
+      // Build conversations from topics
+      const conversations: Conversation[] = [];
+      
+      for (const topic of topics) {
+        // Get conversation participants
+        const participantsQuery = `
+          SELECT p.*, COUNT(m.message_id) as message_count, MAX(m.sent_at) as last_active
+          FROM agent_conversation_participants p
+          LEFT JOIN agent_message_history m ON p.agent_id = m.agent_id AND p.topic_id = m.topic_id
+          WHERE p.topic_id = ?
+          GROUP BY p.agent_id
+        `;
+        
+        const participants = this.execSQLAll<any>(participantsQuery, [topic.topic_id]);
+        
+        // Get message count
+        const messageCountQuery = `
+          SELECT COUNT(*) as count FROM agent_message_history
+          WHERE topic_id = ?
+        `;
+        
+        const messageCountResult = this.execSQL<{ count: number }>(messageCountQuery, [topic.topic_id]);
+        
+        if (!messageCountResult) {
+          continue;
+        }
+        
+        // Map database entities to Conversation interface
+        const conversation: Conversation = {
+          id: topic.topic_id,
+          groupId: topic.group_id,
+          status: topic.status.toUpperCase() as ConversationStatus,
+          startedAt: new Date(topic.started_at).getTime(),
+          endedAt: topic.completed_at ? new Date(topic.completed_at).getTime() : undefined,
+          initiatedBy: topic.initiator_agent_id,
+          topic: topic.title,
+          messageCount: messageCountResult.count,
+          participants: participants.map(p => ({
+            agentId: p.agent_id,
+            joinedAt: new Date(p.joined_at).getTime(),
+            leftAt: p.left_at ? new Date(p.left_at).getTime() : undefined,
+            messageCount: p.message_count || 0,
+            lastActive: p.last_active ? new Date(p.last_active).getTime() : new Date(p.joined_at).getTime()
+          }))
+        };
+        
+        conversations.push(conversation);
+      }
+      
+      return conversations;
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to get active conversations', error);
+      return [];
+    }
   }
   
   /**
@@ -215,8 +625,57 @@ export class TelegramCoordinationAdapter {
    * @returns Array of recent messages
    */
   public async getRecentMessages(conversationId: string, limit: number = 10): Promise<Message[]> {
-    // This method is now empty as the database is no longer used
-    return [];
+    if (!this.db) {
+      return [];
+    }
+    
+    try {
+      // Find the topic_id for this conversation
+      const topicQuery = `
+        SELECT topic_id FROM conversation_topics 
+        WHERE title LIKE ? OR topic_id = ?
+      `;
+      
+      const topicResult = this.execSQL<{ topic_id: string }>(topicQuery, [
+        `%${conversationId}%`,
+        conversationId
+      ]);
+      
+      if (!topicResult) {
+        return [];
+      }
+      
+      // Get recent messages
+      const messagesQuery = `
+        SELECT m.*, 
+               (SELECT COUNT(*) FROM agent_message_history 
+                WHERE reply_to_message_id = m.message_id) as has_replies
+        FROM agent_message_history m
+        WHERE m.topic_id = ?
+        ORDER BY m.sent_at DESC
+        LIMIT ?
+      `;
+      
+      const messages = this.execSQLAll<any>(messagesQuery, [
+        topicResult.topic_id,
+        limit
+      ]);
+      
+      // Map database records to Message interface
+      return messages.map(m => ({
+        id: m.message_id,
+        conversationId: conversationId,
+        senderId: m.agent_id,
+        receiverId: m.recipient_agent_id,
+        content: m.content,
+        sentAt: new Date(m.sent_at).getTime(),
+        isFollowUp: m.has_replies > 0,
+        replyToId: m.reply_to_message_id
+      })).reverse(); // Return in chronological order
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to get recent messages', error);
+      return [];
+    }
   }
   
   /**
@@ -225,7 +684,70 @@ export class TelegramCoordinationAdapter {
    * @param topic - Topic data
    */
   public async upsertTopic(topic: Topic): Promise<void> {
-    // This method is now empty as the database is no longer used
+    if (!this.db) {
+      return;
+    }
+    
+    try {
+      const topicId = topic.id || uuidv4();
+      
+      // Check if topic exists
+      const existingTopicQuery = `
+        SELECT topic_id FROM conversation_topics 
+        WHERE topic_id = ? OR title = ?
+      `;
+      
+      const existingTopic = this.execSQL<{ topic_id: string }>(existingTopicQuery, [
+        topicId,
+        topic.title || topic.name // Use title if available, otherwise use name
+      ]);
+      
+      if (existingTopic) {
+        // Update existing topic
+        const updateTopicSql = `
+          UPDATE conversation_topics
+          SET title = ?, description = ?, status = ?, priority = ?,
+              scheduled_for = ?, initiator_agent_id = ?
+          WHERE topic_id = ?
+        `;
+        
+        this.execSQLRun(updateTopicSql, [
+          topic.title || topic.name,
+          topic.description || null,
+          topic.status || 'PENDING',
+          topic.priority || 5,
+          topic.scheduledFor ? new Date(topic.scheduledFor).toISOString() : null,
+          topic.initiatorId || null,
+          existingTopic.topic_id
+        ]);
+        
+        this.logger.info(`TelegramCoordinationAdapter: Updated topic ${existingTopic.topic_id}`);
+      } else {
+        // Insert new topic
+        const insertTopicSql = `
+          INSERT INTO conversation_topics (
+            topic_id, group_id, title, description, status,
+            priority, created_at, scheduled_for, initiator_agent_id
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+        
+        this.execSQLRun(insertTopicSql, [
+          topicId,
+          topic.groupId || '',
+          topic.title || topic.name,
+          topic.description || null,
+          topic.status || 'PENDING',
+          topic.priority || 5,
+          new Date().toISOString(),
+          topic.scheduledFor ? new Date(topic.scheduledFor).toISOString() : null,
+          topic.initiatorId || null
+        ]);
+        
+        this.logger.info(`TelegramCoordinationAdapter: Created new topic ${topicId}`);
+      }
+    } catch (error) {
+      this.logger.error('TelegramCoordinationAdapter: Failed to upsert topic', error);
+    }
   }
   
   /**
@@ -270,7 +792,8 @@ export class TelegramCoordinationAdapter {
    * Close the database connection
    */
   public async close(): Promise<void> {
-    // This method is now empty as the database is no longer used
+    // No need to close the connection here as the db adapter is managed externally
+    this.logger.info('TelegramCoordinationAdapter: Resources released');
   }
   
   /**

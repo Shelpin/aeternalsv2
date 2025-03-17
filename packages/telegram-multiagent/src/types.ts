@@ -4,10 +4,10 @@
 
 // Logger interface
 export interface ElizaLogger {
-  debug(message: string): void;
-  info(message: string): void;
-  warn(message: string): void;
-  error(message: string): void;
+  debug(message: string, ...args: any[]): void;
+  info(message: string, ...args: any[]): void;
+  warn(message: string, ...args: any[]): void;
+  error(message: string, ...args: any[]): void;
 }
 
 // Agent runtime interface

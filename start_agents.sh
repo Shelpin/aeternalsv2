@@ -34,6 +34,10 @@ declare -A STANDARD_PORTS=(
     ["code_samurai_77"]=3005
 )
 
+# Configure Telegram group IDs
+export TELEGRAM_GROUP_IDS="-1002550618173"
+echo "Setting TELEGRAM_GROUP_IDS=${TELEGRAM_GROUP_IDS}"
+
 # Security: Function to validate input strings
 validate_input() {
     local input="$1"

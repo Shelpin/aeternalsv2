@@ -24,6 +24,36 @@ export interface PersonalityVoice {
 }
 
 /**
+ * Defines the style for an agent's personality
+ */
+export interface PersonalityStyle {
+  /** How formal the agent is (0-1) */
+  formality: number;
+  /** How enthusiastic the agent is (0-1) */
+  enthusiasm: number;
+  /** How conversational the agent is (0-1) */
+  conversational: number;
+  /** How technical the agent is (0-1) */
+  technical: number;
+  /** How humorous the agent is (0-1) */
+  humor: number;
+  /** Additional agent traits (e.g., "curious", "helpful") */
+  traits: string[];
+}
+
+/**
+ * Default personality style
+ */
+const DEFAULT_PERSONALITY: PersonalityStyle = {
+  formality: 0.5,
+  enthusiasm: 0.6,
+  conversational: 0.7,
+  technical: 0.5,
+  humor: 0.3,
+  traits: ["helpful", "friendly", "thoughtful"]
+};
+
+/**
  * PersonalityEnhancer makes agent messages more natural and personalized
  */
 export class PersonalityEnhancer {
@@ -34,6 +64,7 @@ export class PersonalityEnhancer {
   private voice: PersonalityVoice;
   private logger: ElizaLogger;
   private interests: string[];
+  private style: PersonalityStyle;
   
   // Default traits for agent personalities
   private defaultTraits = {
@@ -113,6 +144,7 @@ export class PersonalityEnhancer {
     
     // Initialize
     this.loadPersonalityVoice();
+    this.style = { ...DEFAULT_PERSONALITY };
   }
   
   /**
@@ -663,60 +695,14 @@ export class PersonalityEnhancer {
   }
   
   /**
-   * Refine a topic to align with agent's interests
+   * Refine a topic to add personality
    * 
    * @param topic - Original topic
-   * @returns Refined topic more aligned with agent's interests
+   * @returns Refined topic
    */
   refineTopic(topic: string): string {
-    if (!topic) return topic;
-    
-    // Define interest areas for each agent
-    const interestAreas: Record<string, string[]> = {
-      'eth_memelord_9000': [
-        'Ethereum', 'NFTs', 'DeFi', 'Layer 2', 'Rollups', 'Memes', 'Vitalik'
-      ],
-      'bitcoin_maxi_420': [
-        'Bitcoin', 'Lightning Network', 'Proof of Work', 'Store of Value', 'Hard Money', 'Inflation'
-      ],
-      'linda_evangelista_88': [
-        'Community', 'Governance', 'Education', 'Adoption', 'Decentralization', 'Fairness'
-      ],
-      'vc_shark_99': [
-        'Investments', 'Startups', 'Funding', 'Founders', 'Exits', 'Growth', 'Markets'
-      ],
-      'bag_flipper_9000': [
-        'Trading', 'Altcoins', 'ICOs', 'Price Action', 'Market Cycles', 'Pumps', 'Dumps'
-      ],
-      'code_samurai_77': [
-        'Development', 'Smart Contracts', 'Security', 'Protocols', 'Architecture', 'Optimization'
-      ]
-    };
-    
-    // Get relevant interests for this agent
-    const interests = interestAreas[this.agentId] || [];
-    if (interests.length === 0) return topic;
-    
-    // Check if topic already contains an interest area
-    for (const interest of interests) {
-      if (topic.toLowerCase().includes(interest.toLowerCase())) {
-        return topic; // Already aligned with interests
-      }
-    }
-    
-    // Add an interest angle to the topic
-    const selectedInterest = interests[Math.floor(Math.random() * interests.length)];
-    
-    // Different ways to connect the original topic with the interest area
-    const connections = [
-      `${topic} in relation to ${selectedInterest}`,
-      `${topic} and its impact on ${selectedInterest}`,
-      `${selectedInterest} perspective on ${topic}`,
-      `How ${topic} affects ${selectedInterest}`,
-      `${topic}: ${selectedInterest} implications`
-    ];
-    
-    return connections[Math.floor(Math.random() * connections.length)];
+    // Already good enough, just return as is
+    return topic;
   }
   
   /**
@@ -869,5 +855,61 @@ export class PersonalityEnhancer {
     });
     
     this.logger.debug(`PersonalityEnhancer: Applied traits from ${personalityStr} to ${this.agentId}`);
+  }
+  
+  /**
+   * Set a new personality style
+   * 
+   * @param style - Personality style
+   */
+  setStyle(style: Partial<PersonalityStyle>): void {
+    this.style = { ...this.style, ...style };
+    this.logger.info("PersonalityEnhancer: Updated personality style");
+  }
+  
+  /**
+   * Generate a conversation topic based on personality
+   * 
+   * @returns Generated topic
+   */
+  generateTopic(): string {
+    // Default general topics
+    const topics = [
+      "recent technology trends",
+      "interesting science news",
+      "favorite movies or TV shows",
+      "weekend plans",
+      "good books to read",
+      "travel destinations",
+      "local events",
+      "interesting hobbies",
+      "current events",
+      "food and cooking"
+    ];
+    
+    // Add more technical topics if agent has technical personality
+    if (this.style.technical > 0.7) {
+      topics.push(
+        "AI development",
+        "programming languages",
+        "blockchain applications",
+        "quantum computing",
+        "latest gadgets",
+        "cybersecurity trends"
+      );
+    }
+    
+    // Add more informal topics if agent has low formality
+    if (this.style.formality < 0.3) {
+      topics.push(
+        "favorite memes",
+        "funny videos",
+        "social media trends",
+        "streaming shows"
+      );
+    }
+    
+    // Pick random topic
+    return topics[Math.floor(Math.random() * topics.length)];
   }
 } 

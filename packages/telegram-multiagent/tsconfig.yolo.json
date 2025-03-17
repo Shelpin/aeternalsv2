@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmitOnError": false,
+    "noImplicitAny": false,
+    "strictNullChecks": false,
+    "strict": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": false,
+    "allowUnreachableCode": true,
+    "allowUnusedLabels": true,
+    "suppressExcessPropertyErrors": true,
+    "suppressImplicitAnyIndexErrors": true
+  }
+}

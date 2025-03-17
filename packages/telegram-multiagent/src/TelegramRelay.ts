@@ -45,9 +45,13 @@ export class TelegramRelay {
   private connected: boolean = false;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
+  private updatePollingInterval: ReturnType<typeof setInterval> | null = null;
   private eventHandlers: Record<string, Array<(data: any) => void>> = {};
   private lastPingTime = 0;
   private pingIntervalMs = 30000; // 30 seconds
+  private updatePollingMs = 1000; // Poll for updates every second
+  private lastUpdateId = 0; // Track the last update ID we've processed
+  private messageHandler: ((message: any) => void) | null = null;
   
   /**
    * Constructor overloads for TelegramRelay
@@ -75,7 +79,11 @@ export class TelegramRelay {
     this.processingQueue = false;
     this.reconnectTimeout = null;
     this.pingInterval = null;
+    this.updatePollingInterval = null;
+    this.messageHandler = null;
+    this.lastUpdateId = 0;
     this.pingIntervalMs = 30000; // 30 seconds
+    this.updatePollingMs = 1000; // Poll for updates every second
     
     // Start queue processing
     this.processQueue();
@@ -112,6 +120,11 @@ export class TelegramRelay {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
+    }
+    
+    if (this.updatePollingInterval) {
+      clearInterval(this.updatePollingInterval);
+      this.updatePollingInterval = null;
     }
   }
   
@@ -213,6 +226,10 @@ export class TelegramRelay {
       
       this.connected = true;
       console.log(`[RELAY_CONNECT] TelegramRelay: Connection established successfully`);
+      
+      // Start polling for updates
+      this.startUpdatePolling();
+      
       return true;
     } catch (error) {
       console.error(`[RELAY_CONNECT] TelegramRelay: Connection error: ${error.message}`);
@@ -484,5 +501,116 @@ export class TelegramRelay {
    */
   isConnected(): boolean {
     return this.connected;
+  }
+  
+  /**
+   * Start polling for updates from the relay server
+   */
+  private startUpdatePolling(): void {
+    if (this.updatePollingInterval) {
+      clearInterval(this.updatePollingInterval);
+    }
+    
+    this.updatePollingInterval = setInterval(() => {
+      this.pollForUpdates();
+    }, this.updatePollingMs);
+    
+    this.logger.info(`TelegramRelay: Started polling for updates every ${this.updatePollingMs}ms`);
+  }
+  
+  /**
+   * Poll for updates from the relay server
+   */
+  private async pollForUpdates(): Promise<void> {
+    if (!this.connected) {
+      return;
+    }
+    
+    try {
+      const response = await fetch(
+        `${this.config.relayServerUrl}/getUpdates?agent_id=${encodeURIComponent(this.config.agentId)}&token=${encodeURIComponent(this.config.authToken)}&offset=${this.lastUpdateId}`,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        this.logger.error(`TelegramRelay: Failed to get updates: ${response.status} ${response.statusText}`);
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        this.logger.error(`TelegramRelay: Update request failed: ${data.error || 'Unknown error'}`);
+        return;
+      }
+      
+      const messages = data.messages || [];
+      
+      if (messages.length > 0) {
+        this.logger.debug(`TelegramRelay: Received ${messages.length} new messages`);
+        
+        // Update last update ID to only get newer messages next time
+        const maxUpdateId = Math.max(...messages.map((msg: any) => msg.update_id));
+        this.lastUpdateId = maxUpdateId + 1;
+        
+        // Process each message
+        for (const message of messages) {
+          // Handle different message types
+          if (message.message) {
+            // This is a chat message
+            this.handleIncomingMessage(message.message);
+          } else if (message.agent_updates) {
+            // This is an agent status update
+            for (const update of message.agent_updates) {
+              this.emit('agentStatus', update);
+            }
+          }
+        }
+      }
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`TelegramRelay: Error polling for updates: ${errorMessage}`);
+    }
+  }
+  
+  /**
+   * Handle an incoming message from the relay server
+   */
+  private handleIncomingMessage(message: any): void {
+    // Transform the message to a standardized format
+    const standardizedMessage = {
+      id: message.message_id,
+      groupId: message.chat?.id?.toString(),
+      content: message.text,
+      from: message.from,
+      date: message.date,
+      sender_agent_id: message.sender_agent_id
+    };
+    
+    // Call the message handler if one is registered
+    if (this.messageHandler) {
+      try {
+        this.messageHandler(standardizedMessage);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger.error(`TelegramRelay: Error in message handler: ${errorMessage}`);
+      }
+    }
+    
+    // Also emit a message event
+    this.emit('message', standardizedMessage);
+  }
+  
+  /**
+   * Register a handler for incoming messages
+   */
+  onMessage(handler: (message: any) => void): void {
+    this.messageHandler = handler;
+    this.logger.info('TelegramRelay: Registered message handler');
   }
 } 

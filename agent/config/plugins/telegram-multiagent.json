@@ -4,6 +4,17 @@
   "groupIds": [-1002550618173],
   "conversationCheckIntervalMs": 30000,
   "enabled": true,
+  "useSqliteAdapter": true,
+  "dbPath": "/root/eliza/agent/data/telegram-multiagent.sqlite",
+  "kickstarterConfig": {
+    "minInterval": 30000,
+    "maxInterval": 60000,
+    "probabilityFactor": 1.0,
+    "maxActiveConversationsPerGroup": 2,
+    "shouldTagAgents": true,
+    "maxAgentsToTag": 2,
+    "persistConversations": true
+  },
   "typingSimulation": {
     "enabled": true,
     "baseTypingSpeedCPM": 300,

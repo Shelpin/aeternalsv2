@@ -4,8 +4,44 @@ import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin';
 // Debug log to understand module loading
 console.log('[DEBUG] telegram-multiagent index.ts is being evaluated');
 
-// Create singleton instance early
-const pluginInstance = new TelegramMultiAgentPlugin({});
+// Define KickstarterConfig locally to avoid import issues
+interface KickstarterConfig {
+  minInterval: number;
+  maxInterval: number;
+  probabilityFactor: number;
+  maxActiveConversationsPerGroup: number;
+  shouldTagAgents: boolean;
+  maxAgentsToTag: number;
+  persistConversations: boolean;
+}
+
+// Plugin configuration options
+export interface TelegramMultiAgentPluginConfig {
+  relayServerUrl: string;
+  authToken: string;
+  groupIds: number[];
+  conversationCheckIntervalMs?: number;
+  enabled?: boolean;
+  // SQLite adapter options
+  useSqliteAdapter?: boolean;
+  dbPath?: string;
+  // Kickstarter configuration
+  kickstarterConfig?: Partial<KickstarterConfig>;
+}
+
+// Create plugin instance with explicit configuration
+let pluginConfig = {
+  relayServerUrl: process.env.RELAY_SERVER_URL || 'http://localhost:4000',
+  authToken: process.env.RELAY_AUTH_TOKEN || 'elizaos-secure-relay-key',
+  agentId: process.env.AGENT_ID,
+  groupIds: [],
+  enabled: true,
+  useSqliteAdapter: process.env.USE_SQLITE === 'true' || true,
+  dbPath: process.env.SQLITE_DB_PATH || ':memory:'
+};
+
+// Create plugin instance
+const pluginInstance = new TelegramMultiAgentPlugin(pluginConfig);
 
 // MODULE-LEVEL PROPERTIES
 // These become accessible as properties of the module itself
@@ -32,18 +68,11 @@ export { TelegramRelay } from './TelegramRelay';
 export { ConversationManager } from './ConversationManager';
 export { PersonalityEnhancer } from './PersonalityEnhancer';
 export { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin';
+export { ConversationKickstarter, KickstarterConfig } from './ConversationKickstarter';
+export { SqliteDatabaseAdapter } from './SqliteAdapterProxy';
 
 // Export types
 export { type ElizaLogger, type Plugin, type IAgentRuntime } from './types';
-
-// Plugin configuration options
-export interface TelegramMultiAgentPluginConfig {
-  relayServerUrl: string;
-  authToken: string;
-  groupIds: number[];
-  conversationCheckIntervalMs?: number;
-  enabled?: boolean;
-}
 
 // Create a formal plugin object
 export const telegramMultiAgentPlugin = {

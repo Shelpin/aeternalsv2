@@ -13,7 +13,8 @@ enum ConversationState {
 }
 
 /**
- * ConversationManager handles starting and managing agent conversations
+ * ConversationManager tracks and manages active conversations
+ * across Telegram groups.
  */
 export class ConversationManager {
   private adapter: TelegramCoordinationAdapter;
@@ -28,6 +29,7 @@ export class ConversationManager {
   private lastMessageTime: number = 0;
   private participants: Set<string> = new Set();
   private logger: ElizaLogger;
+  private activeConversations: Map<string, string> = new Map(); // groupId -> topicName
   
   // Natural conversation parameters
   private MIN_MESSAGES_PER_CONVO = 5;
@@ -43,6 +45,7 @@ export class ConversationManager {
    * @param personality - Personality enhancer
    * @param agentId - ID of the agent
    * @param groupId - Telegram group ID
+   * @param logger - Logger instance
    */
   constructor(
     adapter: TelegramCoordinationAdapter,
@@ -58,36 +61,58 @@ export class ConversationManager {
     this.agentId = agentId;
     this.groupId = groupId;
     this.logger = logger;
+    
+    this.logger.info(`ConversationManager: Initialized for agent ${agentId}`);
   }
   
   /**
-   * Initiate a new conversation with a topic
+   * Initiate a new conversation on a topic
    * 
-   * @param topic - Topic to start conversation about
-   * @returns Conversation ID
+   * @param topic - Topic name
+   * @param groupId - Optional group ID (if undefined, applies to all groups)
    */
-  initiateConversation(topic: string): string {
-    if (this.conversationState !== ConversationState.INACTIVE) {
-      this.logger.warn(`ConversationManager: Already in a conversation state: ${this.conversationState}`);
-      return this.activeConversationId || '';
+  initiateConversation(topic: string, groupId?: string): void {
+    if (groupId) {
+      // Track for specific group
+      this.activeConversations.set(groupId, topic);
+      this.logger.info(`ConversationManager: Initiated conversation on "${topic}" in group ${groupId}`);
+    } else {
+      // Just log but don't track (we need a group ID to track)
+      this.logger.info(`ConversationManager: Initiated conversation on "${topic}" (no specific group)`);
     }
-
-    // Refine topic to align with agent's interests
-    const refinedTopic = this.personality.refineTopic(topic);
-    this.lastTopic = refinedTopic;
-
-    // Generate a new conversation ID
-    const conversationId = generateUUID();
-    this.activeConversationId = conversationId;
-    this.conversationState = ConversationState.STARTING;
-    this.messageCount = 0;
-    this.participants.clear();
-    this.participants.add(this.agentId);
-    this.lastMessageTime = Date.now();
-
-    this.logger.info(`ConversationManager: Initiating conversation ${conversationId} on topic: ${refinedTopic}`);
-
-    return conversationId;
+  }
+  
+  /**
+   * Get the current active conversation topic for a group
+   * 
+   * @param groupId - Group ID
+   * @returns Active topic or undefined if none
+   */
+  getActiveConversation(groupId: string): string | undefined {
+    return this.activeConversations.get(groupId);
+  }
+  
+  /**
+   * End the active conversation for a group
+   * 
+   * @param groupId - Group ID
+   */
+  endConversation(groupId: string): void {
+    if (this.activeConversations.has(groupId)) {
+      const topic = this.activeConversations.get(groupId);
+      this.activeConversations.delete(groupId);
+      this.logger.info(`ConversationManager: Ended conversation on "${topic}" in group ${groupId}`);
+    }
+  }
+  
+  /**
+   * Check if a group has an active conversation
+   * 
+   * @param groupId - Group ID
+   * @returns True if conversation is active
+   */
+  hasActiveConversation(groupId: string): boolean {
+    return this.activeConversations.has(groupId);
   }
   
   /**
@@ -316,33 +341,6 @@ export class ConversationManager {
       this.conversationState = ConversationState.ACTIVE;
       this.logger.debug(`ConversationManager: Conversation ${this.activeConversationId} now active`);
     }
-  }
-  
-  /**
-   * End the current conversation
-   * 
-   * @param sendSignOff - Whether to send a sign-off message
-   * @returns The ended conversation ID
-   */
-  endConversation(sendSignOff: boolean = true): string | null {
-    if (this.conversationState === ConversationState.INACTIVE) {
-      return null;
-    }
-    
-    const conversationId = this.activeConversationId;
-    
-    if (sendSignOff && this.conversationState === ConversationState.ACTIVE) {
-      const signOffMessage = this.generateSignOffMessage(this.lastTopic || '');
-      this.relay.sendMessage(this.groupId, signOffMessage);
-    }
-    
-    // Reset conversation state
-    this.conversationState = ConversationState.INACTIVE;
-    this.activeConversationId = null;
-    
-    this.logger.info(`ConversationManager: Ended conversation ${conversationId}`);
-    
-    return conversationId;
   }
   
   /**
