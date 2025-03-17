@@ -1,34 +1,46 @@
-# 🚀 ElizaOS Telegram Multi-Agent Management System
+# 🚀 Aeternals: Autonomous Telegram Bot Network
 
-A comprehensive toolkit for managing, monitoring, and securing multiple Telegram bot agents in your ElizaOS environment.
+A ground-breaking system that enables multiple AI bots to see and communicate with each other in Telegram groups, overcoming the fundamental Telegram API limitation where bots cannot see other bots' messages. Project supported by the Aeternity Foundation.
 
+![Bot Communication](https://img.shields.io/badge/Bot--to--Bot-Communication-purple)
 ![Agent Management System](https://img.shields.io/badge/Agent%20Management-System-blue)
 ![Security Enhanced](https://img.shields.io/badge/Security-Enhanced-green)
 ![Real-time Monitoring](https://img.shields.io/badge/Monitoring-Real--time-orange)
-![Bot Communication](https://img.shields.io/badge/Bot--to--Bot-Communication-purple)
 
 ## 📚 System Overview
 
-The ElizaOS Multi-Agent Management System provides a robust set of scripts for handling the complete lifecycle of your ElizaOS Telegram agents:
+Aeternals creates the previously impossible: an autonomous network of AI bots that can interact with each other and with humans naturally in Telegram groups. Our system uses a central relay server architecture to bypass Telegram's API limitations, allowing bots to:
+
+- **See each other's messages**: Bots can process and respond to other bots' messages
+- **Make independent decisions**: Each bot autonomously decides whether to ignore or respond
+- **Form natural conversations**: Bots can engage in multi-agent conversations as if they were humans
+- **Maintain persistent context**: All conversation data is stored in SQLite for continuity
+
+Built on ElizaOS, Aeternals provides complete agent lifecycle management:
 
 - **Starting Agents**: Secure launching with consistent port assignment
 - **Stopping Agents**: Clean termination with proper resource cleanup
 - **Monitoring**: Real-time activity tracking and health checks
 - **Security**: Enhanced protection for tokens and system resources
-- **Relay Server**: Cross-bot message visibility overcoming Telegram API limitations
-- **Multi-Agent Conversations**: Natural interactions between bots and humans
 
-This system is designed for users who need to manage multiple agents simultaneously with consistent behavior, high security, and comprehensive monitoring capabilities.
+## 📋 Key Achievements
 
-## 📋 Components
+- ✅ **Bot-to-Bot Visibility**: Successfully implemented relay server enabling bots to see and process each other's messages
+- ✅ **Decision Logic**: Bots can analyze other bots' messages and make IGNORE/RESPOND decisions
+- ✅ **Persistent Storage**: SQLite adapter with file-based storage for conversation continuity
+- ✅ **Flexible Configuration**: Environment variable support for group IDs and secure configuration
+- ✅ **Character Personalization**: Six unique bot personalities with distinct behaviors
+- ⏳ **Conversation Kickstarting**: Framework in place for autonomous conversation initiation
 
-The management system consists of these core components:
+## 📋 Core Components
 
-1. **start_agents.sh** - Launches agents with secure session management
-2. **stop_agents.sh** - Terminates agents and cleans up resources
-3. **monitor_agents.sh** - Provides real-time monitoring and health checks
-4. **Relay Server** - Enables bot-to-bot communication bypassing Telegram API limitations
-5. **TelegramMultiAgentPlugin** - Manages conversation kickstarting and coordination
+The Aeternals system consists of these essential parts:
+
+1. **Relay Server** - Central communication hub enabling cross-bot message visibility
+2. **TelegramMultiAgentPlugin** - Manages conversation coordination and decision-making
+3. **start_agents.sh** - Launches agents with secure session management
+4. **stop_agents.sh** - Terminates agents and cleans up resources
+5. **monitor_agents.sh** - Provides real-time monitoring and health checks
 
 ## 🔧 Technical Features
 
