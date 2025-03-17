@@ -1,11 +1,11 @@
-
-# 🚀 ElizaOS Multi-Agent Management System
+# 🚀 ElizaOS Telegram Multi-Agent Management System
 
 A comprehensive toolkit for managing, monitoring, and securing multiple Telegram bot agents in your ElizaOS environment.
 
 ![Agent Management System](https://img.shields.io/badge/Agent%20Management-System-blue)
 ![Security Enhanced](https://img.shields.io/badge/Security-Enhanced-green)
 ![Real-time Monitoring](https://img.shields.io/badge/Monitoring-Real--time-orange)
+![Bot Communication](https://img.shields.io/badge/Bot--to--Bot-Communication-purple)
 
 ## 📚 System Overview
 
@@ -15,16 +15,20 @@ The ElizaOS Multi-Agent Management System provides a robust set of scripts for h
 - **Stopping Agents**: Clean termination with proper resource cleanup
 - **Monitoring**: Real-time activity tracking and health checks
 - **Security**: Enhanced protection for tokens and system resources
+- **Relay Server**: Cross-bot message visibility overcoming Telegram API limitations
+- **Multi-Agent Conversations**: Natural interactions between bots and humans
 
 This system is designed for users who need to manage multiple agents simultaneously with consistent behavior, high security, and comprehensive monitoring capabilities.
 
 ## 📋 Components
 
-The management system consists of three core scripts:
+The management system consists of these core components:
 
 1. **start_agents.sh** - Launches agents with secure session management
 2. **stop_agents.sh** - Terminates agents and cleans up resources
 3. **monitor_agents.sh** - Provides real-time monitoring and health checks
+4. **Relay Server** - Enables bot-to-bot communication bypassing Telegram API limitations
+5. **TelegramMultiAgentPlugin** - Manages conversation kickstarting and coordination
 
 ## 🔧 Technical Features
 
@@ -38,6 +42,7 @@ The management system consists of three core scripts:
 - **Token Security**: Masks sensitive tokens and properly handles environment variables
 - **Process Management**: Better PID tracking with proper child process handling
 - **Permissions Management**: Applies secure file permissions
+- **Environment Variable Support**: Configures group IDs through `TELEGRAM_GROUP_IDS` environment variable
 
 ```bash
 # Start all agents
@@ -103,6 +108,26 @@ The management system consists of three core scripts:
 ./monitor_agents.sh -S
 ```
 
+### Relay Server System (New)
+
+- **Bot-to-Bot Communication**: Successfully enables bots to see and process each other's messages
+- **Bypass Telegram Limitations**: Overcomes API limitation where bots cannot see other bots' messages
+- **Agent Registration**: Automatic registration of agents with the relay server
+- **Message Routing**: Intelligently routes messages to appropriate agents
+- **Heartbeat Mechanism**: Maintains active connections with periodic checks
+- **Decision Processing**: Allows bots to make IGNORE/RESPOND decisions on other bots' messages
+
+```bash
+# The relay server functionality is built into the system and works automatically
+# when agents are started with the start_agents.sh script
+
+# Check relay server logs for agent registration
+grep -n "register" /root/eliza/logs/relay_server.log | tail -n 20
+
+# Check message relay activity
+grep -n "Received" /root/eliza/logs/bag_flipper_9000.log | tail -n 30
+```
+
 ## 🔒 Security Features
 
 The management system includes extensive security enhancements:
@@ -113,6 +138,7 @@ The management system includes extensive security enhancements:
 - **Permission Management**: Applies and verifies proper file permissions
 - **Audit Capabilities**: Security scanning for potential vulnerabilities
 - **Process Verification**: Ensures processes are properly running and using expected resources
+- **Environment Variable Security**: Properly handles sensitive configuration through environment variables
 
 ## 📊 Monitoring Capabilities
 
@@ -123,6 +149,7 @@ The monitoring system provides comprehensive visibility:
 - **Port Management**: Verify port assignments and detect conflicts
 - **Log Analysis**: Filter logs by activity type or errors
 - **Resource Tracking**: Monitor memory usage, CPU, and runtime statistics
+- **Bot Communication**: Verify successful message relay between bots
 
 ## 📈 Resource Management
 
@@ -133,6 +160,23 @@ The system optimizes resource usage:
 - **Memory Usage**: Tracks and reports memory consumption
 - **CPU Utilization**: Monitors agent CPU usage
 - **State Preservation**: Maintains consistent state across restarts
+- **SQLite Persistence**: Uses file-based SQLite storage at `/root/eliza/agent/data/telegram-multiagent.sqlite`
+
+## 🚀 Current Status
+
+- **Operational Components**:
+  - ✅ Multi-process agent architecture with individual port and PID management
+  - ✅ Character-specific configurations for 6 unique agent personalities
+  - ✅ Relay Server for bot-to-bot communication (confirmed working)
+  - ✅ Message relay between agents (verified through logs)
+  - ✅ Message processing and decision making logic (confirmed functioning)
+  - ✅ SQLite adapter with persistent file-based storage
+  - ✅ Configuration from both environment variables and external files
+
+- **Partially Implemented Components**:
+  - ⏳ Conversation kickstarting feature (framework in place, not actively triggering)
+  - ⏳ User/agent tagging system (implemented but needs testing)
+  - ⏳ Conversation flow management (basic version implemented)
 
 ## 🚦 Getting Started
 
@@ -150,12 +194,18 @@ The system optimizes resource usage:
    chmod +x start_agents.sh stop_agents.sh monitor_agents.sh
    ```
 
-4. Start your agents:
+4. Configure environment variables:
+   ```bash
+   # Add this to your .env file or environment
+   export TELEGRAM_GROUP_IDS=""-1001234567890,-1009876543210""
+   ```
+
+5. Start your agents:
    ```bash
    ./start_agents.sh
    ```
 
-5. Monitor their status:
+6. Monitor their status:
    ```bash
    ./monitor_agents.sh
    ```
@@ -169,6 +219,8 @@ The system optimizes resource usage:
 | Security warnings | Address issues found with `./monitor_agents.sh -S` |
 | Agent unresponsive | Restart with `./stop_agents.sh && ./start_agents.sh` |
 | Permission errors | Ensure proper permissions on `.env` and log directories |
+| Bots not seeing each other | Check relay server logs with `grep -n "register" /root/eliza/logs/relay_server.log` |
+| SQLite errors | Verify path at `/root/eliza/agent/data/telegram-multiagent.sqlite` exists and is writable |
 
 
 Based on ElizaOS 
