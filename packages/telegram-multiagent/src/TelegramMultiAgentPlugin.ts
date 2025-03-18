@@ -4,7 +4,7 @@ import { TelegramRelay } from './TelegramRelay';
 import { ConversationManager } from './ConversationManager';
 import { PersonalityEnhancer } from './PersonalityEnhancer';
 import { TelegramMultiAgentPluginConfig } from './index';
-import { SqliteDatabaseAdapter } from './SqliteDatabaseAdapter';
+import { SqliteDatabaseAdapter } from './SqliteAdapterProxy';
 import { ConversationKickstarter } from './ConversationKickstarter';
 
 // Define types locally to avoid import issues
