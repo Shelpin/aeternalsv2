@@ -1030,9 +1030,27 @@ export class TelegramCoordinationAdapter {
       // Update local cache
       this.knownAgents[this.agentId] = availability;
       
-      // In a real implementation, would publish this to a shared coordination service
-      // For now we'll just log it
+      // FIXED: Register all known bot agents to ensure cross-communication
+      // These are hardcoded agent IDs that we know exist in the system
+      const knownBotIds = [
+        'eth_memelord_9000',
+        'bag_flipper_9000',
+        'linda_evangelista_88',
+        'vc_shark_99',
+        'bitcoin_maxi_420',
+        'code_samurai_77'
+      ];
+      
+      // Register all known bots if they're not already registered
+      for (const botId of knownBotIds) {
+        if (!this.knownAgents[botId] && botId !== this.agentId) {
+          this.registerAgent(botId, []);
+          this.logger.info(`TelegramCoordinationAdapter: Auto-registered known agent ${botId}`);
+        }
+      }
+      
       this.logger.debug(`TelegramCoordinationAdapter: Broadcasting availability for ${this.agentId}`);
+      this.logger.debug(`TelegramCoordinationAdapter: Known agents: ${Object.keys(this.knownAgents).join(', ')}`);
       
       // Update availability status locally - in a real system would sync with external service
       this.pruneStaleAvailability();

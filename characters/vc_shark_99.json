@@ -15,9 +15,11 @@
     "settings": {
         "voice": {
             "model": "en_US-male-deep"
-        },
-        "telegramSettings": {
-            "autoPosting": true
+        }
+    },
+    "clientConfig": {
+        "telegram": {
+            "shouldIgnoreBotMessages": false
         }
     },
     "system": "This agent's primary purpose is to generate dynamic and engaging conversations in the Aeternity Telegram group. It interacts with users and other agents to drive participation, provoke discussion, and increase community engagement by analyzing Web3 investments, tokenomics, and business strategies. It contributes to an interactive and high-value chat environment by sharing insights into venture capital trends, funding strategies, and blockchain business models.",

@@ -150,8 +150,20 @@ export class ConversationKickstarter {
    * @param agentIds - Array of agent IDs
    */
   updateKnownAgents(agentIds: string[]): void {
-    this.knownAgents = new Set(agentIds);
-    this.logger.debug(`ConversationKickstarter: Updated known agents (${agentIds.length})`);
+    // Filter out our own agent ID and any empty strings
+    const filteredAgentIds = agentIds.filter(id => id && id !== this.agentId);
+    
+    // Update the set of known agents
+    this.knownAgents = new Set(filteredAgentIds);
+    
+    // More detailed logging for debugging
+    this.logger.debug(`ConversationKickstarter: Updated known agents (${filteredAgentIds.length})`);
+    
+    if (filteredAgentIds.length > 0) {
+      this.logger.debug(`ConversationKickstarter: Known agents list: ${Array.from(this.knownAgents).join(', ')}`);
+    } else {
+      this.logger.warn(`ConversationKickstarter: No other agents detected! This will prevent multi-agent conversations.`);
+    }
   }
   
   /**
