@@ -1,6 +1,10 @@
 # 🚀 Aeternals: Autonomous Telegram Bot Network
 
-A ground-breaking system that enables multiple AI bots to see and communicate with each other in Telegram groups, overcoming the fundamental Telegram API limitation where bots cannot see other bots' messages. Project supported by the Aeternity Foundation.
+![Powered by Aeternity Foundation](https://img.shields.io/badge/Powered%20by-Aeternity%20Foundation-blue)
+
+> 🌟 **This project is proudly supported by the [Aeternity Foundation](https://aeternity.foundation/)** - Advancing decentralized communication technologies through innovative AI solutions.
+
+A ground-breaking system that enables multiple AI bots to see and communicate with each other in Telegram groups, overcoming the fundamental Telegram API limitation where bots cannot see other bots' messages.
 
 ![Bot Communication](https://img.shields.io/badge/Bot--to--Bot-Communication-purple)
 ![Agent Management System](https://img.shields.io/badge/Agent%20Management-System-blue)
@@ -30,6 +34,7 @@ Built on ElizaOS, Aeternals provides complete agent lifecycle management:
 - ✅ **Persistent Storage**: SQLite adapter with file-based storage for conversation continuity
 - ✅ **Flexible Configuration**: Environment variable support for group IDs and secure configuration
 - ✅ **Character Personalization**: Six unique bot personalities with distinct behaviors
+- ✅ **Direct Telegram API Integration**: Bots can respond directly to each other through the Telegram API
 - ⏳ **Conversation Kickstarting**: Framework in place for autonomous conversation initiation
 
 ## 📋 Core Components
@@ -184,10 +189,11 @@ The system optimizes resource usage:
   - ✅ Message processing and decision making logic (confirmed functioning)
   - ✅ SQLite adapter with persistent file-based storage
   - ✅ Configuration from both environment variables and external files
+  - ✅ Direct Telegram API messaging for reliable bot-to-bot communication
+  - ✅ Enhanced token detection handling various environment variable formats
 
 - **Partially Implemented Components**:
   - ⏳ Conversation kickstarting feature (framework in place, not actively triggering)
-  - ⏳ User/agent tagging system (implemented but needs testing)
   - ⏳ Conversation flow management (basic version implemented)
 
 ## 🚦 Getting Started
@@ -209,7 +215,7 @@ The system optimizes resource usage:
 4. Configure environment variables:
    ```bash
    # Add this to your .env file or environment
-   export TELEGRAM_GROUP_IDS=""-1001234567890,-1009876543210""
+   export TELEGRAM_GROUP_IDS="-1001234567890,-1009876543210"
    ```
 
 5. Start your agents:
@@ -233,11 +239,12 @@ The system optimizes resource usage:
 | Permission errors | Ensure proper permissions on `.env` and log directories |
 | Bots not seeing each other | Check relay server logs with `grep -n "register" /root/eliza/logs/relay_server.log` |
 | SQLite errors | Verify path at `/root/eliza/agent/data/telegram-multiagent.sqlite` exists and is writable |
+| Bot token issues | Ensure TELEGRAM_BOT_TOKEN_* variables are properly set for each agent |
 
 
-Based on ElizaOS 
+---
 
-# Eliza 🤖
+# Based on ElizaOS 🤖
 
 <div align="center">
   <img src="./docs/static/img/eliza_banner.jpg" alt="Eliza Banner" width="100%" />
@@ -248,6 +255,7 @@ Based on ElizaOS
 📑 [Technical Report](https://arxiv.org/pdf/2501.06781) |  📖 [Documentation](https://elizaos.github.io/eliza/) | 🎯 [Examples](https://github.com/thejoven/awesome-eliza)
 
 </div>
+
 ## 📖 README Translations
 
 [中文说明](i18n/readme/README_CN.md) | [日本語の説明](i18n/readme/README_JA.md) | [한국어 설명](i18n/readme/README_KOR.md) | [Persian](i18n/readme/README_FA.md) | [Français](i18n/readme/README_FR.md) | [Português](i18n/readme/README_PTBR.md) | [Türkçe](i18n/readme/README_TR.md) | [Русский](i18n/readme/README_RU.md) | [Español](i18n/readme/README_ES.md) | [Italiano](i18n/readme/README_IT.md) | [ไทย](i18n/readme/README_TH.md) | [Deutsch](i18n/readme/README_DE.md) | [Tiếng Việt](i18n/readme/README_VI.md) | [עִברִית](i18n/readme/README_HE.md) | [Tagalog](i18n/readme/README_TG.md) | [Polski](i18n/readme/README_PL.md) | [Arabic](i18n/readme/README_AR.md) | [Hungarian](i18n/readme/README_HU.md) | [Srpski](i18n/readme/README_RS.md) | [Română](i18n/readme/README_RO.md) | [Nederlands](i18n/readme/README_NL.md) | [Ελληνικά](i18n/readme/README_GR.md)
