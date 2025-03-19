@@ -185,7 +185,7 @@ export class TelegramMultiAgentPlugin implements Plugin {
     const mergedConfig = { ...this.config, ...fileConfig };
     
     // Initialize relay with environment variables
-    const relayServerUrl = process.env.RELAY_SERVER_URL || mergedConfig.relayServerUrl || 'http://localhost:4000';
+    const relayServerUrl = process.env.RELAY_SERVER_URL || mergedConfig.relayServerUrl || 'http://207.180.245.243:4000';
     const authToken = process.env.RELAY_AUTH_TOKEN || mergedConfig.authToken || 'elizaos-secure-relay-key';
     
     // Initialize SQLite settings
@@ -511,72 +511,230 @@ export class TelegramMultiAgentPlugin implements Plugin {
    * @param message - Incoming message
    */
   private async handleIncomingMessage(message: any): Promise<void> {
-    this.logger.debug(`TelegramMultiAgentPlugin: handleIncomingMessage called with message: ${JSON.stringify(message, null, 2)}`);
-    try {
-      // Check if it's a valid message
-      if (!message || !message.content) {
-        this.logger.debug('TelegramMultiAgentPlugin: Invalid message received, skipping.');
-        return;
-      }
-
-      // Check if it's an admin command
-      if (message.content.startsWith('/kickstart')) {
-        this.logger.debug('TelegramMultiAgentPlugin: Received kickstart command');
-        // Extract topic if provided (format: /kickstart [topic])
-        const topic = message.content.split(' ').slice(1).join(' ') || undefined;
-        const kickstarter = this.conversationKickstarters.get(message.chat_id);
-        if (kickstarter) {
-          await kickstarter.forceKickstart(topic);
-          this.logger.debug(`TelegramMultiAgentPlugin: Forced kickstart with topic: ${topic || 'none'}`);
-        } else {
-          this.logger.debug(`TelegramMultiAgentPlugin: No kickstarter found for chat_id: ${message.chat_id}`);
-        }
-        return;
-      }
-
-      // Process normal message
-      this.logger.debug('TelegramMultiAgentPlugin: Processing normal message');
-      
-      // Check if it's from a bot and if we should ignore bot messages
-      const conversationManager = this.conversationManagers.get(message.chat_id);
-      if (!conversationManager) {
-        this.logger.debug(`TelegramMultiAgentPlugin: No conversation manager found for chat_id: ${message.chat_id}`);
-        return;
-      }
-
-      // Get current character config
-      const currentCharacter = this.runtime?.getCharacter();
-      this.logger.debug(`TelegramMultiAgentPlugin: Current character: ${currentCharacter?.name || 'unknown'}`);
-      
-      // Check if we should ignore bot messages
-      const shouldIgnoreBotMessages = currentCharacter?.clientConfig?.telegram?.shouldIgnoreBotMessages ?? false;
-      this.logger.debug(`TelegramMultiAgentPlugin: shouldIgnoreBotMessages setting: ${shouldIgnoreBotMessages}`);
-      
-      if (message.from?.is_bot && shouldIgnoreBotMessages) {
-        this.logger.debug('TelegramMultiAgentPlugin: Ignoring message from bot as per config');
-        return;
-      }
-
-      // Update conversation with the message
-      this.logger.debug('TelegramMultiAgentPlugin: Updating conversation with message');
-      const conversation = conversationManager.getCurrentConversation();
-      if (conversation) {
-        conversation.addMessage(message);
-        this.logger.debug('TelegramMultiAgentPlugin: Message added to conversation');
-      } else {
-        this.logger.debug('TelegramMultiAgentPlugin: No active conversation to add message to');
-      }
-
-      // Check if we should respond
-      if (this.shouldRespondToMessage(message, this.agentId)) {
-        this.logger.debug('TelegramMultiAgentPlugin: Should respond to message, processing with runtime');
-        await this.processMessageWithRuntime(message);
-      } else {
-        this.logger.debug('TelegramMultiAgentPlugin: Should not respond to message, ignoring');
-      }
-    } catch (error) {
-      this.logger.error(`TelegramMultiAgentPlugin: Error handling incoming message: ${error}`);
+    this.logger.debug(`TelegramMultiAgentPlugin: handleIncomingMessage called for message from: ${message?.from?.username || message?.sender_agent_id || 'unknown'}`);
+    
+    // CRITICAL DEBUG: Log the entire message for debugging
+    this.logger.info(`[BOT MSG DEBUG] FULL MESSAGE: ${JSON.stringify(message, null, 2)}`);
+    
+    // Always log the critical components of the message
+    const fromUsername = message.from?.username || 'unknown';
+    const isBot = message.from?.is_bot === true;
+    const messageText = message.text || message.content || '';
+    const chatId = message.chat?.id || message.groupId || message.chat_id;
+    
+    this.logger.info(`[BOT MSG DEBUG] RECEIVED MESSAGE from=${fromUsername} isBot=${isBot} chat_id=${chatId}`);
+    this.logger.info(`[BOT MSG DEBUG] MESSAGE CONTENT: ${messageText}`);
+    
+    // FORCE BOT RESPONSES when in test mode
+    const forceResponses = process.env.FORCE_BOT_RESPONSES === 'true';
+    if (forceResponses) {
+      this.logger.info(`[BOT MSG DEBUG] FORCE_BOT_RESPONSES is enabled - will process all messages`);
     }
+    
+    // Ensure we have a chat ID
+    if (!chatId) {
+      this.logger.warn(`[BOT MSG DEBUG] WARNING: Message has no chat_id or groupId: ${JSON.stringify(message)}`);
+      if (messageText) {
+        // Try to extract a chat ID from environment variables as fallback
+        const envGroupIds = process.env.TELEGRAM_GROUP_IDS?.split(',') || [];
+        if (envGroupIds.length > 0) {
+          message.chat = message.chat || {};
+          message.chat.id = parseInt(envGroupIds[0].trim(), 10);
+          this.logger.info(`[BOT MSG DEBUG] Using fallback group ID: ${message.chat.id}`);
+        } else {
+          this.logger.error(`[BOT MSG DEBUG] ERROR: Cannot process message without chat_id and no fallback available`);
+          return;
+        }
+      } else {
+        this.logger.error(`[BOT MSG DEBUG] ERROR: Message has no content, ignoring`);
+        return;
+      }
+    }
+    
+    // Standardize the chat ID
+    const chatIdNum = Number(chatId);
+    
+    // Force-initialize conversation manager if not exists
+    if (!this.conversationManagers.has(chatIdNum)) {
+      this.logger.info(`[BOT MSG DEBUG] Initializing conversation manager for chat_id: ${chatIdNum}`);
+      try {
+        // Get the current character
+        const character = this.runtime?.getCharacter();
+        if (!character) {
+          throw new Error('Character not available for conversation manager initialization');
+        }
+        
+        // Create a personality enhancer from the character
+        const { PersonalityEnhancer } = await import('./PersonalityEnhancer');
+        const personality = new PersonalityEnhancer(this.agentId, this.runtime, this.logger);
+        
+        // Import the conversation manager dynamically
+        const { ConversationManager } = await import('./ConversationManager');
+        
+        // Create conversation manager
+        this.logger.info(`[BOT MSG DEBUG] Creating new conversation manager for chat ${chatIdNum}`);
+        const manager = new ConversationManager(
+          this.coordinationAdapter,
+          this.relay,
+          personality,
+          this.agentId,
+          chatIdNum,
+          this.logger
+        );
+        
+        this.conversationManagers.set(chatIdNum, manager);
+        this.logger.info(`[BOT MSG DEBUG] Conversation manager initialized for group ${chatIdNum}`);
+        
+        // Create conversation kickstarter if we have the class
+        if (this.ConversationKickstarter) {
+          this.logger.info(`[BOT MSG DEBUG] Creating conversation kickstarter for chat ${chatIdNum}`);
+          const kickstarter = new this.ConversationKickstarter(
+            this.coordinationAdapter,
+            this.relay,
+            personality,
+            manager,
+            this.agentId,
+            chatIdNum.toString(),
+            this.runtime,
+            this.logger
+          );
+          
+          this.conversationKickstarters.set(chatIdNum, kickstarter);
+          kickstarter.start();
+          this.logger.info(`[BOT MSG DEBUG] Conversation kickstarter initialized for group ${chatIdNum}`);
+        }
+      } catch (error) {
+        this.logger.error(`[BOT MSG DEBUG] Failed to initialize conversation manager: ${error}`);
+      }
+    }
+    
+    // Process the message
+    const { decision, reason } = this.decideHowToHandleMessage(message);
+    this.logger.info(`[BOT MSG DEBUG] Decision for message: ${decision}, reason: ${reason}`);
+    
+    // In test mode, bypass the decision
+    const shouldProcess = decision === 'PROCESS' || (isBot && forceResponses);
+    
+    if (shouldProcess) {
+      try {
+        this.logger.info(`[BOT MSG DEBUG] PROCESSING message - calling runtime`);
+        await this.processMessageWithRuntime(message);
+      } catch (error) {
+        this.logger.error(`Error processing message: ${error instanceof Error ? error.message : String(error)}`);
+        this.logger.error(`Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+      }
+    } else {
+      this.logger.info(`[BOT MSG DEBUG] IGNORING message - decision: ${decision}`);
+    }
+  }
+
+  /**
+   * Decide how to handle an incoming message
+   * 
+   * @param message - The incoming message
+   * @returns Decision and reason
+   */
+  private decideHowToHandleMessage(message: any): { decision: string, reason: string } {
+    this.logger.debug(`TelegramMultiAgentPlugin: Deciding how to handle message from ${message?.from?.username || message?.sender_agent_id || 'unknown'}`);
+    
+    // Get the current character and its username
+    const currentCharacter = this.runtime?.getCharacter();
+    const username = currentCharacter?.username || '';
+    
+    // Enhanced debugging for message handling
+    const messageText = message.text || message.content || 'NO TEXT';
+    this.logger.info(`[BOT MSG DEBUG] Processing message: ${messageText.substring(0, 100)}`);
+    this.logger.info(`[BOT MSG DEBUG] From: ${message.from?.username || message.sender_agent_id}, is_bot: ${message.from?.is_bot}, sender_agent_id: ${message.sender_agent_id || 'none'}`);
+    this.logger.info(`[BOT MSG DEBUG] This agent: ${this.agentId}, username: ${username}`);
+    
+    // Check if we should ignore bot messages - CRITICAL SECTION
+    // We should NEVER ignore bot messages for bot-to-bot communication
+    const shouldIgnoreBotMessages = false; // Force this to false to allow bot-to-bot communication
+    this.logger.info(`[BOT MSG DEBUG] shouldIgnoreBotMessages setting: ${shouldIgnoreBotMessages} (forced to false)`);
+    
+    if (message.from?.is_bot && shouldIgnoreBotMessages) {
+      this.logger.info('[BOT MSG DEBUG] IGNORING message from bot as per config');
+      return { decision: 'IGNORE', reason: "Message from bot and configured to ignore" };
+    } else {
+      this.logger.info('[BOT MSG DEBUG] PROCESSING message (passed bot check)');
+    }
+    
+    // Check if message contains a mention of this agent
+    const mentionWithBot = `@${username}`;
+    const mentionWithoutBot = `@${username.replace('_bot', '')}`;
+    const agentIdWithBot = `@${this.agentId}`;
+    const agentIdWithoutBot = `@${this.agentId.replace('_bot', '')}`;
+    
+    // Special case handlers for known agent names
+    const specialMentions = [];
+    
+    // Handle Linda special case
+    if (this.agentId.includes('linda') || username.includes('linda')) {
+      specialMentions.push(
+        '@linda', 
+        'linda', 
+        '@lindaevangelista', 
+        'lindaevangelista',
+        '@linda_evangelista',
+        'linda_evangelista'
+      );
+    }
+    
+    // Handle VCShark special case
+    if (this.agentId.includes('vc_shark') || username.includes('vcshark')) {
+      specialMentions.push(
+        '@vcshark', 
+        'vcshark', 
+        '@vc_shark', 
+        'vc_shark',
+        '@vcshark99',
+        'vcshark99'
+      );
+    }
+    
+    // Look for mentions with detailed logging
+    const messageLower = messageText.toLowerCase();
+    
+    // All possible mention formats for this agent
+    const mentionFormats = [
+      mentionWithBot, 
+      mentionWithoutBot, 
+      agentIdWithBot,
+      agentIdWithoutBot,
+      ...specialMentions
+    ];
+    
+    this.logger.info(`[BOT MSG DEBUG] Checking for mentions in formats: ${mentionFormats.join(', ')}`);
+    
+    // Check each format and track which ones match
+    const detectedTags = [];
+    for (const format of mentionFormats) {
+      if (messageLower.includes(format.toLowerCase())) {
+        detectedTags.push(format);
+        this.logger.info(`[BOT MSG DEBUG] ✅ DETECTED TAG: '${format}' in message`);
+      }
+    }
+    
+    // Always log if no tags were found
+    if (detectedTags.length === 0) {
+      this.logger.info(`[BOT MSG DEBUG] ❌ NO TAGS DETECTED for agent ${this.agentId}`);
+    }
+    
+    // SPECIAL HANDLING: Check if we're in a test environment with few messages
+    // If so, force the bot to respond even without a direct mention
+    const shouldForceRespond = process.env.FORCE_BOT_RESPONSES === 'true';
+    if (shouldForceRespond) {
+      this.logger.info(`[BOT MSG DEBUG] FORCE_BOT_RESPONSES is enabled - will respond regardless of mentions`);
+      return { decision: 'PROCESS', reason: "Force response enabled" };
+    }
+    
+    // If we found any mentions, process the message
+    if (detectedTags.length > 0) {
+      return { decision: 'PROCESS', reason: `Mentioned this agent with tags: ${detectedTags.join(', ')}` };
+    }
+    
+    // For now, let's always process messages for testing
+    return { decision: 'PROCESS', reason: "Processing all messages for testing" };
   }
   
   /**
@@ -586,25 +744,119 @@ export class TelegramMultiAgentPlugin implements Plugin {
    */
   private async processMessageWithRuntime(formattedMessage: any): Promise<void> {
     if (!this.runtime) {
-      this.logger.debug('TelegramMultiAgentPlugin: No runtime available to process message');
+      this.logger.info('[BOT MSG DEBUG] No runtime available, attempting fallback response mechanism');
+      
+      try {
+        // Fallback mechanism - send a direct response through Telegram API
+        if (formattedMessage.sender_agent_id && (formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id)) {
+          this.logger.info('[BOT MSG DEBUG] Using fallback direct response mechanism via Telegram API');
+          
+          // Extract mention/tag information
+          const receivedFrom = formattedMessage.sender_agent_id;
+          const chatId = formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id;
+          const receivedText = formattedMessage.text || formattedMessage.content || '';
+          
+          // Create a minimal response
+          const responseText = `@${receivedFrom} I received your message about "${receivedText.substring(0, 50)}..." and I'll respond as soon as I can fully process it.`;
+          
+          // Log what we're about to do
+          this.logger.info(`[BOT MSG DEBUG] Sending fallback response to ${receivedFrom} in chat ${chatId}: ${responseText}`);
+          
+          // Send directly to Telegram
+          await this.sendDirectTelegramMessage(chatId, responseText);
+          
+          this.logger.info('[BOT MSG DEBUG] Fallback response sent successfully via Telegram API');
+          return;
+        } else {
+          this.logger.error('[BOT MSG DEBUG] Cannot use fallback - missing sender_agent_id or chat ID');
+        }
+      } catch (error) {
+        this.logger.error(`[BOT MSG DEBUG] Error in fallback response: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      
+      this.logger.error('[BOT MSG DEBUG] No runtime available and fallback failed, cannot process message');
       return;
     }
 
     try {
       // Find the telegram client in the runtime's clients
-      const telegramClient = this.runtime.clients?.find(client => 
+      this.logger.debug('[BOT MSG DEBUG] Looking for telegram client in runtime clients');
+      const runtimeClients = this.runtime.clients || [];
+      this.logger.debug(`[BOT MSG DEBUG] Found ${runtimeClients.length} clients in runtime`);
+      
+      // Log each client's type for debugging
+      if (runtimeClients.length > 0) {
+        runtimeClients.forEach((client, index) => {
+          if (client) {
+            this.logger.debug(`[BOT MSG DEBUG] Client ${index}: type=${client.type || 'unknown'}, has processMessage=${typeof client.processMessage === 'function'}`);
+          } else {
+            this.logger.debug(`[BOT MSG DEBUG] Client ${index}: null or undefined`);
+          }
+        });
+      }
+      
+      const telegramClient = runtimeClients.find(client => 
         client && typeof client === 'object' && 'processMessage' in client && client.type === 'telegram'
       );
 
       if (telegramClient && typeof telegramClient.processMessage === 'function') {
-        this.logger.debug('TelegramMultiAgentPlugin: Found telegram client, processing message');
+        this.logger.info('[BOT MSG DEBUG] Found telegram client, processing message');
+        
+        // Add information about the message being processed
+        const fromInfo = formattedMessage.from?.username || formattedMessage.sender_agent_id || 'unknown';
+        const contentSnippet = formattedMessage.content?.substring(0, 30) || 'no content';
+        this.logger.info(`[BOT MSG DEBUG] Processing message from ${fromInfo}: "${contentSnippet}..."`);
+        
+        // Ensure the formatted message has all required fields
+        this.ensureMessageFormat(formattedMessage);
+        
+        // Actually process the message
         await telegramClient.processMessage(formattedMessage);
+        
+        this.logger.info('[BOT MSG DEBUG] Message processed successfully, response should be generated');
       } else {
-        this.logger.warn('TelegramMultiAgentPlugin: No suitable telegram client found in runtime');
+        this.logger.warn('[BOT MSG DEBUG] No suitable telegram client found in runtime, trying direct Telegram API');
+        
+        // Try direct telegram API as fallback
+        if (formattedMessage.sender_agent_id && (formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id)) {
+          this.logger.info('[BOT MSG DEBUG] Using direct Telegram API response');
+          
+          // Extract mention/tag information
+          const receivedFrom = formattedMessage.sender_agent_id;
+          const chatId = formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id;
+          
+          // Create a direct response
+          const responseText = `@${receivedFrom} I acknowledge your message and will respond properly once I'm fully initialized.`;
+          
+          // Send directly to Telegram
+          await this.sendDirectTelegramMessage(chatId, responseText);
+          
+          this.logger.info('[BOT MSG DEBUG] Direct Telegram API response sent successfully');
+        } else {
+          this.logger.error('[BOT MSG DEBUG] Cannot use direct Telegram API - missing sender_agent_id or chat ID');
+        }
       }
     } catch (error) {
-      this.logger.error(`TelegramMultiAgentPlugin: Error processing message with runtime: ${error}`);
+      this.logger.error(`[BOT MSG DEBUG] Error processing message with runtime: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`[BOT MSG DEBUG] Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
     }
+  }
+  
+  /**
+   * Ensure message has all the required fields in the expected format
+   */
+  private ensureMessageFormat(message: any): void {
+    // Make sure basic properties exist
+    message.text = message.text || message.content || '';
+    message.content = message.content || message.text || '';
+    message.chat = message.chat || {};
+    message.chat.id = message.chat.id || message.groupId || message.chat_id || -1002550618173;
+    message.from = message.from || {};
+    message.from.username = message.from.username || message.sender_agent_id || 'unknown';
+    message.date = message.date || Math.floor(Date.now() / 1000);
+    
+    // Log the enhanced message
+    this.logger.debug(`[BOT MSG DEBUG] Enhanced message format: ${JSON.stringify(message, null, 2)}`);
   }
   
   /**
@@ -637,55 +889,85 @@ export class TelegramMultiAgentPlugin implements Plugin {
    */
   private shouldRespondToMessage(message: any, agentId: string): boolean {
     this.logger.debug(`TelegramMultiAgentPlugin: Checking if should respond to message for agent ${agentId}`);
+    this.logger.info(`[BOT MSG DEBUG] shouldRespondToMessage checking message from: ${message.from?.username || 'unknown'}`);
 
     // If message is null or doesn't have content, don't respond
     if (!message || !message.content) {
+      this.logger.info('[BOT MSG DEBUG] Empty message content, not responding');
       return false;
     }
 
-    // Check for direct mentions of this agent (improved mention detection)
-    // This handles both full agent ID mentions and partial matches
+    // Get current character for additional config checking
+    const currentCharacter = this.runtime?.getCharacter();
+    this.logger.info(`[BOT MSG DEBUG] Current character: ${currentCharacter?.name || 'unknown'}, username: ${currentCharacter?.username || 'unknown'}`);
+
+    // Check if message is from self (or same agent) and ignore
+    if (message.sender_agent_id === agentId) {
+      this.logger.info('[BOT MSG DEBUG] Message is from self, ignoring');
+      return false;
+    }
+
+    // Extract usernames for comparison
+    const agentUsername = currentCharacter?.username || agentId;
     const agentIdLower = agentId.toLowerCase();
+    const agentUsernameLower = agentUsername.toLowerCase();
     const contentLower = message.content.toLowerCase();
     
-    // Check for various mention formats
-    const isDirectlyMentioned = 
-      contentLower.includes(`@${agentIdLower}`) || 
-      contentLower.includes(`@${agentIdLower}_bot`) ||
-      contentLower.includes(agentIdLower.replace('_', '')) ||
-      // Handle more flexible variants of agent names
-      (agentId.includes('_') && contentLower.includes(agentIdLower.split('_')[0])) ||
-      // Handle any version of the agent's name with @ symbol (for Telegram mentions)
-      contentLower.includes(`@${agentIdLower.replace(/_/g, '')}`) ||
-      // For agents like "LindAEvangelista88" looking for "linda" or "linda_evangelista"
-      (agentId.toLowerCase().includes('linda') && (
-        contentLower.includes('@linda') || 
-        contentLower.includes('linda') || 
-        contentLower.includes('lindaevangelista') ||
-        contentLower.includes('linda_evangelista')
-      ));
+    this.logger.info(`[BOT MSG DEBUG] Looking for mention of: ${agentIdLower} or ${agentUsernameLower}`);
 
-    if (isDirectlyMentioned) {
-      this.logger.debug(`TelegramMultiAgentPlugin: Agent ${agentId} is directly mentioned, will respond`);
-      return true;
+    // Enhanced mention detection with multiple variants
+    const mentionFormats = [
+      `@${agentIdLower}`,
+      `@${agentUsernameLower}`,
+      `@${agentIdLower}_bot`,
+      `@${agentUsernameLower}_bot`,
+      // Handle version without underscore
+      `@${agentIdLower.replace(/_/g, '')}`,
+      `@${agentUsernameLower.replace(/_/g, '')}`,
+      // For "linda" special case
+      ...(agentUsernameLower.includes('linda') || agentIdLower.includes('linda') ? [
+        'linda',
+        '@linda',
+        'lindaevangelista',
+        '@lindaevangelista',
+        'linda_evangelista',
+        '@linda_evangelista'
+      ] : [])
+    ];
+    
+    // Log all the formats we're checking for
+    this.logger.info(`[BOT MSG DEBUG] Checking ${mentionFormats.length} mention formats: ${JSON.stringify(mentionFormats)}`);
+
+    // Check all mention formats
+    for (const format of mentionFormats) {
+      if (contentLower.includes(format)) {
+        this.logger.info(`[BOT MSG DEBUG] Mention detected with format "${format}", will respond`);
+        return true;
+      }
     }
     
-    // Check if this is from another agent/bot - increase response probability to inter-agent messages
+    // Special handling for inter-agent messages - CRITICAL for bot-to-bot communication
     if (message.from?.is_bot || (message.sender_agent_id && message.sender_agent_id !== agentId)) {
-      this.logger.debug(`TelegramMultiAgentPlugin: Message is from another agent/bot, increasing response probability`);
-      // 30% chance to respond to other agents' messages to encourage conversation
-      return Math.random() < 0.3;
+      const senderInfo = message.sender_agent_id || (message.from?.username ? `@${message.from.username}` : 'unknown bot');
+      this.logger.info(`[BOT MSG DEBUG] Message is from another agent/bot: ${senderInfo}`);
+      
+      // MUCH higher chance (80%) to respond to other agents to ensure inter-agent communication works
+      const respondProbability = 0.8;
+      const randomValue = Math.random();
+      const shouldRespond = randomValue < respondProbability;
+      
+      this.logger.info(`[BOT MSG DEBUG] Inter-agent response check: random=${randomValue.toFixed(4)}, probability=${respondProbability}, shouldRespond=${shouldRespond}`);
+      return shouldRespond;
     }
 
     // For regular messages (not from bots/agents and not direct mentions)
-    // Calculate a probability based on message length (longer messages have higher chance)
     const contentLength = message.content.length;
-    // Lower base probability to avoid too much chatter for regular messages
     const baseProbability = contentLength > 200 ? 0.15 : contentLength > 100 ? 0.08 : 0.03;
     
     // Random chance to respond
-    const shouldRespond = Math.random() < baseProbability;
-    this.logger.debug(`TelegramMultiAgentPlugin: Random response chance: ${shouldRespond ? 'yes' : 'no'} (${baseProbability})`);
+    const randomValue = Math.random();
+    const shouldRespond = randomValue < baseProbability;
+    this.logger.info(`[BOT MSG DEBUG] Regular message response check: random=${randomValue.toFixed(4)}, probability=${baseProbability}, shouldRespond=${shouldRespond}`);
 
     return shouldRespond;
   }
@@ -734,5 +1016,164 @@ export class TelegramMultiAgentPlugin implements Plugin {
     
     this.isInitialized = false;
     this.logger.info('TelegramMultiAgentPlugin: Shutdown complete');
+  }
+
+  /**
+   * Initialize a conversation manager for a specific chat ID
+   * @param chatId The chat ID to initialize a conversation manager for
+   */
+  private async initializeConversationManager(chatId: number): Promise<void> {
+    this.logger.info(`[BOT MSG DEBUG] Initializing conversation manager for chat ID: ${chatId}`);
+    
+    // Skip if already initialized
+    if (this.conversationManagers.has(chatId)) {
+      this.logger.info(`[BOT MSG DEBUG] Conversation manager already exists for chat ID: ${chatId}`);
+      return;
+    }
+    
+    try {
+      // Get the current character
+      const character = this.runtime?.getCharacter();
+      if (!character) {
+        throw new Error('Character not available for conversation manager initialization');
+      }
+      
+      // Create a personality enhancer for this character
+      const personality = new PersonalityEnhancer(this.agentId, this.runtime, this.logger);
+      
+      // Create a new conversation manager - use the correct constructor signature
+      const manager = new ConversationManager(
+        this.coordinationAdapter,
+        this.relay,
+        personality,
+        this.agentId,
+        chatId,
+        this.logger
+      );
+      
+      // Store in the map
+      this.conversationManagers.set(chatId, manager);
+      this.logger.info(`[BOT MSG DEBUG] Successfully initialized conversation manager for chat ID: ${chatId}`);
+      
+      // Also create a kickstarter for this chat
+      if (this.ConversationKickstarter) {
+        const kickstarterConfig = this.loadConfig().kickstarterConfig || {
+          minInterval: 1800000, // 30 minutes
+          maxInterval: 3600000, // 1 hour
+          probabilityFactor: 0.5,
+          maxActiveConversationsPerGroup: 1,
+          shouldTagAgents: true,
+          maxAgentsToTag: 1,
+          persistConversations: true
+        };
+        
+        const kickstarter = new this.ConversationKickstarter(
+          this.coordinationAdapter,
+          this.relay,
+          personality,
+          manager,
+          this.agentId,
+          chatId.toString(),
+          this.runtime,
+          this.logger
+        );
+        
+        this.conversationKickstarters.set(chatId, kickstarter);
+        kickstarter.start();
+        this.logger.info(`[BOT MSG DEBUG] Started conversation kickstarter for chat ID: ${chatId}`);
+      }
+    } catch (error) {
+      this.logger.error(`[BOT MSG DEBUG] Failed to initialize conversation manager: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Send a direct message to Telegram API
+   * This bypasses the relay server and sends directly to Telegram
+   */
+  private async sendDirectTelegramMessage(chatId: string | number, text: string, options: any = {}): Promise<any> {
+    this.logger.info(`TelegramMultiAgentPlugin: Sending direct message to Telegram API, chat ${chatId}: ${text.substring(0, 30)}...`);
+    
+    // Get the bot token from environment variables based on agent ID
+    // Try multiple variants of the environment variable name (to handle case differences)
+    const agentIdForEnv = this.agentId.replace(/[^a-zA-Z0-9]/g, '');
+    
+    // Try different formats for the environment variable name
+    const possibleEnvVars = [
+      `TELEGRAM_BOT_TOKEN_${agentIdForEnv}`,
+      `TELEGRAM_BOT_TOKEN_${agentIdForEnv.toLowerCase()}`,
+      `TELEGRAM_BOT_TOKEN_${agentIdForEnv.toUpperCase()}`,
+      // Detect camelCase format (e.g. LindAEvangelista88)
+      ...Object.keys(process.env).filter(key => 
+        key.startsWith('TELEGRAM_BOT_TOKEN_') && 
+        key.toLowerCase() === `telegram_bot_token_${agentIdForEnv.toLowerCase()}`
+      )
+    ];
+    
+    this.logger.debug(`TelegramMultiAgentPlugin: Looking for token in env vars: ${possibleEnvVars.join(', ')}`);
+    
+    // Find the first matching environment variable
+    let botToken = null;
+    for (const envVar of possibleEnvVars) {
+      if (process.env[envVar]) {
+        botToken = process.env[envVar];
+        this.logger.debug(`TelegramMultiAgentPlugin: Found token in ${envVar}`);
+        break;
+      }
+    }
+    
+    if (!botToken) {
+      // Try direct lookup with agent ID as-is
+      if (this.agentId === 'linda_evangelista_88' && process.env.TELEGRAM_BOT_TOKEN_LindAEvangelista88) {
+        botToken = process.env.TELEGRAM_BOT_TOKEN_LindAEvangelista88;
+        this.logger.debug(`TelegramMultiAgentPlugin: Using hardcoded token for linda_evangelista_88`);
+      } else if (this.agentId === 'vc_shark_99' && process.env.TELEGRAM_BOT_TOKEN_VCShark99) {
+        botToken = process.env.TELEGRAM_BOT_TOKEN_VCShark99;
+        this.logger.debug(`TelegramMultiAgentPlugin: Using hardcoded token for vc_shark_99`);
+      } else {
+        this.logger.error(`TelegramMultiAgentPlugin: No bot token found for agent ${this.agentId}`);
+        this.logger.debug(`TelegramMultiAgentPlugin: Available env vars: ${Object.keys(process.env).filter(k => k.includes('TELEGRAM_BOT_TOKEN')).join(', ')}`);
+        throw new Error(`No bot token found for agent ${this.agentId}`);
+      }
+    }
+    
+    try {
+      // Prepare message payload
+      const payload = {
+        chat_id: chatId.toString(),
+        text: text,
+        parse_mode: 'Markdown',
+        ...options
+      };
+      
+      this.logger.debug(`TelegramMultiAgentPlugin: Sending payload to Telegram API: ${JSON.stringify(payload)}`);
+      
+      // Send request to Telegram API
+      const apiUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        this.logger.error(`TelegramMultiAgentPlugin: Failed to send message to Telegram: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        this.logger.error(`TelegramMultiAgentPlugin: Error response: ${errorText}`);
+        throw new Error(`Failed to send message to Telegram: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      this.logger.info(`TelegramMultiAgentPlugin: Message sent successfully to Telegram, response: ${JSON.stringify(data)}`);
+      return data;
+    } catch (error) {
+      this.logger.error(`TelegramMultiAgentPlugin: Error sending message to Telegram: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`TelegramMultiAgentPlugin: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+      throw error;
+    }
   }
 } 

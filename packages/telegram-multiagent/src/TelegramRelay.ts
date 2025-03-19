@@ -272,33 +272,57 @@ export class TelegramRelay {
   }
   
   /**
-   * Send a message to a Telegram group
-   * 
-   * @param groupId - Telegram group ID
-   * @param text - Message text
-   * @returns Message ID
+   * Send a message through the relay server
+   * @param chatId - The chat ID to send to (can be a string or number)
+   * @param text - The message text to send
+   * @returns Promise resolving to the message ID or error
    */
-  sendMessage(groupId: number, text: string): string {
-    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  async sendMessage(chatId: string | number, text: string): Promise<any> {
+    this.logger.info(`TelegramRelay: Sending message to chat ${chatId}: ${text.substring(0, 30)}...`);
     
-    // Create message
-    const message: RelayMessage = {
-      id: messageId,
-      fromAgentId: this.config.agentId,
-      groupId,
-      text,
-      timestamp: Date.now(),
-      status: MessageStatus.PENDING,
-      retries: 0
-    };
+    if (!this.connected) {
+      this.logger.error('TelegramRelay: Cannot send message, not connected to relay server');
+      throw new Error('Not connected to relay server');
+    }
     
-    // Add to queue
-    this.messageQueue.push(message);
-    
-    // Trigger queue processing
-    this.processQueue();
-    
-    return messageId;
+    try {
+      // Prepare message payload
+      const payload = {
+        chat_id: chatId.toString(),
+        text: text,
+        agent_id: this.config.agentId,
+        token: this.config.authToken,
+        date: Math.floor(Date.now() / 1000)
+      };
+      
+      this.logger.debug(`TelegramRelay: Sending payload to relay server: ${JSON.stringify(payload)}`);
+      
+      // Send request
+      const response = await fetch(`${this.config.relayServerUrl}/sendMessage`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.authToken}`
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      if (!response.ok) {
+        this.logger.error(`TelegramRelay: Failed to send message: ${response.status} ${response.statusText}`);
+        const errorText = await response.text();
+        this.logger.error(`TelegramRelay: Error response: ${errorText}`);
+        throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      this.logger.info(`TelegramRelay: Message sent successfully, response: ${JSON.stringify(data)}`);
+      return data;
+    } catch (error) {
+      this.logger.error(`TelegramRelay: Error sending message: ${error instanceof Error ? error.message : String(error)}`);
+      this.logger.error(`TelegramRelay: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+      throw error;
+    }
   }
   
   /**
@@ -527,18 +551,28 @@ export class TelegramRelay {
     }
     
     try {
+      const requestUrl = `${this.config.relayServerUrl}/getUpdates?agent_id=${encodeURIComponent(this.config.agentId)}&token=${encodeURIComponent(this.config.authToken)}&offset=${this.lastUpdateId}`;
+      this.logger.debug(`TelegramRelay: Polling for updates from: ${requestUrl}`);
+      
       const response = await fetch(
-        `${this.config.relayServerUrl}/getUpdates?agent_id=${encodeURIComponent(this.config.agentId)}&token=${encodeURIComponent(this.config.authToken)}&offset=${this.lastUpdateId}`,
+        requestUrl,
         {
           method: 'GET',
           headers: {
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${this.config.authToken}`
           }
         }
       );
       
       if (!response.ok) {
         this.logger.error(`TelegramRelay: Failed to get updates: ${response.status} ${response.statusText}`);
+        try {
+          const errorText = await response.text();
+          this.logger.error(`TelegramRelay: Error response: ${errorText}`);
+        } catch (e) {
+          // Ignore error reading response
+        }
         return;
       }
       
@@ -553,28 +587,41 @@ export class TelegramRelay {
       
       if (messages.length > 0) {
         this.logger.debug(`TelegramRelay: Received ${messages.length} new messages`);
+        this.logger.debug(`TelegramRelay: Message details: ${JSON.stringify(messages)}`);
         
         // Update last update ID to only get newer messages next time
-        const maxUpdateId = Math.max(...messages.map((msg: any) => msg.update_id));
-        this.lastUpdateId = maxUpdateId + 1;
+        const maxUpdateId = Math.max(...messages.map((msg: any) => msg.update_id || 0));
+        if (maxUpdateId > 0) {
+          this.lastUpdateId = maxUpdateId + 1;
+          this.logger.debug(`TelegramRelay: Updated lastUpdateId to ${this.lastUpdateId}`);
+        }
         
         // Process each message
         for (const message of messages) {
+          this.logger.debug(`TelegramRelay: Processing message: ${JSON.stringify(message)}`);
+          
           // Handle different message types
           if (message.message) {
             // This is a chat message
+            this.logger.debug(`TelegramRelay: Handling chat message: ${JSON.stringify(message.message)}`);
             this.handleIncomingMessage(message.message);
           } else if (message.agent_updates) {
             // This is an agent status update
+            this.logger.debug(`TelegramRelay: Handling agent updates: ${JSON.stringify(message.agent_updates)}`);
             for (const update of message.agent_updates) {
               this.emit('agentStatus', update);
             }
+          } else if (message.text || message.content) {
+            // This might be a direct message format
+            this.logger.debug(`TelegramRelay: Handling direct message: ${JSON.stringify(message)}`);
+            this.handleIncomingMessage(message);
           }
         }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error(`TelegramRelay: Error polling for updates: ${errorMessage}`);
+      this.logger.error(`TelegramRelay: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
     }
   }
   
@@ -582,28 +629,42 @@ export class TelegramRelay {
    * Handle an incoming message from the relay server
    */
   private handleIncomingMessage(message: any): void {
-    // Transform the message to a standardized format
-    const standardizedMessage = {
-      id: message.message_id,
-      groupId: message.chat?.id?.toString(),
-      content: message.text,
-      from: message.from,
-      date: message.date,
-      sender_agent_id: message.sender_agent_id
-    };
-    
-    // Call the message handler if one is registered
-    if (this.messageHandler) {
-      try {
-        this.messageHandler(standardizedMessage);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.logger.error(`TelegramRelay: Error in message handler: ${errorMessage}`);
+    try {
+      this.logger.debug(`TelegramRelay: Original incoming message: ${JSON.stringify(message)}`);
+      
+      // Transform the message to a standardized format
+      const standardizedMessage = {
+        id: message.message_id || message.id || `msg_${Date.now()}`,
+        groupId: message.chat?.id?.toString() || message.groupId?.toString() || message.chat_id?.toString() || '-1002550618173', // Fallback to known group ID
+        content: message.text || message.content || '',
+        from: message.from || { username: message.sender_agent_id, is_bot: true },
+        date: message.date || Date.now() / 1000,
+        sender_agent_id: message.sender_agent_id || (message.from?.username ? message.from.username.replace('_bot', '') : null)
+      };
+      
+      this.logger.debug(`TelegramRelay: Standardized message: ${JSON.stringify(standardizedMessage)}`);
+      
+      // Call the message handler if one is registered
+      if (this.messageHandler) {
+        try {
+          this.logger.debug(`TelegramRelay: Calling message handler with: ${JSON.stringify(standardizedMessage)}`);
+          this.messageHandler(standardizedMessage);
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          this.logger.error(`TelegramRelay: Error in message handler: ${errorMessage}`);
+          this.logger.error(`TelegramRelay: Handler error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+        }
+      } else {
+        this.logger.warn(`TelegramRelay: No message handler registered to process: ${JSON.stringify(standardizedMessage)}`);
       }
+      
+      // Also emit a message event
+      this.emit('message', standardizedMessage);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error(`TelegramRelay: Error handling incoming message: ${errorMessage}`);
+      this.logger.error(`TelegramRelay: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
     }
-    
-    // Also emit a message event
-    this.emit('message', standardizedMessage);
   }
   
   /**
