@@ -75,6 +75,11 @@ export class TelegramMultiAgentPlugin implements Plugin {
   private checkIntervalId: NodeJS.Timeout | null = null;
   private ConversationKickstarter: any = null;
   private telegramGroupIds: string[] = [];
+  private runtimeInitialized = false;
+  private maxRuntimeWaitMs = 60000; // 1 minute max wait time
+  private runtimeWaitIntervalMs = 1000; // Check every second
+  private runtimeRetryAttempts = 0;
+  private maxRuntimeRetryAttempts = 60; // Maximum retry attempts
 
   /**
    * Create a new TelegramMultiAgentPlugin
@@ -138,14 +143,56 @@ export class TelegramMultiAgentPlugin implements Plugin {
    */
   registerWithRuntime(runtime: IAgentRuntime): void {
     console.log('[REGISTER] TelegramMultiAgentPlugin: Registering with runtime');
+    
+    if (!runtime) {
+      console.error('[REGISTER] TelegramMultiAgentPlugin: Invalid runtime provided (null or undefined)');
+      return;
+    }
+    
     this.runtime = runtime;
-    this.agentId = runtime.getAgentId();
-    console.log(`[REGISTER] TelegramMultiAgentPlugin: Agent ID set to ${this.agentId}`);
+    
+    // Try to get agent ID from runtime
+    try {
+      this.agentId = runtime.getAgentId();
+      console.log(`[REGISTER] TelegramMultiAgentPlugin: Agent ID set to ${this.agentId}`);
+    } catch (error) {
+      console.error(`[REGISTER] TelegramMultiAgentPlugin: Error getting agent ID from runtime: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[REGISTER] TelegramMultiAgentPlugin: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+      // Don't return - continue with initialization
+    }
     
     // Use the runtime's logger if available
     if (runtime.logger) {
       this.logger = runtime.logger;
       console.log('[REGISTER] TelegramMultiAgentPlugin: Using runtime logger');
+    } else {
+      console.warn('[REGISTER] TelegramMultiAgentPlugin: Runtime provided no logger, using default logger');
+    }
+    
+    // Check if we can access the character from the runtime
+    try {
+      const character = runtime.getCharacter();
+      if (character) {
+        console.log(`[REGISTER] TelegramMultiAgentPlugin: Character available: ${character.name || 'unnamed'}`);
+        
+        // If agent ID wasn't set earlier, try to use character username
+        if (!this.agentId && character.username) {
+          this.agentId = character.username;
+          console.log(`[REGISTER] TelegramMultiAgentPlugin: Using character username as agent ID: ${this.agentId}`);
+        }
+      } else {
+        console.warn('[REGISTER] TelegramMultiAgentPlugin: Character not available in runtime');
+      }
+    } catch (error) {
+      console.warn(`[REGISTER] TelegramMultiAgentPlugin: Error accessing character: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    
+    // Set runtime as initialized if everything looks good
+    if (this.runtime && this.agentId) {
+      this.runtimeInitialized = true;
+      console.log(`[REGISTER] TelegramMultiAgentPlugin: Runtime registration complete for agent ${this.agentId}`);
+    } else {
+      console.warn('[REGISTER] TelegramMultiAgentPlugin: Runtime registration incomplete (missing runtime or agent ID)');
     }
   }
 
@@ -259,8 +306,7 @@ export class TelegramMultiAgentPlugin implements Plugin {
       
       // Check if runtime is available
       if (!this.runtime) {
-        console.error('[INITIALIZE] TelegramMultiAgentPlugin: No runtime available, cannot initialize');
-        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Will try to proceed without runtime, but expect errors');
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: No runtime available during initial check, will try to initialize anyway and wait for runtime');
       } else {
         // Get agent ID from runtime if not already set
         if (!this.agentId) {
@@ -439,6 +485,18 @@ export class TelegramMultiAgentPlugin implements Plugin {
         });
       }, config.conversationCheckIntervalMs);
       console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Set up conversation check interval (${config.conversationCheckIntervalMs}ms)`);
+      
+      // Wait for runtime to be available (async, doesn't block initialization)
+      this.waitForRuntime().then(runtimeAvailable => {
+        if (runtimeAvailable) {
+          console.log('[INITIALIZE] TelegramMultiAgentPlugin: Runtime is now available and verified');
+        } else {
+          console.warn('[INITIALIZE] TelegramMultiAgentPlugin: Failed to connect to runtime after waiting, will continue with fallback responses');
+        }
+      }).catch(error => {
+        console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Error waiting for runtime: ${error instanceof Error ? error.message : String(error)}`);
+      });
+      
     } catch (error) {
       console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Initialization failed: ${error instanceof Error ? error.message : String(error)}`);
       console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
@@ -743,39 +801,49 @@ export class TelegramMultiAgentPlugin implements Plugin {
    * @param formattedMessage - Formatted message to process
    */
   private async processMessageWithRuntime(formattedMessage: any): Promise<void> {
-    if (!this.runtime) {
-      this.logger.info('[BOT MSG DEBUG] No runtime available, attempting fallback response mechanism');
+    // Check runtime availability using our new method
+    if (!this.isRuntimeAvailable()) {
+      this.logger.info('[BOT MSG DEBUG] Runtime not available or not initialized, attempting to wait for runtime...');
       
-      try {
-        // Fallback mechanism - send a direct response through Telegram API
-        if (formattedMessage.sender_agent_id && (formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id)) {
-          this.logger.info('[BOT MSG DEBUG] Using fallback direct response mechanism via Telegram API');
-          
-          // Extract mention/tag information
-          const receivedFrom = formattedMessage.sender_agent_id;
-          const chatId = formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id;
-          const receivedText = formattedMessage.text || formattedMessage.content || '';
-          
-          // Create a minimal response
-          const responseText = `@${receivedFrom} I received your message about "${receivedText.substring(0, 50)}..." and I'll respond as soon as I can fully process it.`;
-          
-          // Log what we're about to do
-          this.logger.info(`[BOT MSG DEBUG] Sending fallback response to ${receivedFrom} in chat ${chatId}: ${responseText}`);
-          
-          // Send directly to Telegram
-          await this.sendDirectTelegramMessage(chatId, responseText);
-          
-          this.logger.info('[BOT MSG DEBUG] Fallback response sent successfully via Telegram API');
-          return;
-        } else {
-          this.logger.error('[BOT MSG DEBUG] Cannot use fallback - missing sender_agent_id or chat ID');
+      // Try to wait for runtime (with a shorter timeout for user experience)
+      const runtimeReady = await this.waitForRuntime(10000); // 10 second wait max
+      
+      if (!runtimeReady) {
+        this.logger.info('[BOT MSG DEBUG] Runtime still not available after waiting, attempting fallback response mechanism');
+        
+        try {
+          // Fallback mechanism - send a direct response through Telegram API
+          if (formattedMessage.sender_agent_id && (formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id)) {
+            this.logger.info('[BOT MSG DEBUG] Using fallback direct response mechanism via Telegram API');
+            
+            // Extract mention/tag information
+            const receivedFrom = formattedMessage.sender_agent_id;
+            const chatId = formattedMessage.chat?.id || formattedMessage.groupId || formattedMessage.chat_id;
+            const receivedText = formattedMessage.text || formattedMessage.content || '';
+            
+            // Create a minimal response
+            const responseText = `@${receivedFrom} I received your message about "${receivedText.substring(0, 50)}..." and I'll respond as soon as I can fully process it.`;
+            
+            // Log what we're about to do
+            this.logger.info(`[BOT MSG DEBUG] Sending fallback response to ${receivedFrom} in chat ${chatId}: ${responseText}`);
+            
+            // Send directly to Telegram
+            await this.sendDirectTelegramMessage(chatId, responseText);
+            
+            this.logger.info('[BOT MSG DEBUG] Fallback response sent successfully via Telegram API');
+            return;
+          } else {
+            this.logger.error('[BOT MSG DEBUG] Cannot use fallback - missing sender_agent_id or chat ID');
+          }
+        } catch (error) {
+          this.logger.error(`[BOT MSG DEBUG] Error in fallback response: ${error instanceof Error ? error.message : String(error)}`);
         }
-      } catch (error) {
-        this.logger.error(`[BOT MSG DEBUG] Error in fallback response: ${error instanceof Error ? error.message : String(error)}`);
+        
+        this.logger.error('[BOT MSG DEBUG] No runtime available and fallback failed, cannot process message');
+        return;
+      } else {
+        this.logger.info('[BOT MSG DEBUG] Runtime is now available, proceeding with message processing');
       }
-      
-      this.logger.error('[BOT MSG DEBUG] No runtime available and fallback failed, cannot process message');
-      return;
     }
 
     try {
@@ -844,19 +912,71 @@ export class TelegramMultiAgentPlugin implements Plugin {
   
   /**
    * Ensure message has all the required fields in the expected format
+   * @param message - The message to standardize
    */
   private ensureMessageFormat(message: any): void {
-    // Make sure basic properties exist
+    if (!message) {
+      this.logger.error('[FORMATTER] Message is null or undefined');
+      return;
+    }
+    
+    this.logger.debug(`[FORMATTER] Original message format: ${JSON.stringify(message, null, 2)}`);
+    
+    // Standardize basic message properties
     message.text = message.text || message.content || '';
     message.content = message.content || message.text || '';
+    
+    // Ensure chat object exists and has ID
     message.chat = message.chat || {};
     message.chat.id = message.chat.id || message.groupId || message.chat_id || -1002550618173;
+    
+    // Add groupId for easier access if not present
+    message.groupId = message.groupId || message.chat.id;
+    
+    // Ensure sender information
     message.from = message.from || {};
     message.from.username = message.from.username || message.sender_agent_id || 'unknown';
+    message.from.id = message.from.id || Math.floor(Math.random() * 1000000);
+    message.from.is_bot = message.from.is_bot === undefined ? true : message.from.is_bot;
+    message.from.first_name = message.from.first_name || message.from.username;
+    
+    // Add sender_agent_id for compatibility with ElizaOS
+    message.sender_agent_id = message.sender_agent_id || message.from.username;
+    
+    // Ensure message has an ID
+    message.message_id = message.message_id || Date.now();
+    
+    // Add timestamp if not present
     message.date = message.date || Math.floor(Date.now() / 1000);
     
-    // Log the enhanced message
-    this.logger.debug(`[BOT MSG DEBUG] Enhanced message format: ${JSON.stringify(message, null, 2)}`);
+    // Add chat_id property used by some parts of the code
+    message.chat_id = message.chat_id || message.chat.id;
+    
+    // Add thread support if missing
+    if (!message.reply_to_message && message.thread_id) {
+      message.reply_to_message = {
+        message_id: message.thread_id
+      };
+    }
+    
+    // Standard message format for telegram-multi-agent
+    const standardized = {
+      message_id: message.message_id,
+      from: message.from,
+      date: message.date,
+      chat: message.chat,
+      text: message.text,
+      content: message.content,
+      sender_agent_id: message.sender_agent_id,
+      groupId: message.groupId || message.chat.id,
+      chat_id: message.chat_id || message.chat.id,
+      reply_to_message: message.reply_to_message
+    };
+    
+    // Copy standardized properties back to original message
+    Object.assign(message, standardized);
+    
+    this.logger.debug(`[FORMATTER] Standardized message format: ${JSON.stringify(message, null, 2)}`);
   }
   
   /**
@@ -888,88 +1008,109 @@ export class TelegramMultiAgentPlugin implements Plugin {
    * @returns Whether to respond
    */
   private shouldRespondToMessage(message: any, agentId: string): boolean {
-    this.logger.debug(`TelegramMultiAgentPlugin: Checking if should respond to message for agent ${agentId}`);
-    this.logger.info(`[BOT MSG DEBUG] shouldRespondToMessage checking message from: ${message.from?.username || 'unknown'}`);
-
-    // If message is null or doesn't have content, don't respond
-    if (!message || !message.content) {
-      this.logger.info('[BOT MSG DEBUG] Empty message content, not responding');
-      return false;
+    // If FORCE_BOT_RESPONSES is enabled, always respond
+    if (process.env.FORCE_BOT_RESPONSES === 'true') {
+      this.logger.debug(`[shouldRespond] ${agentId}: FORCE_BOT_RESPONSES is enabled, will respond`);
+      return true;
     }
-
-    // Get current character for additional config checking
-    const currentCharacter = this.runtime?.getCharacter();
-    this.logger.info(`[BOT MSG DEBUG] Current character: ${currentCharacter?.name || 'unknown'}, username: ${currentCharacter?.username || 'unknown'}`);
-
-    // Check if message is from self (or same agent) and ignore
-    if (message.sender_agent_id === agentId) {
-      this.logger.info('[BOT MSG DEBUG] Message is from self, ignoring');
-      return false;
-    }
-
-    // Extract usernames for comparison
-    const agentUsername = currentCharacter?.username || agentId;
-    const agentIdLower = agentId.toLowerCase();
-    const agentUsernameLower = agentUsername.toLowerCase();
-    const contentLower = message.content.toLowerCase();
     
-    this.logger.info(`[BOT MSG DEBUG] Looking for mention of: ${agentIdLower} or ${agentUsernameLower}`);
-
-    // Enhanced mention detection with multiple variants
-    const mentionFormats = [
-      `@${agentIdLower}`,
-      `@${agentUsernameLower}`,
-      `@${agentIdLower}_bot`,
-      `@${agentUsernameLower}_bot`,
-      // Handle version without underscore
-      `@${agentIdLower.replace(/_/g, '')}`,
-      `@${agentUsernameLower.replace(/_/g, '')}`,
-      // For "linda" special case
-      ...(agentUsernameLower.includes('linda') || agentIdLower.includes('linda') ? [
-        'linda',
-        '@linda',
-        'lindaevangelista',
-        '@lindaevangelista',
-        'linda_evangelista',
-        '@linda_evangelista'
-      ] : [])
+    // Get the message text
+    const text = message.text || message.content || '';
+    
+    // Check if message is empty or too short
+    if (!text || text.length < 2) {
+      this.logger.debug(`[shouldRespond] ${agentId}: Message is empty or too short`);
+      return false;
+    }
+    
+    // Check if the message is from this bot (avoid responding to self)
+    const fromUsername = message.from?.username || message.sender_agent_id || '';
+    if (fromUsername === agentId) {
+      this.logger.debug(`[shouldRespond] ${agentId}: Message is from self, ignoring`);
+      return false;
+    }
+    
+    // Detect all possible tag formats
+    const isExplicitlyTagged = this.isAgentTaggedInMessage(text, agentId);
+    
+    if (isExplicitlyTagged) {
+      this.logger.info(`[shouldRespond] ${agentId}: Agent is tagged in message, will respond`);
+      return true;
+    }
+    
+    // Check if the message is from another bot
+    const isFromBot = message.from?.is_bot === true || this.isFromKnownBot(fromUsername);
+    
+    // If from another bot, but we're not tagged, don't respond to avoid bot chatter
+    if (isFromBot && !isExplicitlyTagged) {
+      this.logger.debug(`[shouldRespond] ${agentId}: Message is from another bot and not explicitly tagged, ignoring`);
+      return false;
+    }
+    
+    // Random chance to respond to non-tagged messages from humans (to appear natural)
+    if (!isFromBot && Math.random() < 0.15) { // 15% chance
+      this.logger.info(`[shouldRespond] ${agentId}: Random chance to respond to human message`);
+      return true;
+    }
+    
+    this.logger.debug(`[shouldRespond] ${agentId}: No criteria met for response`);
+    return false;
+  }
+  
+  /**
+   * Check if this agent is specifically tagged in the message
+   * Handles multiple tag formats
+   * 
+   * @param text - Message text
+   * @param agentId - This agent's ID
+   * @returns True if agent is tagged
+   */
+  private isAgentTaggedInMessage(text: string, agentId: string): boolean {
+    // Normalize agent ID for comparison (remove underscores, make lowercase)
+    const normalizedAgentId = agentId.replace(/_/g, '').toLowerCase();
+    
+    // Array of patterns to check
+    const patterns = [
+      // Standard Telegram @username format
+      new RegExp(`@${agentId}\\b`, 'i'),
+      // Variant without underscore
+      new RegExp(`@${normalizedAgentId}\\b`, 'i'),
+      // Direct username mention without @
+      new RegExp(`\\b${agentId}\\b`, 'i'),
+      // Username_bot format
+      new RegExp(`\\b${agentId}_bot\\b`, 'i'),
+      // Variants with different casing
+      new RegExp(`@${agentId}`, 'i')
     ];
     
-    // Log all the formats we're checking for
-    this.logger.info(`[BOT MSG DEBUG] Checking ${mentionFormats.length} mention formats: ${JSON.stringify(mentionFormats)}`);
-
-    // Check all mention formats
-    for (const format of mentionFormats) {
-      if (contentLower.includes(format)) {
-        this.logger.info(`[BOT MSG DEBUG] Mention detected with format "${format}", will respond`);
+    // Check each pattern
+    for (const pattern of patterns) {
+      if (pattern.test(text)) {
         return true;
       }
     }
     
-    // Special handling for inter-agent messages - CRITICAL for bot-to-bot communication
-    if (message.from?.is_bot || (message.sender_agent_id && message.sender_agent_id !== agentId)) {
-      const senderInfo = message.sender_agent_id || (message.from?.username ? `@${message.from.username}` : 'unknown bot');
-      this.logger.info(`[BOT MSG DEBUG] Message is from another agent/bot: ${senderInfo}`);
-      
-      // MUCH higher chance (80%) to respond to other agents to ensure inter-agent communication works
-      const respondProbability = 0.8;
-      const randomValue = Math.random();
-      const shouldRespond = randomValue < respondProbability;
-      
-      this.logger.info(`[BOT MSG DEBUG] Inter-agent response check: random=${randomValue.toFixed(4)}, probability=${respondProbability}, shouldRespond=${shouldRespond}`);
-      return shouldRespond;
-    }
-
-    // For regular messages (not from bots/agents and not direct mentions)
-    const contentLength = message.content.length;
-    const baseProbability = contentLength > 200 ? 0.15 : contentLength > 100 ? 0.08 : 0.03;
+    return false;
+  }
+  
+  /**
+   * Check if the username belongs to a known bot
+   * 
+   * @param username - Username to check
+   * @returns True if from a known bot
+   */
+  private isFromKnownBot(username: string): boolean {
+    // List of known bot usernames (normalized to lowercase)
+    const knownBots = [
+      'linda_evangelista_88',
+      'vc_shark_99',
+      'bitcoin_maxi_420',
+      'eth_memelord_9000',
+      'bag_flipper_9000',
+      'aeternity_admin'
+    ].map(name => name.toLowerCase());
     
-    // Random chance to respond
-    const randomValue = Math.random();
-    const shouldRespond = randomValue < baseProbability;
-    this.logger.info(`[BOT MSG DEBUG] Regular message response check: random=${randomValue.toFixed(4)}, probability=${baseProbability}, shouldRespond=${shouldRespond}`);
-
-    return shouldRespond;
+    return knownBots.includes(username.toLowerCase());
   }
 
   /**
@@ -1174,6 +1315,90 @@ export class TelegramMultiAgentPlugin implements Plugin {
       this.logger.error(`TelegramMultiAgentPlugin: Error sending message to Telegram: ${error instanceof Error ? error.message : String(error)}`);
       this.logger.error(`TelegramMultiAgentPlugin: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
       throw error;
+    }
+  }
+
+  /**
+   * Wait for the runtime to be available
+   * @param timeoutMs Maximum time to wait in milliseconds
+   * @returns Promise that resolves when runtime is available, or rejects with timeout
+   */
+  private async waitForRuntime(timeoutMs = this.maxRuntimeWaitMs): Promise<boolean> {
+    const startTime = Date.now();
+    this.logger.info('[RUNTIME] TelegramMultiAgentPlugin: Waiting for runtime to be available');
+    
+    return new Promise<boolean>((resolve) => {
+      const checkRuntime = () => {
+        // Check if we've exceeded the timeout
+        if (Date.now() - startTime > timeoutMs) {
+          this.logger.warn(`[RUNTIME] TelegramMultiAgentPlugin: Runtime wait timeout exceeded (${timeoutMs}ms)`);
+          resolve(false);
+          return;
+        }
+        
+        // Check if runtime is available
+        if (this.runtime) {
+          try {
+            // Try to use the runtime to verify it's properly connected
+            const runtimeId = this.runtime.getAgentId();
+            this.logger.info(`[RUNTIME] TelegramMultiAgentPlugin: Runtime connected with agent ID: ${runtimeId}`);
+            this.runtimeInitialized = true;
+            resolve(true);
+            return;
+          } catch (e) {
+            this.runtimeRetryAttempts++;
+            if (this.runtimeRetryAttempts >= this.maxRuntimeRetryAttempts) {
+              this.logger.error(`[RUNTIME] TelegramMultiAgentPlugin: Maximum runtime retry attempts (${this.maxRuntimeRetryAttempts}) exceeded`);
+              resolve(false);
+              return;
+            }
+            this.logger.warn(`[RUNTIME] TelegramMultiAgentPlugin: Runtime connection error: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        } else {
+          this.runtimeRetryAttempts++;
+          if (this.runtimeRetryAttempts >= this.maxRuntimeRetryAttempts) {
+            this.logger.error(`[RUNTIME] TelegramMultiAgentPlugin: Maximum runtime retry attempts (${this.maxRuntimeRetryAttempts}) exceeded`);
+            resolve(false);
+            return;
+          }
+          this.logger.debug(`[RUNTIME] TelegramMultiAgentPlugin: Runtime not yet available (attempt ${this.runtimeRetryAttempts}/${this.maxRuntimeRetryAttempts})`);
+        }
+        
+        // Schedule next check
+        setTimeout(checkRuntime, this.runtimeWaitIntervalMs);
+      };
+      
+      // Start checking
+      checkRuntime();
+    });
+  }
+  
+  /**
+   * Check if runtime is available and valid
+   * @returns True if runtime is available and initialized, false otherwise
+   */
+  private isRuntimeAvailable(): boolean {
+    if (!this.runtime) {
+      this.logger.debug('[RUNTIME] TelegramMultiAgentPlugin: No runtime available');
+      return false;
+    }
+    
+    if (!this.runtimeInitialized) {
+      this.logger.debug('[RUNTIME] TelegramMultiAgentPlugin: Runtime not yet initialized');
+      return false;
+    }
+    
+    try {
+      // Quick verification that runtime is still working
+      const runtimeId = this.runtime.getAgentId();
+      if (!runtimeId) {
+        this.logger.warn('[RUNTIME] TelegramMultiAgentPlugin: Runtime returned empty agent ID');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      this.logger.warn(`[RUNTIME] TelegramMultiAgentPlugin: Runtime verification error: ${e instanceof Error ? e.message : String(e)}`);
+      return false;
     }
   }
 } 
