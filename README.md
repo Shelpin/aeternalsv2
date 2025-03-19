@@ -1,4 +1,4 @@
-# 🚀 Aeternals: Autonomous Telegram Bot Network
+# 🚀 æternals: Autonomous Telegram Bot Network
 
 ![Powered by Aeternity Foundation](https://img.shields.io/badge/Powered%20by-Aeternity%20Foundation-blue)
 
