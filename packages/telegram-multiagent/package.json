@@ -4,14 +4,15 @@
   "description": "Multi-agent coordination for Telegram bots in ElizaOS",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
-    "build": "node build-yolo.js",
+    "build": "npm run clean && npm run build:esm && npm run build:types",
+    "build:esm": "esbuild src/index.ts --bundle --platform=node --target=node16 --format=esm --outfile=dist/index.js --external:@elizaos/core --external:better-sqlite3 --external:sqlite --external:sqlite3 --external:uuid",
+    "build:types": "tsc --emitDeclarationOnly",
     "yolo-build": "node build-yolo.js",
-    "build-strict": "tsc",
     "clean": "rimraf dist",
     "lint": "eslint src --ext .ts",
-    "test": "jest",
-    "prepare": "npm run build"
+    "test": "jest"
   },
   "keywords": [
     "elizaos",
@@ -25,15 +26,17 @@
   "dependencies": {
     "@elizaos/core": "^0.25.9",
     "axios": "^1.6.2",
-    "better-sqlite3": "^11.8.1",
+    "better-sqlite3": "^11.9.1",
     "sqlite": "^5.0.1",
     "sqlite3": "^5.1.6",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^7.6.9",
     "@types/jest": "^29.5.10",
     "@types/node": "^20.10.0",
     "@types/uuid": "^9.0.7",
+    "esbuild": "^0.20.0",
     "eslint": "^8.54.0",
     "jest": "^29.7.0",
     "rimraf": "^5.0.5",

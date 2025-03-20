@@ -1,8 +1,14 @@
 import { Plugin } from './types';
 import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin';
+// Import better-sqlite3 directly at the module level
+import BetterSqlite3 from 'better-sqlite3';
 
 // Debug log to understand module loading
 console.log('[DEBUG] telegram-multiagent index.ts is being evaluated');
+
+// Make better-sqlite3 available globally if needed
+globalThis.betterSqlite3 = BetterSqlite3;
+console.log('[DEBUG] BetterSqlite3 imported and made globally available');
 
 // Define KickstarterConfig locally to avoid import issues
 interface KickstarterConfig {
@@ -46,28 +52,27 @@ const pluginInstance = new TelegramMultiAgentPlugin(pluginConfig);
 // MODULE-LEVEL PROPERTIES
 // These become accessible as properties of the module itself
 // Making them accessible both through import and require
-module.exports.name = "@elizaos/telegram-multiagent";
-module.exports.description = "Enables multi-agent coordination in Telegram groups";
-module.exports.npmName = "@elizaos/telegram-multiagent";
-
-// Add initialize function at module level
-module.exports.initialize = async function() {
+export { TelegramMultiAgentPlugin };
+// Define module-level functions first
+const moduleInitialize = async function() {
   console.log('[DEBUG] Module-level initialize() called directly');
   return pluginInstance.initialize();
 };
 
-// Add shutdown function at module level
-module.exports.shutdown = async function() {
+const moduleShutdown = async function() {
   console.log('[DEBUG] Module-level shutdown() called directly');
   return pluginInstance.shutdown();
 };
+
+// Export module-level functions with a single export statement
+export { moduleInitialize as initialize, moduleShutdown as shutdown };
+export const name = "@elizaos/telegram-multiagent";
 
 // Export all components
 export { TelegramCoordinationAdapter } from './TelegramCoordinationAdapter';
 export { TelegramRelay } from './TelegramRelay';
 export { ConversationManager } from './ConversationManager';
 export { PersonalityEnhancer } from './PersonalityEnhancer';
-export { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin';
 export { ConversationKickstarter, KickstarterConfig } from './ConversationKickstarter';
 export { SqliteDatabaseAdapter } from './SqliteAdapterProxy';
 
@@ -91,7 +96,7 @@ export const telegramMultiAgentPlugin = {
   }
 } as Plugin;
 
-// Also export as default
+// Add default export for compatibility with ElizaOS plugin system
 export default telegramMultiAgentPlugin;
 
 // Final debug log

@@ -61,11 +61,7 @@ export class TelegramMultiAgentPlugin implements Plugin {
   public name: string = 'TelegramMultiAgentPlugin';
   public description: string = 'Enables multi-agent coordination in Telegram groups';
   public npmName: string = '@elizaos/telegram-multiagent';
-  public version: string = '0.1.0';
-  
-  // Flag to track initialization state
-  private initialized = false;
-  
+
   // Plugin state
   private config: TelegramMultiAgentPluginConfig;
   private logger: ElizaLogger;
@@ -85,8 +81,6 @@ export class TelegramMultiAgentPlugin implements Plugin {
     attempts: number,
     timestamp: number
   }> = new Map();
-  private maxMessageRetries: number = 3; // Maximum retry attempts for a message
-  private ConversationKickstarter: any; // Reference to the ConversationKickstarter class
 
   /**
    * Create a new TelegramMultiAgentPlugin
@@ -129,21 +123,9 @@ export class TelegramMultiAgentPlugin implements Plugin {
       return false;
     }
     
-    // Store runtime reference with additional safety measures
+    // Store runtime reference
     this.runtime = runtime;
-    console.log('[REGISTER] TelegramMultiAgentPlugin: Runtime reference stored in instance');
-    
-    // IMPORTANT NEW CODE: Store runtime globally as backup measure
-    try {
-      (global as any).__telegramMultiAgentRuntime = runtime;
-      console.log('[REGISTER] TelegramMultiAgentPlugin: Runtime reference stored globally as backup');
-    } catch (error) {
-      console.warn(`[REGISTER] TelegramMultiAgentPlugin: Could not store runtime globally: ${error instanceof Error ? error.message : String(error)}`);
-    }
-    
-    // Set runtimeInitialized flag to true immediately
-    this.runtimeInitialized = true;
-    console.log('[REGISTER] TelegramMultiAgentPlugin: runtimeInitialized flag set to true');
+    console.log('[REGISTER] TelegramMultiAgentPlugin: Runtime reference stored');
     
     // Try to get agent ID from runtime
     try {
@@ -200,110 +182,202 @@ export class TelegramMultiAgentPlugin implements Plugin {
    * Standard Plugin interface method for initializing the plugin
    * This is called by the runtime after all plugins are registered
    */
-  public async initialize(): Promise<void> {
-    const bootTime = Date.now();
-    console.log(`[INIT] TelegramMultiAgentPlugin: Initializing (version ${this.getVersion()})...`);
-    
+  async initialize(): Promise<void> {
     try {
-      // Make sure we're initialized
-      if (this.initialized) {
-        console.log('[INIT] TelegramMultiAgentPlugin: Already initialized');
+      console.log('[INITIALIZE] TelegramMultiAgentPlugin: initialize() method called');
+      
+      if (this.isInitialized) {
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Already initialized, skipping');
+        return;
+      }
+
+      console.log('[INITIALIZE] TelegramMultiAgentPlugin: Starting initialization');
+      console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Runtime is ${this.runtime ? 'available' : 'null or undefined'}`);
+      console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Agent ID is ${this.agentId || 'not set'}`);
+      
+      // Check if runtime is available
+      if (!this.runtime) {
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: No runtime available during initial check, will try to initialize anyway and wait for runtime');
+      } else {
+        // Get agent ID from runtime if not already set
+        if (!this.agentId) {
+          try {
+            this.agentId = this.runtime.getAgentId();
+            console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Set agent ID from runtime: ${this.agentId}`);
+          } catch (error) {
+            console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Error getting agent ID from runtime: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+      }
+      
+      // Load configuration from environment or config file
+      console.log('[INITIALIZE] TelegramMultiAgentPlugin: Loading configuration');
+      let config;
+      try {
+        config = this.loadConfig();
+        console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Loaded config with relay URL: ${config.relayServerUrl}`);
+        console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Config groupIds: ${JSON.stringify(config.groupIds || [])}`);
+      } catch (error) {
+        console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Error loading config: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+      
+      if (!config.enabled) {
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Plugin is disabled in config, skipping initialization');
         return;
       }
       
-      // Wait for runtime availability with a 30-second timeout
-      const runtimeAvailable = await this.waitForRuntime(30000);
-      if (!runtimeAvailable && !process.env.FORCE_RUNTIME_AVAILABLE) {
-        console.warn('[INIT] TelegramMultiAgentPlugin: Runtime not available after timeout, initializing without runtime integration');
-      } else {
-        // Verify runtime and try to register with it
-        const runtime = this.getRuntime();
-        if (runtime) {
-          console.log('[INIT] TelegramMultiAgentPlugin: Runtime found, attempting to register plugin');
+      // Initialize SQLite adapter if enabled
+      if (config.useSqliteAdapter) {
+        try {
+          console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Initializing SQLite adapter with db path: ${config.dbPath}`);
+          this.dbAdapter = new SqliteDatabaseAdapter(config.dbPath);
+          console.log('[INITIALIZE] TelegramMultiAgentPlugin: SQLite adapter initialized successfully');
+        } catch (error) {
+          console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Failed to initialize SQLite adapter: ${error instanceof Error ? error.message : String(error)}`);
+          console.warn('[INITIALIZE] TelegramMultiAgentPlugin: Continuing without SQLite adapter');
+        }
+      }
+
+      // Use manual group ID fallback if needed
+      if (!config.groupIds || config.groupIds.length === 0) {
+        console.warn('[INITIALIZE] TelegramMultiAgentPlugin: No group IDs in config, using default group ID');
+        config.groupIds = [-1002550618173]; // Hardcoded fallback group ID from config file
+        console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Using fallback group IDs: ${JSON.stringify(config.groupIds)}`);
+      }
+
+      // Initialize the relay client
+      try {
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Initializing TelegramRelay');
+        this.relay = new TelegramRelay({
+          relayServerUrl: config.relayServerUrl,
+          authToken: config.authToken,
+          agentId: this.agentId
+        }, this.logger);
+        
+        // Connect to relay server
+        await this.relay.connect();
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Connected to relay server');
+        
+        // Register message handler
+        this.relay.onMessage((message) => {
+          console.log(`[MESSAGE] TelegramMultiAgentPlugin: Received message: ${JSON.stringify(message)}`);
+          this.handleIncomingMessage(message).catch(error => {
+            console.error(`[ERROR] TelegramMultiAgentPlugin: Message handling error: ${error instanceof Error ? error.message : String(error)}`);
+          });
+        });
+      } catch (error) {
+        console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Failed to initialize relay: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+
+      // Initialize the coordination adapter
+      try {
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Initializing coordination adapter');
+        this.coordinationAdapter = new TelegramCoordinationAdapter(
+          this.agentId,
+          this.runtime,
+          this.logger,
+          this.dbAdapter
+        );
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Coordination adapter initialized');
+      } catch (error) {
+        console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Failed to initialize coordination adapter: ${error instanceof Error ? error.message : String(error)}`);
+        throw error;
+      }
+      
+      // Create personality enhancer
+      let personality;
+      try {
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Initializing personality enhancer');
+        personality = new PersonalityEnhancer(this.agentId, this.runtime, this.logger);
+        console.log('[INITIALIZE] TelegramMultiAgentPlugin: Personality enhancer initialized');
+      } catch (error) {
+        console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Failed to initialize personality enhancer: ${error instanceof Error ? error.message : String(error)}`);
+        // Create fallback personality enhancer
+        personality = new PersonalityEnhancer({
+          agentId: this.agentId,
+          primary: [],
+          secondary: [],
+          interests: []
+        });
+      }
+
+      // Initialize conversation managers and kickstarters for each group
+      try {
+        for (const groupId of config.groupIds) {
+          const groupIdStr = groupId.toString();
+          console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Setting up conversation manager for group ${groupId}`);
           
-          // Try to register with runtime
-          const registered = await this.registerWithRuntime(runtime);
-          if (registered) {
-            console.log('[INIT] TelegramMultiAgentPlugin: Successfully registered with runtime');
-          } else {
-            console.warn('[INIT] TelegramMultiAgentPlugin: Failed to register with runtime, continuing with limited functionality');
-          }
-        } else if (process.env.FORCE_RUNTIME_AVAILABLE === 'true') {
-          console.warn('[INIT] TelegramMultiAgentPlugin: FORCE_RUNTIME_AVAILABLE is true but runtime not found, continuing with limited functionality');
+          // Create conversation manager
+          const manager = new ConversationManager(
+            this.coordinationAdapter,
+            this.relay,
+            personality,
+            this.agentId,
+            groupId,
+            this.logger
+          );
+          this.conversationManagers.set(groupId, manager);
+          
+          // Create conversation kickstarter
+          console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Setting up conversation kickstarter for group ${groupId}`);
+          const kickstarter = new ConversationKickstarter(
+            this.coordinationAdapter,
+            this.relay,
+            personality,
+            manager,
+            this.agentId,
+            groupIdStr,
+            this.runtime,
+            this.logger,
+            config.kickstarterConfig
+          );
+          
+          this.conversationKickstarters.set(groupId, kickstarter);
         }
+      } catch (error) {
+        console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Failed to initialize conversation managers: ${error instanceof Error ? error.message : String(error)}`);
+      }
+
+      // Initialize telegramGroupIds from config
+      this.telegramGroupIds = this.config.groupIds?.map(id => id.toString()) || [];
+      
+      // If no group IDs are in the config, try to get them from environment
+      if (this.telegramGroupIds.length === 0 && process.env.TELEGRAM_GROUP_IDS) {
+        this.telegramGroupIds = process.env.TELEGRAM_GROUP_IDS.split(',').map(id => id.trim());
       }
       
-      // Initialize bot, server, and storage
-      await this.initializeBot();
-      await this.initializeServer();
-      await this.initializeStorage();
+      console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Using telegram group IDs: ${JSON.stringify(this.telegramGroupIds)}`);
       
-      // Show initialization status
-      this.initialized = true;
-      const initTime = Date.now() - bootTime;
-      console.log(`[INIT] TelegramMultiAgentPlugin: Initialization complete in ${initTime}ms`);
+      // Set initialization complete
+      this.isInitialized = true;
+      console.log('[INITIALIZE] TelegramMultiAgentPlugin: Initialization complete');
+      
+      // Set up interval to check conversations periodically
+      this.checkIntervalId = setInterval(() => {
+        this.checkConversations().catch(error => {
+          console.error(`[CHECK] TelegramMultiAgentPlugin: Error in conversation check: ${error instanceof Error ? error.message : String(error)}`);
+        });
+      }, config.conversationCheckIntervalMs);
+      console.log(`[INITIALIZE] TelegramMultiAgentPlugin: Set up conversation check interval (${config.conversationCheckIntervalMs}ms)`);
+      
+      // Wait for runtime to be available
+      try {
+        const runtimeReady = await this.waitForRuntime(60000);
+        if (runtimeReady) {
+          console.log('[INITIALIZE] TelegramMultiAgentPlugin: Runtime is now available and verified');
+        } else {
+          console.warn('[INITIALIZE] TelegramMultiAgentPlugin: Failed to connect to runtime after waiting, will continue with fallback responses');
+        }
+      } catch (error) {
+        console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Error waiting for runtime: ${error instanceof Error ? error.message : String(error)}`);
+      }
+      
+      return Promise.resolve();
     } catch (error) {
-      console.error(`[INIT] TelegramMultiAgentPlugin: Initialization failed: ${error instanceof Error ? error.message : String(error)}`);
-      if (error instanceof Error && error.stack) {
-        console.error(`[INIT] TelegramMultiAgentPlugin: Stack trace: ${error.stack}`);
-      }
+      console.error(`[INITIALIZE] TelegramMultiAgentPlugin: Initialization failed: ${error instanceof Error ? error.message : String(error)}`);
       throw error;
-    }
-  }
-  
-  /**
-   * Attempts to register the plugin with the runtime
-   * @param runtime The runtime to register with
-   * @returns Promise resolving to true if registration was successful
-   */
-  private async registerWithRuntime(runtime: any): Promise<boolean> {
-    try {
-      if (!runtime) {
-        console.warn('[REGISTER] TelegramMultiAgentPlugin: No runtime provided for registration');
-        return false;
-      }
-      
-      // Check if registerPlugin method exists
-      if (typeof runtime.registerPlugin !== 'function') {
-        console.warn('[REGISTER] TelegramMultiAgentPlugin: Runtime does not have registerPlugin method');
-        return false;
-      }
-      
-      // Attempt to register
-      console.log('[REGISTER] TelegramMultiAgentPlugin: Attempting to register with runtime');
-      const result = runtime.registerPlugin(this);
-      console.log(`[REGISTER] TelegramMultiAgentPlugin: Registration result: ${result}`);
-      
-      // Store runtime reference on success
-      if (result) {
-        this.runtime = runtime;
-        this.runtimeInitialized = true;
-        
-        try {
-          // Store global runtime as backup
-          (global as any).__telegramMultiAgentRuntime = runtime;
-        } catch (e) {
-          console.warn(`[REGISTER] TelegramMultiAgentPlugin: Failed to store global runtime: ${e instanceof Error ? e.message : String(e)}`);
-        }
-        
-        // Try to get agent ID as verification
-        try {
-          if (typeof runtime.getAgentId === 'function') {
-            const agentId = runtime.getAgentId();
-            console.log(`[REGISTER] TelegramMultiAgentPlugin: Verified runtime with agent ID: ${agentId}`);
-          }
-        } catch (e) {
-          console.warn(`[REGISTER] TelegramMultiAgentPlugin: Failed to verify runtime: ${e instanceof Error ? e.message : String(e)}`);
-        }
-      }
-      
-      return !!result;
-    } catch (error) {
-      console.error(`[REGISTER] TelegramMultiAgentPlugin: Registration failed with error: ${error instanceof Error ? error.message : String(error)}`);
-      if (error instanceof Error && error.stack) {
-        console.error(`[REGISTER] TelegramMultiAgentPlugin: Stack trace: ${error.stack}`);
-      }
-      return false;
     }
   }
 
@@ -377,8 +451,8 @@ export class TelegramMultiAgentPlugin implements Plugin {
    * Load configuration from environment or config file
    */
   private loadConfig(): TelegramMultiAgentPluginConfig {
-    // Get agent ID from environment - don't try to get it from config as it's not part of our config interface
-    this.agentId = process.env.AGENT_ID || this.agentId || '';
+    // Get agent ID from environment or config
+    this.agentId = process.env.AGENT_ID || this.config.agentId || '';
     
     if (!this.agentId) {
       console.log('[ERROR] TelegramMultiAgentPlugin: No agent ID provided');
@@ -1404,6 +1478,52 @@ export class TelegramMultiAgentPlugin implements Plugin {
   }
 
   /**
+   * Shutdown the plugin
+   */
+  async shutdown(): Promise<void> {
+    if (!this.isInitialized) {
+      return;
+    }
+    
+    this.logger.info('TelegramMultiAgentPlugin: Shutting down');
+    
+    // Clear interval
+    if (this.checkIntervalId) {
+      clearInterval(this.checkIntervalId);
+      this.checkIntervalId = null;
+    }
+    
+    // Stop all kickstarters
+    for (const kickstarter of this.conversationKickstarters.values()) {
+      if (kickstarter && typeof kickstarter.stop === 'function') {
+        kickstarter.stop();
+      }
+    }
+    
+    // Disconnect from relay server
+    if (this.relay) {
+      await this.relay.disconnect();
+    }
+    
+    // Close coordination adapter
+    if (this.coordinationAdapter) {
+      await this.coordinationAdapter.close();
+    }
+    
+    // Close database connection
+    if (this.dbAdapter) {
+      try {
+        await this.dbAdapter.close();
+      } catch (error) {
+        this.logger.error(`Error closing database: ${error.message}`);
+      }
+    }
+    
+    this.isInitialized = false;
+    this.logger.info('TelegramMultiAgentPlugin: Shutdown complete');
+  }
+
+  /**
    * Initialize a conversation manager for a specific chat ID
    * @param chatId The chat ID to initialize a conversation manager for
    */
@@ -1573,18 +1693,9 @@ export class TelegramMultiAgentPlugin implements Plugin {
   private async waitForRuntime(timeoutMs: number = 60000): Promise<boolean> {
     console.log(`[WAITRUNTIME] TelegramMultiAgentPlugin: Starting wait for runtime (timeout: ${timeoutMs}ms)`);
     
-    // First, try to directly get the runtime using our enhanced method
-    const runtime = this.getRuntime();
-    if (runtime) {
-      console.log('[WAITRUNTIME] TelegramMultiAgentPlugin: Runtime already available via getRuntime');
-      this.runtime = runtime; // Ensure it's set in the instance
-      this.runtimeInitialized = true;
-      return true;
-    }
-    
-    // If runtime is already available via standard check, return immediately
+    // If runtime is already available, return immediately
     if (this.isRuntimeAvailable()) {
-      console.log('[WAITRUNTIME] TelegramMultiAgentPlugin: Runtime already available via isRuntimeAvailable');
+      console.log('[WAITRUNTIME] TelegramMultiAgentPlugin: Runtime already available');
       return true;
     }
     
@@ -1606,16 +1717,7 @@ export class TelegramMultiAgentPlugin implements Plugin {
       attempts++;
       elapsedTime = Date.now() - startTime;
       
-      // Try our enhanced runtime retrieval first
-      const retrievedRuntime = this.getRuntime();
-      if (retrievedRuntime) {
-        console.log(`[WAITRUNTIME] TelegramMultiAgentPlugin: Runtime retrieved after ${attempts} attempts (${elapsedTime}ms)`);
-        this.runtime = retrievedRuntime;
-        this.runtimeInitialized = true;
-        return true;
-      }
-      
-      // Fall back to standard availability check
+      // Check if runtime is available
       const runtimeAvailable = this.isRuntimeAvailable();
       console.log(`[WAITRUNTIME] TelegramMultiAgentPlugin: Runtime check attempt ${attempts}/${maxAttempts} - Available: ${runtimeAvailable} (elapsed: ${elapsedTime}ms)`);
       
@@ -1667,78 +1769,45 @@ export class TelegramMultiAgentPlugin implements Plugin {
    * @returns boolean indicating if runtime is fully available for use
    */
   private isRuntimeAvailable(): boolean {
-    try {
-      // First check if we already have runtime initialized
-      if (this.runtimeInitialized) {
-        return true;
-      }
-      
-      // Try to get runtime from our enhanced getter
-      const runtime = this.getRuntime();
-      if (runtime) {
-        this.runtime = runtime; // Ensure instance variable is set
-        this.runtimeInitialized = true;
-        console.log('[RUNTIMECHECK] TelegramMultiAgentPlugin: Runtime found via getRuntime helper');
-        return true;
-      }
-      
-      // If forced availability is enabled, bypass checks
-      if (process.env.FORCE_RUNTIME_AVAILABLE === 'true') {
-        console.warn('[RUNTIMECHECK] TelegramMultiAgentPlugin: Forcing runtime available due to FORCE_RUNTIME_AVAILABLE=true');
-        this.runtimeInitialized = true;
-        return true;
-      }
-      
-      // Legacy check fallback (instance runtime)
-      if (this.runtime) {
-        if (typeof this.runtime.getAgentId === 'function') {
-          console.log('[RUNTIMECHECK] TelegramMultiAgentPlugin: Runtime available via instance variable');
-          this.runtimeInitialized = true;
-          return true;
-        } else {
-          console.warn('[RUNTIMECHECK] TelegramMultiAgentPlugin: Runtime instance exists but getAgentId is not a function');
-        }
-      } else {
-        console.debug('[RUNTIMECHECK] TelegramMultiAgentPlugin: Runtime not available yet');
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('[RUNTIMECHECK] TelegramMultiAgentPlugin: Error checking runtime availability:', error instanceof Error ? error.message : String(error));
+    // First check if FORCE_RUNTIME_AVAILABLE is set
+    if (process.env.FORCE_RUNTIME_AVAILABLE === 'true') {
+      console.log('[CHECK] TelegramMultiAgentPlugin: Forcing runtime available due to environment variable');
+      return true;
+    }
+    
+    // Basic check - do we have a runtime object?
+    if (!this.runtime) {
+      console.log('[CHECK] TelegramMultiAgentPlugin: Runtime is null or undefined');
       return false;
     }
-  }
-
-  /**
-   * Enhanced runtime retrieval that tries multiple sources
-   * @returns The runtime object or null if unavailable
-   */
-  private getRuntime(): IAgentRuntime | null {
-    console.log('[GETRUNTIME] TelegramMultiAgentPlugin: Attempting to get runtime');
     
-    // Try getting runtime from instance variable first
-    if (this.runtime) {
-      console.log('[GETRUNTIME] TelegramMultiAgentPlugin: Using runtime from instance variable');
-      return this.runtime;
-    }
-    
-    // Try getting runtime from global backup
+    // Check basic functionality - can we get the agent ID?
     try {
-      const globalRuntime = (global as any).__telegramMultiAgentRuntime;
-      if (globalRuntime) {
-        console.log('[GETRUNTIME] TelegramMultiAgentPlugin: Retrieved runtime from global backup');
-        // Store it back in the instance for future use
-        this.runtime = globalRuntime;
-        this.runtimeInitialized = true;
-        return globalRuntime;
+      const hasAgentIdMethod = typeof this.runtime.getAgentId === 'function';
+      if (!hasAgentIdMethod) {
+        console.log('[CHECK] TelegramMultiAgentPlugin: Runtime missing getAgentId method');
+        return false;
+      }
+      
+      // Try to actually get the agent ID
+      const agentId = this.runtime.getAgentId();
+      if (!agentId) {
+        console.log('[CHECK] TelegramMultiAgentPlugin: Runtime returns empty agent ID');
+        return false;
       }
     } catch (error) {
-      console.warn(`[GETRUNTIME] TelegramMultiAgentPlugin: Error accessing global runtime: ${error instanceof Error ? error.message : String(error)}`);
+      console.error(`[CHECK] TelegramMultiAgentPlugin: Error accessing runtime methods: ${error instanceof Error ? error.message : String(error)}`);
+      return false;
     }
     
-    // No runtime available
-    console.warn('[GETRUNTIME] TelegramMultiAgentPlugin: No runtime available from any source');
-    return null;
+    // Check for clients array
+    if (!this.runtime.clients || !Array.isArray(this.runtime.clients)) {
+      console.log('[CHECK] TelegramMultiAgentPlugin: Runtime missing clients array');
+      return this.runtimeInitialized; // Fall back to our tracked state if clients are missing
+    }
+    
+    // All checks passed
+    return true;
   }
 
   /**
@@ -1843,68 +1912,5 @@ export class TelegramMultiAgentPlugin implements Plugin {
     } catch (error) {
       this.logger.error(`[BOT2BOT] Error sending fallback response: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  /**
-   * Get the plugin version
-   * @returns The current version of the plugin
-   */
-  public getVersion(): string {
-    return this.version;
-  }
-
-  /**
-   * Initialize the bot functionality
-   * Called during the initialize() lifecycle method
-   */
-  private async initializeBot(): Promise<void> {
-    console.log('[BOT] TelegramMultiAgentPlugin: Initializing bot functionality');
-    
-    // Implementation will depend on your specific bot initialization needs
-    // This method should handle bot setup, commands, etc.
-    
-    // For now, just log that we're initialized
-    console.log('[BOT] TelegramMultiAgentPlugin: Bot functionality initialized');
-  }
-
-  /**
-   * Initialize the server functionality
-   * Called during the initialize() lifecycle method
-   */
-  private async initializeServer(): Promise<void> {
-    console.log('[SERVER] TelegramMultiAgentPlugin: Initializing server functionality');
-    
-    // Implementation will depend on your specific server needs
-    // This might include setting up webhooks, API endpoints, etc.
-    
-    // For now, just log that we're initialized
-    console.log('[SERVER] TelegramMultiAgentPlugin: Server functionality initialized');
-  }
-
-  /**
-   * Initialize the storage functionality
-   * Called during the initialize() lifecycle method
-   */
-  private async initializeStorage(): Promise<void> {
-    console.log('[STORAGE] TelegramMultiAgentPlugin: Initializing storage functionality');
-    
-    // Database adapter initialization logic
-    if (this.config.useSqliteAdapter) {
-      try {
-        // Ensure dbPath is set
-        const dbPath = this.config.dbPath || ':memory:';
-        console.log(`[STORAGE] TelegramMultiAgentPlugin: Using SQLite adapter with path: ${dbPath}`);
-        
-        // Initialize the SQLite adapter (already handles initialization internally)
-        this.dbAdapter = new SqliteDatabaseAdapter(dbPath);
-        
-        console.log('[STORAGE] TelegramMultiAgentPlugin: SQLite adapter initialized successfully');
-      } catch (error) {
-        console.error(`[STORAGE] TelegramMultiAgentPlugin: SQLite adapter initialization failed: ${error instanceof Error ? error.message : String(error)}`);
-        throw error;
-      }
-    }
-    
-    console.log('[STORAGE] TelegramMultiAgentPlugin: Storage functionality initialized');
   }
 } 

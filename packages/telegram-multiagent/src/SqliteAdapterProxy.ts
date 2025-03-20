@@ -4,6 +4,9 @@
  * not be available in all environments.
  */
 
+// Import better-sqlite3 directly - we've ensured it's in our dependencies
+import BetterSqlite3 from 'better-sqlite3';
+
 // Define basic types for compatibility
 export interface Database {
   exec: (sql: string) => void;
@@ -19,35 +22,55 @@ export interface Database {
 export class SqliteDatabaseAdapter {
   public db: Database;
   private dbPath: string;
-  private betterSqlite3: any;
 
   constructor(dbPath: string) {
     this.dbPath = dbPath;
-    this.betterSqlite3 = this.requireBetterSqlite3();
-    this.db = new this.betterSqlite3(dbPath);
-  }
-
-  private requireBetterSqlite3() {
+    console.log(`[SQLITE] Initializing database at path: ${dbPath}`);
+    
     try {
-      // Dynamic import to avoid bundling issues
-      return require('better-sqlite3');
+      // Create a new database instance
+      this.db = new BetterSqlite3(dbPath);
+      console.log('[SQLITE] Successfully created SQLite database');
     } catch (error) {
-      console.error('Failed to load better-sqlite3. SQLite functionality will not be available.');
-      throw new Error('SQLite adapter requires better-sqlite3 package');
+      console.error('[SQLITE] Failed to create SQLite database:', error);
+      throw new Error(`Failed to create SQLite database: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   
   async init() {
     // This would normally initialize tables, but we'll let the coordination adapter handle it
+    console.log('[SQLITE] Adapter initialized');
   }
 
   async close() {
     if (this.db) {
       try {
         this.db.close();
+        console.log('[SQLITE] Database closed successfully');
       } catch (error) {
-        console.error('Error closing SQLite database:', error);
+        console.error('[SQLITE] Error closing SQLite database:', error);
       }
     }
+  }
+  
+  // Helper methods for working with the database
+  
+  async createTable(tableName: string, schema: string) {
+    try {
+      this.db.exec(`CREATE TABLE IF NOT EXISTS ${tableName} (${schema})`);
+      console.log(`[SQLITE] Created table: ${tableName}`);
+      return true;
+    } catch (error) {
+      console.error(`[SQLITE] Error creating table ${tableName}:`, error);
+      return false;
+    }
+  }
+  
+  prepare(sql: string) {
+    return this.db.prepare(sql);
+  }
+  
+  exec(sql: string) {
+    return this.db.exec(sql);
   }
 } 

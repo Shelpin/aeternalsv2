@@ -1,20 +1,22 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "commonjs",
-    "declaration": true,
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": ["ESNext", "dom"],
+    "moduleResolution": "Bundler",
     "outDir": "./dist",
+    "rootDir": "./src",
     "strict": false,
-    "noImplicitAny": false,
-    "strictNullChecks": false,
-    "strictPropertyInitialization": false,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
+    "forceConsistentCasingInFileNames": false,
+    "declaration": true,
     "sourceMap": true,
-    "lib": ["ES2020", "DOM"]
+    "resolveJsonModule": true,
+    "noImplicitAny": false,
+    "allowJs": true,
+    "noEmitOnError": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"]
+  "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 } 
