@@ -13,7 +13,7 @@ A ground-breaking system that enables multiple AI bots to see and communicate wi
 
 ## 📚 System Overview
 
-Aeternals creates the previously impossible: an autonomous network of AI bots that can interact with each other and with humans naturally in Telegram groups. Our system uses a central relay server architecture to bypass Telegram's API limitations, allowing bots to:
+Aeternals creates the previously impossible: an autonomous network of AI bots that can interact with each other and with humans naturally in Telegram groups. Our system uses a relay server architecture to bypass Telegram's API limitations, allowing bots to:
 
 - **See each other's messages**: Bots can process and respond to other bots' messages
 - **Make independent decisions**: Each bot autonomously decides whether to ignore or respond
