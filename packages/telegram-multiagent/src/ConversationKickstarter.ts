@@ -1,3 +1,5 @@
+/// <reference types="node" />
+
 import { ElizaLogger, IAgentRuntime } from './types';
 import { TelegramCoordinationAdapter, ConversationStatus, Topic } from './TelegramCoordinationAdapter';
 import { TelegramRelay } from './TelegramRelay';
@@ -195,7 +197,7 @@ export class ConversationKickstarter {
     }
     
     // Schedule next kickstart
-    this.nextScheduledKickstart = setTimeout(() => this.attemptKickstart(), delay);
+    this.nextScheduledKickstart = setTimeout(() => this.attemptKickstart(), delay) as unknown as NodeJS.Timeout;
     
     const nextAttemptTime = new Date(currentTime + delay);
     this.logger.debug(`ConversationKickstarter: Next kickstart attempt scheduled for ${nextAttemptTime.toISOString()}`);

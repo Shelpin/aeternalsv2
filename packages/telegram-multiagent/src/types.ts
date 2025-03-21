@@ -10,17 +10,28 @@ export interface ElizaLogger {
   error(message: string, ...args: any[]): void;
 }
 
-// Agent runtime interface
+/**
+ * Interface representing an agent runtime environment
+ */
 export interface IAgentRuntime {
-  registerPlugin(plugin: any): boolean;
+  // Add new optional agent property
+  agent?: {
+    name?: string;
+    [key: string]: any;
+  };
+  registerPlugin?: (plugin: any) => boolean;
   getAgentId(): string;
   getService(name: string): any;
   registerService?(name: string, service: any): void;
   getCharacter?(): Character;
+  [key: string]: any;
 }
 
-// Plugin interface
+// Plugin interface - simplified
 export interface Plugin {
+  name: string;
+  description: string;
+  npmName?: string;
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
 }
@@ -126,4 +137,16 @@ export interface Runtime {
   registerService(name: string, service: any): void;
   getService(name: string): any;
   start(): Promise<void>;
-} 
+}
+
+// For CommonJS interoperability
+// eslint-disable-next-line no-undef
+module.exports.ElizaLogger = {} as ElizaLogger;
+// eslint-disable-next-line no-undef
+module.exports.IAgentRuntime = {} as IAgentRuntime;
+// eslint-disable-next-line no-undef
+module.exports.Plugin = {} as Plugin;
+// eslint-disable-next-line no-undef
+module.exports.MessageStatus = MessageStatus;
+// eslint-disable-next-line no-undef
+module.exports.FollowUpType = FollowUpType; 

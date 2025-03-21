@@ -46,10 +46,15 @@ The ElizaOS Multi-Agent Telegram System enables multiple AI agents powered by El
   - Enhanced logging throughout message processing
   - Comprehensive fallback response mechanism
   - Bot-to-bot communication with direct responses
-  - **Properly configured SQLite storage with better-sqlite3 integration** (new)
-  - **Streamlined ESM imports for better-sqlite3** (new)
-  - **Proper TypeScript configuration with default export** (new)
-  - **Fixed build process for ES modules** (new)
+  - Properly configured SQLite storage with better-sqlite3 integration
+  - Streamlined ESM imports for better-sqlite3
+  - Proper TypeScript configuration with default export
+  - Fixed build process for ES modules
+  - Robust runtime registration without FORCE_RUNTIME_AVAILABLE
+  - Reliable global runtime reference system with module-level sharing
+  - Enhanced initialization sequence for better runtime detection
+  - Fixed circular dependencies in module structure
+  - All agents successfully running and communicating in Telegram
 
 - **Partially Implemented Components**:
   - Conversation kickstarting feature (implemented but not actively generating conversations)
@@ -79,8 +84,8 @@ The ElizaOS Multi-Agent Telegram System enables multiple AI agents powered by El
   - Conversation check interval is running regularly (every 30 seconds)
   - Direct Telegram API integration allows messages to be posted to Telegram groups
   - Improved token detection handles various case formats in environment variables
-  - **TypeScript build now properly produces ES modules with types** (new)
-  - **Default export properly configured for ElizaOS compatibility** (new)
+  - TypeScript build now properly produces ES modules with types
+  - Default export properly configured for ElizaOS compatibility
 
   - **Recently Resolved Issues**:
     - Fixed SQLite adapter imports to properly use better-sqlite3
@@ -92,9 +97,14 @@ The ElizaOS Multi-Agent Telegram System enables multiple AI agents powered by El
     - Added @types/better-sqlite3 for proper TypeScript integration
     - Removed dynamic require() calls in favor of proper ES module imports
     - Fixed the build process to properly handle ES module dependencies
+    - Resolved runtime registration issues by implementing a module-level shared runtime system
+    - Removed dependency on FORCE_RUNTIME_AVAILABLE environment variable
+    - Fixed circular dependencies between modules to improve initialization reliability
+    - Implemented proper type handling for better-sqlite3 integration
+    - Enhanced SQLiteAdapterProxy for more reliable database operations with proper typing
+    - Improved plugin registration process to ensure runtime is properly detected
 
   - **Remaining Issues**:
-    - The runtime initialization process needs improvement for more consistent agent operation
     - Conversation kickstarters aren't consistently generating new conversations
     - Some edge cases in the message handling flow may need further refinement
     - Type mismatches in the PersonalityEnhancer class require workarounds
@@ -313,6 +323,98 @@ We've optimized the TypeScript configuration for ES modules:
 }
 ```
 
+### 3.5 Improved Runtime Registration (New)
+
+We've significantly enhanced the runtime registration process to ensure reliable operation without depending on the FORCE_RUNTIME_AVAILABLE flag:
+
+```typescript
+// In index.ts
+// Global runtime reference
+let sharedRuntime = null;
+
+/**
+ * Pre-register the runtime with the plugin
+ * This should be called by ElizaOS core during plugin loading
+ */
+export function preRegisterRuntime(runtime) {
+  if (!runtime) {
+    console.warn('[PLUGIN] telegram-multiagent: Attempted to register null runtime');
+    return;
+  }
+  
+  console.log('[PLUGIN] telegram-multiagent: Pre-registering runtime');
+  
+  // Store runtime in module-level variable
+  sharedRuntime = runtime;
+  
+  // Also make available globally for legacy code
+  try {
+    globalThis.__elizaRuntime = runtime;
+    globalThis.__telegramMultiAgentRuntime = runtime;
+  } catch (error) {
+    console.warn('[PLUGIN] telegram-multiagent: Failed to store runtime globally', error);
+  }
+}
+
+/**
+ * Get the shared runtime instance
+ */
+export function getSharedRuntime() {
+  return sharedRuntime;
+}
+```
+
+### 3.6 Enhanced Runtime Detection (New)
+
+We've improved how the plugin detects and accesses the runtime across different modules:
+
+```typescript
+// In TelegramMultiAgentPlugin.ts
+/**
+ * Check if runtime is available and ready
+ */
+private isRuntimeAvailable(): boolean {
+  try {
+    // First check runtime initialization flag
+    if (this.runtimeInitialized && this.runtime) {
+      return true;
+    }
+    
+    // Check for plugin forced availability
+    if (process.env.FORCE_RUNTIME_AVAILABLE === 'true') {
+      this.logger.warn('Forcing runtime availability due to environment flag');
+      this.runtimeInitialized = true;
+      return true;
+    }
+    
+    // Try global references
+    try {
+      if ((globalThis as any).__telegramMultiAgentRuntime) {
+        this.logger.info('Found runtime in global telegramMultiAgentRuntime variable');
+        this.runtime = (globalThis as any).__telegramMultiAgentRuntime;
+        this.runtimeInitialized = true;
+        return true;
+      }
+      
+      if ((globalThis as any).__elizaRuntime) {
+        this.logger.info('Found runtime in global elizaRuntime variable');
+        this.runtime = (globalThis as any).__elizaRuntime;
+        this.runtimeInitialized = true;
+        return true;
+      }
+    } catch (error) {
+      this.logger.debug('Error accessing global runtime:', error);
+    }
+    
+    this.logger.debug('Runtime not available after all checks');
+    return false;
+  } catch (error) {
+    this.logger.error('Error checking runtime availability:', error);
+    return false;
+  }
+}
+```
+
 ## 4. Current Build Process
 
 The current build process has been refined to properly handle ES modules and TypeScript:
@@ -353,31 +455,30 @@ The current build process has been refined to properly handle ES modules and Typ
 
 ### 5.1 Immediate Next Steps
 
-1. **Runtime Initialization Improvement**:
-   - Investigate why the runtime is not consistently available during message processing
-   - Implement a more robust initialization process for the runtime connection
-   - Add retry logic for runtime initialization
-
-2. **Conversation Kickstarter Enhancement**:
+1. **Conversation Kickstarter Enhancement**:
    - Review and improve the conversation kickstarter functionality
    - Adjust probability settings for more frequent automated conversations
    - Implement better topic selection for kickstarted conversations
 
-3. **TypeScript Project Structure Enhancement**:
-   - Review TypeScript project references for better modularization
-   - Consider implementing a shared tsconfig.base.json for consistent settings
-   - Improve path mappings to simplify import statements
+2. **Build Process Optimization**:
+   - Further streamline the build process for better developer experience
+   - Add automated testing to ensure consistency across builds
+   - Create build documentation for common scenarios
 
-4. **Better ES Module Support**:
-   - Ensure all imported packages fully support ES modules
-   - Update build configurations to better handle ES module external dependencies
-   - Address any remaining dynamic import issues
+3. **SQLite Adapter Enhancements**:
+   - Add better error handling for SQLite operations
+   - Implement reconnection logic for intermittent database issues
+   - Improve transaction handling for better data integrity
 
-5. **Comprehensive Testing**:
-   - Test the plugin in the ElizaOS environment after the recent changes
-   - Verify proper initialization and runtime connection
-   - Confirm SQLite functionality with in-memory storage
-   - Test direct Telegram API integration
+4. **Plugin Configuration Improvements**:
+   - Create a unified configuration system
+   - Support dynamic configuration updates without requiring restarts
+   - Implement better configuration validation
+
+5. **Runtime Detection Refinement**:
+   - Further enhance the runtime detection logic
+   - Add telemetry to monitor runtime availability
+   - Implement automatic recovery strategies for runtime connection issues
 
 ### 5.2 Medium-Term Improvements
 

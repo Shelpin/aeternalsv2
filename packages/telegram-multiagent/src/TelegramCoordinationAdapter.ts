@@ -152,7 +152,7 @@ export class TelegramCoordinationAdapter {
     if (!this.db) return undefined;
     
     try {
-      const stmt = this.db.db.prepare(sql);
+      const stmt = (this.db as any).db.prepare(sql);
       // We'll use a typed function that accepts a spread of parameters
       // This avoids the "Expected 1 arguments, but got 2" error
       return stmt.get(...params) as T;
@@ -172,7 +172,7 @@ export class TelegramCoordinationAdapter {
     if (!this.db) return [];
     
     try {
-      const stmt = this.db.db.prepare(sql);
+      const stmt = (this.db as any).db.prepare(sql);
       // We'll use a typed function that accepts a spread of parameters
       return stmt.all(...params) as T[];
     } catch (error) {
@@ -191,7 +191,7 @@ export class TelegramCoordinationAdapter {
     if (!this.db) return { changes: 0 };
     
     try {
-      const stmt = this.db.db.prepare(sql);
+      const stmt = (this.db as any).db.prepare(sql);
       // We'll use a typed function that accepts a spread of parameters
       return stmt.run(...params);
     } catch (error) {
@@ -207,7 +207,7 @@ export class TelegramCoordinationAdapter {
     if (this.db) {
       try {
         // Initialize the database with Telegram-specific schema
-        this.db.db.exec(telegramMultiAgentSchema);
+        (this.db as any).db.exec(telegramMultiAgentSchema);
         this.logger.info('TelegramCoordinationAdapter: Database initialized successfully');
       } catch (error) {
         this.logger.error('TelegramCoordinationAdapter: Failed to initialize database', error);
@@ -1107,6 +1107,68 @@ export class TelegramCoordinationAdapter {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.warn(`TelegramCoordinationAdapter: Error getting preferred topics: ${errorMessage}`);
       return ['cryptocurrency', 'blockchain', 'technology'];
+    }
+  }
+
+  /**
+   * Process a message from Telegram
+   * @param chatId The ID of the chat the message was received in
+   * @param text The text content of the message
+   * @param sender The sender of the message
+   * @param isBotMentioned Whether the bot was mentioned in the message
+   */
+  processMessage(chatId: number | string, text: string, sender: string, isBotMentioned: boolean): void {
+    try {
+      console.log(`[COORD] TelegramCoordinationAdapter: Processing message from ${sender} in chat ${chatId}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
+      
+      // Convert chatId to numeric if it's a string
+      const numericChatId = typeof chatId === 'string' ? parseInt(chatId, 10) : chatId;
+      
+      // Store the message in the database
+      this.storeMessage(numericChatId, text, sender);
+      
+      // If the bot was mentioned, update the active conversations
+      if (isBotMentioned) {
+        console.log(`[COORD] TelegramCoordinationAdapter: Bot was mentioned, updating conversation status`);
+        this.updateConversationStatus(numericChatId, ConversationStatus.ACTIVE);
+      }
+    } catch (error) {
+      console.error(`[COORD] TelegramCoordinationAdapter: Error processing message: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Store a message in the database
+   * @param chatId The ID of the chat the message was received in
+   * @param text The text content of the message
+   * @param sender The sender of the message
+   */
+  private storeMessage(chatId: number, text: string, sender: string): void {
+    try {
+      console.log(`[COORD] TelegramCoordinationAdapter: Storing message from ${sender} in chat ${chatId}`);
+      
+      // Here we would typically store the message in a database
+      // For now, just log that we're storing it
+      console.log(`[COORD] TelegramCoordinationAdapter: Message stored (mock implementation)`);
+    } catch (error) {
+      console.error(`[COORD] TelegramCoordinationAdapter: Error storing message: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Update the status of a conversation
+   * @param chatId The ID of the chat
+   * @param status The new status of the conversation
+   */
+  private updateConversationStatus(chatId: number, status: ConversationStatus): void {
+    try {
+      console.log(`[COORD] TelegramCoordinationAdapter: Updating conversation status for chat ${chatId} to ${status}`);
+      
+      // Here we would typically update the conversation status in a database
+      // For now, just log that we're updating it
+      console.log(`[COORD] TelegramCoordinationAdapter: Conversation status updated (mock implementation)`);
+    } catch (error) {
+      console.error(`[COORD] TelegramCoordinationAdapter: Error updating conversation status: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 } 

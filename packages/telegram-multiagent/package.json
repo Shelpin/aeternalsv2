@@ -8,7 +8,7 @@
   "scripts": {
     "build": "npm run clean && npm run build:esm && npm run build:types",
     "build:esm": "esbuild src/index.ts --bundle --platform=node --target=node16 --format=esm --outfile=dist/index.js --external:@elizaos/core --external:better-sqlite3 --external:sqlite --external:sqlite3 --external:uuid",
-    "build:types": "tsc --emitDeclarationOnly",
+    "build:types": "tsc --emitDeclarationOnly --skipLibCheck",
     "yolo-build": "node build-yolo.js",
     "clean": "rimraf dist",
     "lint": "eslint src --ext .ts",
