@@ -13,7 +13,7 @@ import { TelegramRelay } from './TelegramRelay';
  * ConversationKickstarter initiates conversations between agents in Telegram groups
  */
 export class ConversationKickstarter {
-  private runtime: IAgentRuntime;
+  private runtime: IAgentRuntime | null;
   private logger: ElizaLogger;
   private conversationManager: ConversationManager;
   private relay: TelegramRelay;
@@ -30,15 +30,16 @@ export class ConversationKickstarter {
   /**
    * Create a new ConversationKickstarter
    * 
-   * @param runtime - Agent runtime
+   * @param runtime - Agent runtime (can be null for testing)
    * @param logger - Logger instance
    * @param conversationManager - Conversation manager
    * @param relay - Telegram relay
    * @param config - Kickstarter configuration
    * @param groupId - Group ID this kickstarter is for
+   * @param personality - Personality enhancer for messages
    */
   constructor(
-    runtime: IAgentRuntime,
+    runtime: IAgentRuntime | null,
     logger: ElizaLogger,
     conversationManager: ConversationManager,
     relay: TelegramRelay,
@@ -59,7 +60,20 @@ export class ConversationKickstarter {
       ...config
     };
     this.groupId = groupId;
-    this.agentId = runtime.getAgentId();
+    
+    // Get agent ID from runtime or fallback to environment variable
+    if (this.runtime) {
+      try {
+        this.agentId = this.runtime.getAgentId();
+      } catch (error) {
+        this.agentId = process.env.AGENT_ID || 'unknown-agent';
+        this.logger.warn(`ConversationKickstarter: Could not get agent ID from runtime, using fallback: ${this.agentId}`);
+      }
+    } else {
+      this.agentId = process.env.AGENT_ID || 'unknown-agent';
+      this.logger.warn(`ConversationKickstarter: Runtime not available, using fallback agent ID: ${this.agentId}`);
+    }
+    
     this.personality = personality;
     
     this.logger.info('ConversationKickstarter: Initialized');
@@ -73,7 +87,7 @@ export class ConversationKickstarter {
   updateKnownAgents(agents: string[]): void {
     // Filter out this agent and any invalid IDs
     this.knownAgents = agents.filter(id => 
-      id && id !== this.runtime.getAgentId()
+      id && id !== this.runtime?.getAgentId()
     );
     
     this.logger.debug(`ConversationKickstarter: Updated known agents, ${this.knownAgents.length} available`);

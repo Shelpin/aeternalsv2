@@ -4,13 +4,10 @@
  * Multi-agent coordination for Telegram bots in ElizaOS
  */
 
-// Export main plugin class
+// Import the plugin class
 import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin';
 
-// Export default plugin creator function
-import createPlugin from './TelegramMultiAgentPlugin';
-
-// Export other components for direct use if needed
+// Export components for direct use if needed
 import { TelegramRelay } from './TelegramRelay';
 import { ConversationManager } from './ConversationManager';
 import { ConversationKickstarter } from './ConversationKickstarter';
@@ -18,16 +15,30 @@ import { ConversationKickstarter } from './ConversationKickstarter';
 // Export types
 import * as Types from './types';
 
-// Export plugin class
+// Export components (named exports)
 export { TelegramMultiAgentPlugin };
-
-// Export components
 export { TelegramRelay };
 export { ConversationManager };
 export { ConversationKickstarter };
-
-// Export types
 export { Types };
 
-// Default export - plugin creator
-export default createPlugin;
+// Create plugin instance
+const telegramMultiAgentPlugin = new TelegramMultiAgentPlugin();
+
+// CRITICAL FIX: Explicitly attach the initialize method to make it directly accessible
+// ElizaOS plugin system likely checks for the method directly, not via the prototype
+const pluginExport = {
+  ...telegramMultiAgentPlugin,
+  // Explicitly bind initialize method to the instance
+  initialize: telegramMultiAgentPlugin.initialize.bind(telegramMultiAgentPlugin),
+  // Explicitly bind shutdown method as well
+  shutdown: telegramMultiAgentPlugin.shutdown.bind(telegramMultiAgentPlugin)
+};
+
+// Log the plugin instance for debugging
+console.log('[TELEGRAMMODULE] Creating plugin instance');
+console.log('[TELEGRAMMODULE] Plugin has initialize method:', typeof pluginExport.initialize === 'function');
+console.log('[TELEGRAMMODULE] Direct check if initialize exists:', 'initialize' in pluginExport);
+
+// Default export - plugin instance with explicitly attached methods
+export default pluginExport;

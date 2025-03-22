@@ -23,17 +23,17 @@ enum ConversationState {
  * using the ElizaOS memory system for persistent state tracking
  */
 export class ConversationManager {
-  private runtime: IAgentRuntime;
+  private runtime: IAgentRuntime | null;
   private logger: ElizaLogger;
   private memoryNamespace = 'telegram-multiagent';
   
   /**
    * Create a new ConversationManager
    * 
-   * @param runtime - Agent runtime
+   * @param runtime - Agent runtime (can be null for testing)
    * @param logger - Logger instance
    */
-  constructor(runtime: IAgentRuntime, logger: ElizaLogger) {
+  constructor(runtime: IAgentRuntime | null, logger: ElizaLogger) {
     this.runtime = runtime;
     this.logger = logger;
   }
@@ -43,6 +43,12 @@ export class ConversationManager {
    */
   async initialize(): Promise<void> {
     this.logger.info('ConversationManager: Initializing');
+    
+    // Skip memory check if runtime is not available
+    if (!this.runtime) {
+      this.logger.warn('ConversationManager: Runtime not available, operating in limited mode');
+      return;
+    }
     
     // Check if memory is available
     if (!this.runtime.memoryManager) {
@@ -61,50 +67,72 @@ export class ConversationManager {
   }
   
   /**
-   * Get conversation state for a group
+   * Get the current state of a conversation in a group
    * 
    * @param groupId - Telegram group ID
-   * @returns Conversation state or null if not found
+   * @returns The conversation state or null if not found
    */
   async getConversationState(groupId: string | number): Promise<ConversationStateTracking | null> {
+    // Skip if runtime is not available
+    if (!this.runtime || !this.runtime.memoryManager) {
+      this.logger.warn(`ConversationManager: Cannot get conversation state - runtime or memory not available`);
+      return null;
+    }
+
     try {
+      await this.ensureMemoryNamespaceExists();
+      
       const memoryKey = this.getMemoryKey(groupId);
       
       // Query the memory system
       const query: MemoryQuery = {
-        roomId: memoryKey,
-        type: 'conversation_state'
+        roomId: this.memoryNamespace,
+        type: memoryKey
       };
       
       const memories = await this.runtime.memoryManager.getMemories(query);
       
-      if (!memories || memories.length === 0) {
-        this.logger.debug(`ConversationManager: No conversation state found for group ${groupId}`);
-        return null;
+      if (memories && memories.length > 0) {
+        // Get the most recent state
+        const latestMemory = memories.reduce((prev, current) => {
+          const prevDate = prev.createdAt instanceof Date ? prev.createdAt : new Date(prev.createdAt);
+          const currDate = current.createdAt instanceof Date ? current.createdAt : new Date(current.createdAt);
+          return prevDate > currDate ? prev : current;
+        });
+        
+        // Extract conversation state from memory metadata
+        return latestMemory.content.metadata as ConversationStateTracking;
       }
       
-      this.logger.debug(`ConversationManager: Retrieved conversation state for group ${groupId}`);
-      return memories[0].content.metadata as ConversationStateTracking;
+      return null;
     } catch (error) {
-      this.logger.error(`ConversationManager: Error getting conversation state: ${error.message}`);
+      this.logger.error(`ConversationManager: Error getting conversation state for group ${groupId}: ${error}`);
       return null;
     }
   }
   
   /**
-   * Store conversation state for a group
+   * Store the state of a conversation in a group
    * 
    * @param groupId - Telegram group ID
-   * @param state - Conversation state
-   * @returns True if stored successfully, false otherwise
+   * @param state - The conversation state to store
+   * @returns True if successfully stored
    */
   async storeConversationState(groupId: string | number, state: ConversationStateTracking): Promise<boolean> {
+    // Skip if runtime is not available
+    if (!this.runtime || !this.runtime.memoryManager) {
+      this.logger.warn(`ConversationManager: Cannot store conversation state - runtime or memory not available`);
+      return false;
+    }
+
     try {
+      await this.ensureMemoryNamespaceExists();
+      
       const memoryKey = this.getMemoryKey(groupId);
       
-      // Create memory data
+      // Create memory data in the correct format
       const memoryData: MemoryData = {
-        roomId: memoryKey,
+        roomId: this.memoryNamespace,
         userId: 'system',
         content: {
           text: `Conversation state for group ${groupId}`,
@@ -113,39 +141,44 @@ export class ConversationManager {
             groupId: groupId.toString()
           }
         },
-        type: 'conversation_state'
+        type: memoryKey
       };
       
-      // Store in memory system
       await this.runtime.memoryManager.createMemory(memoryData);
+      this.logger.debug(`ConversationManager: Stored state for group ${groupId}`);
       
-      this.logger.debug(`ConversationManager: Stored conversation state for group ${groupId}`);
       return true;
     } catch (error) {
-      this.logger.error(`ConversationManager: Error storing conversation state: ${error.message}`);
+      this.logger.error(`ConversationManager: Error storing conversation state for group ${groupId}: ${error}`);
       return false;
     }
   }
   
   /**
-   * Update conversation state for a group
+   * Update an existing conversation state with partial changes
    * 
    * @param groupId - Telegram group ID
-   * @param updates - Partial conversation state updates
-   * @returns Updated conversation state or null if failed
+   * @param updates - Partial state changes to apply
+   * @returns The updated state or null if failed
    */
   async updateConversationState(
     groupId: string | number, 
     updates: Partial<ConversationStateTracking>
   ): Promise<ConversationStateTracking | null> {
+    // Skip if runtime is not available
+    if (!this.runtime || !this.runtime.memoryManager) {
+      this.logger.warn(`ConversationManager: Cannot update conversation state - runtime or memory not available`);
+      return null;
+    }
+
     try {
       // Get current state
       let currentState = await this.getConversationState(groupId);
       
+      // If no existing state, create a new one
       if (!currentState) {
-        // Initialize new state if none exists
         currentState = {
-          status: 'inactive',
+          status: 'inactive' as 'inactive' | 'active' | 'starting' | 'ending',
           lastMessageTimestamp: Date.now(),
           lastSpeakerId: null,
           messageCount: 0,
@@ -155,23 +188,23 @@ export class ConversationManager {
         };
       }
       
-      // Apply updates
-      const updatedState = {
+      // Update the state
+      const updatedState: ConversationStateTracking = {
         ...currentState,
         ...updates,
         lastUpdated: Date.now()
       };
       
-      // Store updated state
+      // Store the updated state
       const success = await this.storeConversationState(groupId, updatedState);
       
-      if (!success) {
-        return null;
+      if (success) {
+        return updatedState;
       }
       
-      return updatedState;
+      return null;
     } catch (error) {
-      this.logger.error(`ConversationManager: Error updating conversation state: ${error.message}`);
+      this.logger.error(`ConversationManager: Error updating conversation state for group ${groupId}: ${error}`);
       return null;
     }
   }
@@ -190,31 +223,46 @@ export class ConversationManager {
     fromAgentId: string | null
   ): Promise<boolean> {
     try {
+      console.log(`[CONVO_MANAGER] Checking if ${agentId} should respond to message from ${fromAgentId || 'unknown'} in group ${groupId}`);
+      
       // Get current conversation state
       const state = await this.getConversationState(groupId);
       
       if (!state) {
         // No conversation in progress, allow response
+        console.log(`[CONVO_MANAGER] No conversation state, ${agentId} can respond to ${fromAgentId || 'human'}`);
         this.logger.debug(`ConversationManager: No conversation state, ${agentId} can respond to ${fromAgentId || 'human'}`);
         return true;
       }
       
       // Don't respond to our own messages
       if (fromAgentId === agentId) {
+        console.log(`[CONVO_MANAGER] Agent ${agentId} should not respond to itself`);
         this.logger.debug(`ConversationManager: Agent ${agentId} should not respond to itself`);
         return false;
       }
       
       // If this is the first message in conversation, any agent can respond
       if (state.messageCount === 0) {
+        console.log(`[CONVO_MANAGER] First message in conversation, ${agentId} can respond`);
         this.logger.debug(`ConversationManager: First message in conversation, ${agentId} can respond`);
         return true;
       }
       
       // Don't respond if we were the last speaker
       if (state.lastSpeakerId === agentId) {
+        console.log(`[CONVO_MANAGER] Agent ${agentId} was the last speaker, should not respond`);
         this.logger.debug(`ConversationManager: Agent ${agentId} was the last speaker, should not respond`);
         return false;
+      }
+      
+      // Always use a higher probability for bot-to-bot communication to ensure interactions happen
+      if (fromAgentId && fromAgentId.includes("Bot")) {
+        console.log(`[CONVO_MANAGER] Message is from another bot (${fromAgentId}), using higher response probability`);
+        // 50% chance to respond to other bots to make sure interactions happen
+        const shouldRespond = Math.random() < 0.5;
+        console.log(`[CONVO_MANAGER] Bot-to-bot response decision: ${shouldRespond}`);
+        return shouldRespond;
       }
       
       // Randomize response probability based on number of participants
@@ -223,10 +271,12 @@ export class ConversationManager {
       const responseChance = 1 / participantCount;
       const shouldRespond = Math.random() <= responseChance;
       
+      console.log(`[CONVO_MANAGER] Agent ${agentId} response probability ${responseChance}, shouldRespond=${shouldRespond}`);
       this.logger.debug(`ConversationManager: Agent ${agentId} response probability ${responseChance}, shouldRespond=${shouldRespond}`);
       
       return shouldRespond;
     } catch (error) {
+      console.error(`[CONVO_MANAGER] Error checking if agent should respond:`, error);
       this.logger.error(`ConversationManager: Error checking if agent should respond: ${error.message}`);
       // Default to allowing response in case of error
       return true;
@@ -350,34 +400,46 @@ export class ConversationManager {
   }
   
   /**
-   * Ensure memory namespace exists
+   * Ensure the memory namespace exists
    */
   private async ensureMemoryNamespaceExists(): Promise<void> {
+    // Skip if runtime is not available
+    if (!this.runtime || !this.runtime.memoryManager) {
+      this.logger.warn('ConversationManager: Cannot ensure memory namespace - runtime or memory not available');
+      return;
+    }
+
     try {
-      // Check if namespace exists by trying to get a key
-      const initMemory = await this.runtime.memoryManager.getMemories({
-        roomId: 'system',
-        type: 'initialization'
-      });
+      // Check if the namespace exists by querying it
+      const query: MemoryQuery = {
+        roomId: this.memoryNamespace,
+        count: 1
+      };
       
-      if (!initMemory || initMemory.length === 0) {
-        // Initialize namespace with a sentinel value
-        await this.runtime.memoryManager.createMemory({
-          roomId: 'system',
+      const memories = await this.runtime.memoryManager.getMemories(query);
+      
+      // If there are no memories, create a namespace marker
+      if (!memories || memories.length === 0) {
+        this.logger.debug(`ConversationManager: Creating memory namespace: ${this.memoryNamespace}`);
+        
+        // Create a marker memory to establish the namespace
+        const namespaceMarker: MemoryData = {
+          roomId: this.memoryNamespace,
           userId: 'system',
           content: {
-            text: 'Telegram Multi-Agent initialization record',
+            text: `${this.memoryNamespace} namespace`,
             metadata: {
-              initialized: true,
-              timestamp: Date.now()
+              type: 'namespace_marker',
+              created: Date.now()
             }
           },
-          type: 'initialization'
-        });
+          type: 'namespace_marker'
+        };
+        
+        await this.runtime.memoryManager.createMemory(namespaceMarker);
       }
     } catch (error) {
-      this.logger.error(`ConversationManager: Error ensuring memory namespace exists: ${error.message}`);
-      throw error;
+      this.logger.error(`ConversationManager: Error ensuring memory namespace: ${error}`);
     }
   }
   

@@ -72,7 +72,10 @@ export class TelegramRelay {
       
       if (!healthCheck.ok) {
         this.logger.warn(`Relay server health check failed with status ${healthCheck.status}`);
+        return false;
       }
+      
+      this.logger.debug(`Health check succeeded, registering agent: ${this.config.agentId}`);
       
       // Register with the relay server
       const payload = {
@@ -80,13 +83,14 @@ export class TelegramRelay {
         token: this.config.authToken
       };
       
+      this.logger.debug(`Registration payload: ${JSON.stringify(payload)}`);
+      
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/register`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.authToken}`
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload)
         }
@@ -99,26 +103,31 @@ export class TelegramRelay {
       }
       
       const data = await response.json();
-      this.logger.info(`Registration successful, connected agents: ${data.connected_agents?.join(', ') || 'none'}`);
       
-      // Update connected agents list
-      if (data.connected_agents && this.agentUpdateHandlers.length > 0) {
-        for (const handler of this.agentUpdateHandlers) {
-          handler(data.connected_agents);
-        }
+      if (!data.success) {
+        this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
+        return false;
       }
       
+      this.logger.info(`Successfully registered with relay server: ${JSON.stringify(data)}`);
       this.connected = true;
       
-      // Start polling for updates
+      // Start ping interval
+      this.setupPingInterval();
+      
+      // Start update polling
       this.startUpdatePolling();
       
-      // Start heartbeat
-      this.setupPingInterval();
+      // Fetch available agents
+      const agents = await this.getAvailableAgents();
+      this.logger.info(`Available agents: ${agents.join(', ')}`);
+      
+      // Notify agent update handlers
+      this.agentUpdateHandlers.forEach(handler => handler(agents));
       
       return true;
     } catch (error) {
-      this.logger.error(`Connection error: ${error.message}`);
+      this.logger.error(`Failed to connect to relay server: ${error.message}`);
       this.scheduleReconnect();
       return false;
     }
@@ -516,25 +525,35 @@ export class TelegramRelay {
   }
 
   /**
-   * Get the list of available agents
+   * Get available agents from the relay server
    * 
-   * @returns Array of agent IDs
+   * @returns List of agent IDs
    */
-  private async getAvailableAgents(): Promise<string[]> {
+  async getAvailableAgents(): Promise<string[]> {
     try {
+      this.logger.debug(`Fetching available agents from: ${this.config.relayServerUrl}/health`);
+      
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/health`,
         { method: 'GET' }
       );
       
       if (!response.ok) {
+        this.logger.warn(`Failed to fetch available agents: ${response.status}`);
         return [];
       }
       
       const data = await response.json();
-      return data.agents_list || [];
+      this.logger.debug(`Health response: ${JSON.stringify(data)}`);
+      
+      if (data.agents_list && typeof data.agents_list === 'string') {
+        const agents = data.agents_list.split(',').filter(Boolean);
+        return agents;
+      }
+      
+      return [];
     } catch (error) {
-      this.logger.error(`Error getting available agents: ${error.message}`);
+      this.logger.error(`Error fetching available agents: ${error.message}`);
       return [];
     }
   }
