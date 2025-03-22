@@ -4,6 +4,7 @@
 
 // Logger interface
 export interface ElizaLogger {
+  trace(message: string, ...args: any[]): void;
   debug(message: string, ...args: any[]): void;
   info(message: string, ...args: any[]): void;
   warn(message: string, ...args: any[]): void;
@@ -14,7 +15,7 @@ export interface ElizaLogger {
  * Interface representing an agent runtime environment
  */
 export interface IAgentRuntime {
-  // Add new optional agent property
+  // Core Agent properties
   agent?: {
     name?: string;
     [key: string]: any;
@@ -24,7 +25,69 @@ export interface IAgentRuntime {
   getService(name: string): any;
   registerService?(name: string, service: any): void;
   getCharacter?(): Character;
+  
+  // Memory management
+  memoryManager?: {
+    createMemory: (data: MemoryData) => Promise<any>;
+    getMemories: (options: MemoryQuery) => Promise<Memory[]>;
+    addEmbeddingToMemory?: (memoryId: string, embedding: number[]) => Promise<void>;
+  };
+  
+  // Response handling
+  handleMessage?: (message: any) => Promise<any>;
+  composeState?: (options: any) => Promise<any>;
+  
+  // Allow for additional properties
   [key: string]: any;
+}
+
+/**
+ * Memory data structure for storing messages
+ */
+export interface MemoryData {
+  id?: string;
+  roomId: string;
+  userId: string;
+  content: {
+    text: string;
+    facts?: any[];
+    goal?: string;
+    metadata?: {
+      conversationType?: string;
+      agentId?: string;
+      groupId?: string;
+      [key: string]: any;
+    };
+  };
+  type?: string;
+}
+
+/**
+ * Memory query options
+ */
+export interface MemoryQuery {
+  roomId: string;
+  userId?: string;
+  count?: number;
+  unique?: boolean;
+  type?: string;
+}
+
+/**
+ * Memory structure for retrieved memories
+ */
+export interface Memory {
+  id: string;
+  roomId: string;
+  userId: string;
+  content: {
+    text: string;
+    facts?: any[];
+    goal?: string;
+    metadata?: any;
+  };
+  createdAt: Date;
+  type?: string;
 }
 
 // Plugin interface - simplified
@@ -32,8 +95,44 @@ export interface Plugin {
   name: string;
   description: string;
   npmName?: string;
+  register?: (runtime: IAgentRuntime) => Plugin | boolean;
   initialize(): Promise<void>;
   shutdown(): Promise<void>;
+}
+
+/**
+ * Telegram Multi-Agent Plugin Configuration
+ */
+export interface TelegramMultiAgentConfig {
+  enabled?: boolean;
+  relayServerUrl?: string;
+  authToken?: string;
+  groupIds?: string[];
+  dbPath?: string;
+  logLevel?: string;
+  conversationCheckIntervalMs?: number;
+  maxRetries?: number;
+  kickstarterConfig?: KickstarterConfig;
+}
+
+/**
+ * Kickstarter configuration for conversation initiation
+ */
+export interface KickstarterConfig {
+  // Probability factor (0-1) that affects how likely a kickstart is to happen
+  probabilityFactor: number;
+  
+  // Minimum time between kickstarts (ms)
+  minIntervalMs: number;
+  
+  // Should include topics in kickstarted messages
+  includeTopics: boolean;
+  
+  // Should tag other agents in kickstarter messages
+  shouldTagAgents: boolean;
+  
+  // Maximum number of agents to tag in a message
+  maxAgentsToTag: number;
 }
 
 // Personality traits
@@ -90,8 +189,16 @@ export interface TelegramRelayConfig {
   retryDelayMs?: number;
 }
 
-// Conversation state
-export type ConversationState = 'inactive' | 'starting' | 'active' | 'ending';
+// Detailed conversation state tracking
+export interface ConversationStateTracking {
+  status: 'inactive' | 'starting' | 'active' | 'ending';
+  lastMessageTimestamp: number;
+  lastSpeakerId?: string;
+  messageCount: number;
+  participants: string[];
+  currentTopic?: string;
+  lastUpdated: number;
+}
 
 // Follow-up type
 export enum FollowUpType {
@@ -130,6 +237,19 @@ export interface Character {
 }
 
 /**
+ * Topic for conversation
+ */
+export interface Topic {
+  id?: string;
+  name: string;
+  title?: string;
+  description?: string;
+  relevance?: number;
+  groupId?: string;
+  tags?: string[];
+}
+
+/**
  * Runtime interface for ElizaOS core
  */
 export interface Runtime {
@@ -137,16 +257,18 @@ export interface Runtime {
   registerService(name: string, service: any): void;
   getService(name: string): any;
   start(): Promise<void>;
+  memory: {
+    query: (query: MemoryQuery) => Promise<MemoryData[]>;
+    store: (data: MemoryData) => Promise<void>;
+    getNamespaces: () => Promise<string[]>;
+    ensureNamespace: (namespace: string) => Promise<void>;
+  };
 }
 
-// For CommonJS interoperability
-// eslint-disable-next-line no-undef
-module.exports.ElizaLogger = {} as ElizaLogger;
-// eslint-disable-next-line no-undef
-module.exports.IAgentRuntime = {} as IAgentRuntime;
-// eslint-disable-next-line no-undef
-module.exports.Plugin = {} as Plugin;
-// eslint-disable-next-line no-undef
-module.exports.MessageStatus = MessageStatus;
-// eslint-disable-next-line no-undef
-module.exports.FollowUpType = FollowUpType; 
+export const EmptyLogger: ElizaLogger = {
+  trace: () => {},
+  debug: () => {},
+  info: () => {},
+  warn: () => {},
+  error: () => {}
+}; 

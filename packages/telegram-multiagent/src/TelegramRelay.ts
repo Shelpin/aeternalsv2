@@ -1,36 +1,17 @@
-import { ElizaLogger } from './types';
-
-/**
- * Message relay status
- */
-export enum MessageStatus {
-  PENDING = 'pending',
-  SENT = 'sent',
-  FAILED = 'failed'
-}
+import { ElizaLogger, TelegramRelayConfig, MessageStatus, RelayMessage } from './types';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * Message structure for the relay
  */
-export interface RelayMessage {
+export interface QueuedMessage {
   id: string;
   fromAgentId: string;
-  groupId: number;
+  groupId: number | string;
   text: string;
   timestamp: number;
   status: MessageStatus;
   retries?: number;
-}
-
-/**
- * Configuration for the relay
- */
-export interface TelegramRelayConfig {
-  relayServerUrl: string;
-  authToken: string;
-  agentId: string;
-  retryLimit?: number;
-  retryDelayMs?: number;
 }
 
 /**
@@ -40,58 +21,381 @@ export interface TelegramRelayConfig {
 export class TelegramRelay {
   private config: TelegramRelayConfig;
   private logger: ElizaLogger;
-  private messageQueue: RelayMessage[] = [];
+  private messageQueue: QueuedMessage[] = [];
   private processingQueue: boolean = false;
   private connected: boolean = false;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
   private updatePollingInterval: ReturnType<typeof setInterval> | null = null;
-  private eventHandlers: Record<string, Array<(data: any) => void>> = {};
   private lastPingTime = 0;
-  private pingIntervalMs = 30000; // 30 seconds
-  private updatePollingMs = 1000; // Poll for updates every second
-  private lastUpdateId = 0; // Track the last update ID we've processed
-  private messageHandler: ((message: any) => void) | null = null;
-  
+  private lastUpdateId = 0;
+  private messageHandlers: Array<(message: RelayMessage) => void> = [];
+  private agentUpdateHandlers: Array<(agents: string[]) => void> = [];
+
   /**
-   * Constructor overloads for TelegramRelay
+   * Create a new TelegramRelay
+   * 
+   * @param config - Relay configuration
+   * @param logger - Logger instance
    */
-  constructor(config: TelegramRelayConfig);
-  constructor(config: TelegramRelayConfig, logger: ElizaLogger);
-  constructor(config: TelegramRelayConfig, logger?: ElizaLogger) {
+  constructor(config: TelegramRelayConfig, logger: ElizaLogger) {
     this.config = {
       retryLimit: 3,
       retryDelayMs: 5000,
       ...config
     };
     
-    this.logger = logger || {
-      debug: (msg: string) => console.log(`[DEBUG] ${msg}`),
-      info: (msg: string) => console.log(`[INFO] ${msg}`),
-      warn: (msg: string) => console.log(`[WARN] ${msg}`),
-      error: (msg: string) => console.log(`[ERROR] ${msg}`)
-    };
+    this.logger = logger;
     
-    this.connected = false;
-    this.eventHandlers = {};
-    this.lastPingTime = 0;
-    this.messageQueue = [];
-    this.processingQueue = false;
-    this.reconnectTimeout = null;
-    this.pingInterval = null;
-    this.updatePollingInterval = null;
-    this.messageHandler = null;
-    this.lastUpdateId = 0;
-    this.pingIntervalMs = 30000; // 30 seconds
-    this.updatePollingMs = 1000; // Poll for updates every second
-    
-    // Start queue processing
+    // Start queue processing immediately
     this.processQueue();
-    
-    // Set up ping interval
-    this.setupPingInterval();
   }
-  
+
+  /**
+   * Connect to the relay server
+   * @returns True if connected successfully, false otherwise
+   */
+  async connect(): Promise<boolean> {
+    this.logger.info(`Connecting to relay server at ${this.config.relayServerUrl}`);
+    
+    if (!this.config.agentId) {
+      this.logger.error('No agent ID provided, cannot connect');
+      return false;
+    }
+    
+    try {
+      // Check if the server is available
+      const healthCheck = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/health`,
+        { method: 'GET' }
+      );
+      
+      if (!healthCheck.ok) {
+        this.logger.warn(`Relay server health check failed with status ${healthCheck.status}`);
+      }
+      
+      // Register with the relay server
+      const payload = {
+        agent_id: this.config.agentId,
+        token: this.config.authToken
+      };
+      
+      const response = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/register`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.authToken}`
+          },
+          body: JSON.stringify(payload)
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.error(`Registration failed: Status ${response.status}, Response: ${errorText}`);
+        return false;
+      }
+      
+      const data = await response.json();
+      this.logger.info(`Registration successful, connected agents: ${data.connected_agents?.join(', ') || 'none'}`);
+      
+      // Update connected agents list
+      if (data.connected_agents && this.agentUpdateHandlers.length > 0) {
+        for (const handler of this.agentUpdateHandlers) {
+          handler(data.connected_agents);
+        }
+      }
+      
+      this.connected = true;
+      
+      // Start polling for updates
+      this.startUpdatePolling();
+      
+      // Start heartbeat
+      this.setupPingInterval();
+      
+      return true;
+    } catch (error) {
+      this.logger.error(`Connection error: ${error.message}`);
+      this.scheduleReconnect();
+      return false;
+    }
+  }
+
+  /**
+   * Disconnect from the relay server
+   */
+  async disconnect(): Promise<void> {
+    if (!this.connected) {
+      return;
+    }
+    
+    try {
+      // Clear all intervals
+      this.clearTimers();
+      
+      // Unregister from the relay server
+      await fetch(`${this.config.relayServerUrl}/unregister`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.authToken}`
+        },
+        body: JSON.stringify({
+          agent_id: this.config.agentId,
+          token: this.config.authToken
+        })
+      });
+      
+      this.connected = false;
+      this.logger.info('Disconnected from relay server');
+    } catch (error) {
+      this.logger.error(`Error during disconnect: ${error.message}`);
+    }
+  }
+
+  /**
+   * Send a message through the relay
+   * 
+   * @param groupId - Telegram group ID
+   * @param text - Message text
+   * @returns Message ID
+   */
+  async sendMessage(groupId: number | string, text: string): Promise<string> {
+    const messageId = uuidv4();
+    
+    // Add to queue
+    this.messageQueue.push({
+      id: messageId,
+      fromAgentId: this.config.agentId,
+      groupId,
+      text,
+      timestamp: Date.now(),
+      status: MessageStatus.PENDING
+    });
+    
+    // Trigger queue processing if not already running
+    if (!this.processingQueue) {
+      this.processQueue();
+    }
+    
+    return messageId;
+  }
+
+  /**
+   * Register a handler for incoming messages
+   * 
+   * @param handler - Message handler function
+   */
+  onMessage(handler: (message: RelayMessage) => void): void {
+    this.messageHandlers.push(handler);
+  }
+
+  /**
+   * Register a handler for agent updates
+   * 
+   * @param handler - Agent update handler function
+   */
+  onAgentUpdate(handler: (agents: string[]) => void): void {
+    this.agentUpdateHandlers.push(handler);
+  }
+
+  /**
+   * Process the message queue
+   */
+  private async processQueue(): Promise<void> {
+    if (this.processingQueue || this.messageQueue.length === 0) {
+      return;
+    }
+    
+    this.processingQueue = true;
+    
+    try {
+      // Take first pending message
+      const message = this.messageQueue.find(m => m.status === MessageStatus.PENDING);
+      if (!message) {
+        this.processingQueue = false;
+        return;
+      }
+      
+      try {
+        // Send the message
+        const success = await this.sendMessageToRelay(message);
+        
+        if (success) {
+          // Remove from queue
+          this.messageQueue = this.messageQueue.filter(m => m.id !== message.id);
+        } else {
+          // Increment retry count
+          message.retries = (message.retries || 0) + 1;
+          
+          // Mark as failed if retries exhausted
+          if (message.retries >= (this.config.retryLimit || 3)) {
+            message.status = MessageStatus.FAILED;
+            this.logger.error(`Message failed after ${message.retries} retries: ${message.text.substring(0, 50)}...`);
+          }
+        }
+      } catch (error) {
+        this.logger.error(`Error sending message: ${error.message}`);
+        
+        // Increment retry count
+        message.retries = (message.retries || 0) + 1;
+        
+        // Mark as failed if retries exhausted
+        if (message.retries >= (this.config.retryLimit || 3)) {
+          message.status = MessageStatus.FAILED;
+        }
+      }
+    } finally {
+      this.processingQueue = false;
+      
+      // Continue processing if more messages
+      if (this.messageQueue.some(m => m.status === MessageStatus.PENDING)) {
+        setTimeout(() => this.processQueue(), 100);
+      }
+    }
+  }
+
+  /**
+   * Send a message to the relay server
+   * 
+   * @param message - Message to send
+   * @returns True if sent successfully, false otherwise
+   */
+  private async sendMessageToRelay(message: QueuedMessage): Promise<boolean> {
+    if (!this.connected) {
+      // Try to reconnect
+      const reconnected = await this.connect();
+      if (!reconnected) {
+        return false;
+      }
+    }
+    
+    try {
+      const response = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/sendMessage`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.authToken}`
+          },
+          body: JSON.stringify({
+            agent_id: this.config.agentId,
+            token: this.config.authToken,
+            chat_id: message.groupId,
+            text: message.text
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        this.logger.error(`Failed to send message: ${errorText}`);
+        return false;
+      }
+      
+      const data = await response.json();
+      if (!data.success) {
+        this.logger.error(`Failed to send message: ${data.error || 'Unknown error'}`);
+        return false;
+      }
+      
+      this.logger.debug(`Message sent successfully: ${message.text.substring(0, 50)}...`);
+      return true;
+    } catch (error) {
+      this.logger.error(`Error sending message to relay: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Start polling for updates
+   */
+  private startUpdatePolling(): void {
+    if (this.updatePollingInterval) {
+      clearInterval(this.updatePollingInterval);
+    }
+    
+    this.updatePollingInterval = setInterval(async () => {
+      if (!this.connected) {
+        return;
+      }
+      
+      try {
+        await this.pollForUpdates();
+      } catch (error) {
+        this.logger.error(`Error polling for updates: ${error.message}`);
+      }
+    }, 1000);
+  }
+
+  /**
+   * Poll the relay server for updates
+   */
+  private async pollForUpdates(): Promise<void> {
+    this.logger.debug(`Polling for updates from: ${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&token=${this.config.authToken}&offset=${this.lastUpdateId}`);
+    
+    try {
+      const response = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&token=${this.config.authToken}&offset=${this.lastUpdateId}`,
+        { method: 'GET' }
+      );
+      
+      if (!response.ok) {
+        this.logger.warn(`Failed to poll for updates: ${response.status}`);
+        return;
+      }
+      
+      const data = await response.json();
+      if (!data.success) {
+        this.logger.warn(`Failed to poll for updates: ${data.error || 'Unknown error'}`);
+        return;
+      }
+      
+      // Process messages
+      if (data.messages && data.messages.length > 0) {
+        for (const update of data.messages) {
+          this.lastUpdateId = Math.max(this.lastUpdateId, update.update_id + 1);
+          
+          // Handle agent updates
+          if (update.agent_updates) {
+            for (const agentUpdate of update.agent_updates) {
+              this.logger.info(`Agent update: ${agentUpdate.agent_id} is now ${agentUpdate.status}`);
+            }
+            
+            // Get list of available agents
+            const availableAgents = await this.getAvailableAgents();
+            
+            // Notify handlers
+            for (const handler of this.agentUpdateHandlers) {
+              handler(availableAgents);
+            }
+          }
+          
+          // Handle message updates
+          if (update.message) {
+            this.logger.debug(`Received message: ${update.message.text}`);
+            
+            // Skip messages from self
+            if (update.message.sender_agent_id === this.config.agentId) {
+              continue;
+            }
+            
+            // Notify handlers
+            for (const handler of this.messageHandlers) {
+              handler(update.message);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Error polling for updates: ${error.message}`);
+    }
+  }
+
   /**
    * Set up the ping interval for keeping the connection alive
    */
@@ -100,14 +404,73 @@ export class TelegramRelay {
       clearInterval(this.pingInterval);
     }
     
-    this.pingInterval = setInterval(() => {
-      this.ping();
-    }, this.pingIntervalMs);
-    
-    // Record first ping time
-    this.lastPingTime = Date.now();
+    this.pingInterval = setInterval(async () => {
+      await this.sendHeartbeat();
+    }, 30000);
   }
-  
+
+  /**
+   * Send a heartbeat to the relay server
+   */
+  private async sendHeartbeat(): Promise<void> {
+    if (!this.connected) {
+      return;
+    }
+    
+    try {
+      const response = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/heartbeat`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.authToken}`
+          },
+          body: JSON.stringify({
+            agent_id: this.config.agentId,
+            token: this.config.authToken
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        this.logger.warn(`Heartbeat failed: ${response.status}`);
+        return;
+      }
+      
+      const data = await response.json();
+      if (!data.success) {
+        this.logger.warn(`Heartbeat failed: ${data.error || 'Unknown error'}`);
+        return;
+      }
+      
+      this.lastPingTime = Date.now();
+      this.logger.debug('Heartbeat sent successfully');
+    } catch (error) {
+      this.logger.error(`Error sending heartbeat: ${error.message}`);
+      // Check if we should reconnect
+      const timeSinceLastPing = Date.now() - this.lastPingTime;
+      if (timeSinceLastPing > 60000) {
+        this.logger.warn('No heartbeat response for 60 seconds, reconnecting...');
+        this.scheduleReconnect();
+      }
+    }
+  }
+
+  /**
+   * Schedule a reconnect attempt
+   */
+  private scheduleReconnect(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+    
+    this.reconnectTimeout = setTimeout(async () => {
+      this.logger.info('Attempting to reconnect to relay server...');
+      await this.connect();
+    }, 5000);
+  }
+
   /**
    * Clean up all timers
    */
@@ -127,551 +490,52 @@ export class TelegramRelay {
       this.updatePollingInterval = null;
     }
   }
-  
+
   /**
-   * Connect to the relay server
-   * @returns True if connected successfully, false otherwise
+   * Fetch with a timeout
+   * 
+   * @param url - URL to fetch
+   * @param options - Fetch options
+   * @param timeout - Timeout in milliseconds
+   * @returns Response
    */
-  async connect(): Promise<boolean> {
-    console.log(`[RELAY_CONNECT] TelegramRelay: Connecting to relay server at ${this.config.relayServerUrl}`);
-    console.log(`[RELAY_CONNECT] TelegramRelay: Agent ID: ${this.config.agentId}`);
-    console.log(`[RELAY_CONNECT] TelegramRelay: Auth token length: ${this.config.authToken ? this.config.authToken.length : 0}`);
-    
-    if (!this.config.agentId) {
-      console.error(`[RELAY_CONNECT] TelegramRelay: No agent ID provided, cannot connect`);
-      return false;
-    }
+  private async fetchWithTimeout(url: string, options: RequestInit, timeout: number = 10000): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
     
     try {
-      // Test relay server availability first
-      try {
-        console.log(`[RELAY_CONNECT] TelegramRelay: Testing server availability at ${this.config.relayServerUrl}/health`);
-        const healthResponse = await fetch(`${this.config.relayServerUrl}/health`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (healthResponse.ok) {
-          const healthData = await healthResponse.json();
-          console.log(`[RELAY_CONNECT] TelegramRelay: Server is available, current stats: ${JSON.stringify(healthData)}`);
-        } else {
-          console.warn(`[RELAY_CONNECT] TelegramRelay: Server health check failed with status ${healthResponse.status}`);
-        }
-      } catch (healthError) {
-        console.warn(`[RELAY_CONNECT] TelegramRelay: Server health check failed: ${healthError.message}`);
-      }
-      
-      // Prepare the registration payload
-      const payload = {
-        agent_id: this.config.agentId,
-        token: this.config.authToken
-      };
-      
-      console.log(`[RELAY_CONNECT] TelegramRelay: Registration payload prepared for agent: ${this.config.agentId}`);
-      
-      // Send registration request to the relay server
-      console.log(`[RELAY_CONNECT] TelegramRelay: Sending registration request to ${this.config.relayServerUrl}/register`);
-      const response = await fetch(`${this.config.relayServerUrl}/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.authToken}`
-        },
-        body: JSON.stringify(payload)
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
       });
       
-      console.log(`[RELAY_CONNECT] TelegramRelay: Registration response status: ${response.status}`);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`[RELAY_CONNECT] TelegramRelay: Registration failed: Status ${response.status}, Response: ${errorText}`);
-        return false;
-      }
-      
-      let data;
-      try {
-        data = await response.json();
-        console.log(`[RELAY_CONNECT] TelegramRelay: Registration successful: ${JSON.stringify(data)}`);
-      } catch (jsonError) {
-        const rawText = await response.text();
-        console.log(`[RELAY_CONNECT] TelegramRelay: Could not parse response as JSON: ${rawText}`);
-        console.log(`[RELAY_CONNECT] TelegramRelay: Parse error: ${jsonError.message}`);
-      }
-      
-      // Verify registration by checking health again
-      try {
-        console.log(`[RELAY_CONNECT] TelegramRelay: Verifying registration via health check`);
-        const verifyResponse = await fetch(`${this.config.relayServerUrl}/health`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json'
-          }
-        });
-        
-        if (verifyResponse.ok) {
-          const healthData = await verifyResponse.json();
-          console.log(`[RELAY_CONNECT] TelegramRelay: Post-registration server stats: ${JSON.stringify(healthData)}`);
-          
-          if (healthData.agents > 0 && healthData.agents_list && healthData.agents_list.includes(this.config.agentId)) {
-            console.log(`[RELAY_CONNECT] TelegramRelay: Agent ${this.config.agentId} successfully verified as connected`);
-          } else {
-            console.warn(`[RELAY_CONNECT] TelegramRelay: Agent ${this.config.agentId} not found in connected agents list`);
-          }
-        }
-      } catch (verifyError) {
-        console.warn(`[RELAY_CONNECT] TelegramRelay: Verification check failed: ${verifyError.message}`);
-      }
-      
-      this.connected = true;
-      console.log(`[RELAY_CONNECT] TelegramRelay: Connection established successfully`);
-      
-      // Start polling for updates
-      this.startUpdatePolling();
-      
-      return true;
-    } catch (error) {
-      console.error(`[RELAY_CONNECT] TelegramRelay: Connection error: ${error.message}`);
-      console.error(`[RELAY_CONNECT] TelegramRelay: Error stack: ${error.stack}`);
-      return false;
-    }
-  }
-  
-  /**
-   * Disconnect from the relay server
-   */
-  async disconnect(): Promise<void> {
-    if (!this.connected) {
-      return;
-    }
-    
-    try {
-      await fetch(`${this.config.relayServerUrl}/unregister`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.authToken}`
-        },
-        body: JSON.stringify({
-          agent_id: this.config.agentId
-        })
-      });
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`TelegramRelay: Disconnect error: ${errorMessage}`);
-    }
-    
-    this.connected = false;
-    
-    // Clear timers
-    this.clearTimers();
-    
-    // Emit disconnected event
-    this.emit('disconnected', { agentId: this.config.agentId });
-  }
-  
-  /**
-   * Send a message through the relay server
-   * @param chatId - The chat ID to send to (can be a string or number)
-   * @param text - The message text to send
-   * @returns Promise resolving to the message ID or error
-   */
-  async sendMessage(chatId: string | number, text: string): Promise<any> {
-    this.logger.info(`TelegramRelay: Sending message to chat ${chatId}: ${text.substring(0, 30)}...`);
-    
-    if (!this.connected) {
-      this.logger.error('TelegramRelay: Cannot send message, not connected to relay server');
-      throw new Error('Not connected to relay server');
-    }
-    
-    try {
-      // Prepare message payload
-      const payload = {
-        chat_id: chatId.toString(),
-        text: text,
-        agent_id: this.config.agentId,
-        token: this.config.authToken,
-        date: Math.floor(Date.now() / 1000)
-      };
-      
-      this.logger.debug(`TelegramRelay: Sending payload to relay server: ${JSON.stringify(payload)}`);
-      
-      // Send request
-      const response = await fetch(`${this.config.relayServerUrl}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.authToken}`
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        this.logger.error(`TelegramRelay: Failed to send message: ${response.status} ${response.statusText}`);
-        const errorText = await response.text();
-        this.logger.error(`TelegramRelay: Error response: ${errorText}`);
-        throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      this.logger.info(`TelegramRelay: Message sent successfully, response: ${JSON.stringify(data)}`);
-      return data;
-    } catch (error) {
-      this.logger.error(`TelegramRelay: Error sending message: ${error instanceof Error ? error.message : String(error)}`);
-      this.logger.error(`TelegramRelay: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-      throw error;
-    }
-  }
-  
-  /**
-   * Process the message queue
-   */
-  private async processQueue(): Promise<void> {
-    if (this.processingQueue || this.messageQueue.length === 0) {
-      return;
-    }
-    
-    this.processingQueue = true;
-    
-    try {
-      // Ensure we're connected
-      if (!this.connected) {
-        await this.connect();
-        
-        if (!this.connected) {
-          this.processingQueue = false;
-          return;
-        }
-      }
-      
-      // Process messages
-      while (this.messageQueue.length > 0) {
-        const message = this.messageQueue[0];
-        
-        try {
-          const response = await fetch(`${this.config.relayServerUrl}/sendMessage`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.config.authToken}`
-            },
-            body: JSON.stringify({
-              agent_id: message.fromAgentId,
-              token: this.config.authToken,
-              chat_id: message.groupId,
-              text: message.text
-            })
-          });
-          
-          if (!response.ok) {
-            throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
-          }
-          
-          // Remove from queue
-          this.messageQueue.shift();
-          
-          // Update status
-          message.status = MessageStatus.SENT;
-          
-          // Emit sent event
-          this.emit('messageSent', message);
-          
-          this.logger.debug(`TelegramRelay: Message ${message.id} sent to group ${message.groupId}`);
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          this.logger.error(`TelegramRelay: Error sending message ${message.id}: ${errorMessage}`);
-          
-          // Increment retry count
-          message.retries = (message.retries || 0) + 1;
-          
-          if (message.retries >= (this.config.retryLimit || 3)) {
-            // Max retries reached, remove from queue
-            this.messageQueue.shift();
-            
-            // Update status
-            message.status = MessageStatus.FAILED;
-            
-            // Emit failed event
-            this.emit('messageFailed', { ...message, error: errorMessage });
-            
-            this.logger.error(`TelegramRelay: Message ${message.id} failed after ${message.retries} retries`);
-          } else {
-            // Move to end of queue for retry
-            this.messageQueue.shift();
-            this.messageQueue.push(message);
-            
-            this.logger.warn(`TelegramRelay: Message ${message.id} will be retried (${message.retries}/${this.config.retryLimit})`);
-          }
-          
-          // Add delay between retries
-          await new Promise(resolve => setTimeout(resolve, this.config.retryDelayMs));
-        }
-      }
+      return response;
     } finally {
-      this.processingQueue = false;
+      clearTimeout(timeoutId);
     }
   }
-  
+
   /**
-   * Ping the relay server to keep the connection alive
+   * Get the list of available agents
+   * 
+   * @returns Array of agent IDs
    */
-  private async ping(): Promise<void> {
-    // Record ping time
-    this.lastPingTime = Date.now();
-    
-    if (!this.connected) {
-      console.log('[DEBUG] TelegramRelay: Skipping ping because relay is not connected');
-      return;
-    }
-    
+  private async getAvailableAgents(): Promise<string[]> {
     try {
-      console.log(`[DEBUG] TelegramRelay: Sending heartbeat to ${this.config.relayServerUrl}/heartbeat for agent ${this.config.agentId}`);
-      
-      const response = await fetch(`${this.config.relayServerUrl}/heartbeat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.authToken}`
-        },
-        body: JSON.stringify({
-          agent_id: this.config.agentId,
-          token: this.config.authToken,
-          timestamp: Date.now()
-        })
-      });
-      
-      console.log(`[DEBUG] TelegramRelay: Heartbeat response status: ${response.status} ${response.statusText}`);
-      
-      if (!response.ok) {
-        this.connected = false;
-        console.log(`[WARN] TelegramRelay: Ping failed: ${response.status} ${response.statusText}`);
-        
-        try {
-          const errorText = await response.text();
-          console.log(`[DEBUG] TelegramRelay: Heartbeat error response: ${errorText}`);
-        } catch (e) {
-          console.log(`[DEBUG] TelegramRelay: Could not read heartbeat error response`);
-        }
-        
-        // Reconnect
-        console.log('[INFO] TelegramRelay: Attempting to reconnect after failed heartbeat');
-        this.connect();
-      } else {
-        console.log('[DEBUG] TelegramRelay: Heartbeat successful');
-      }
-    } catch (error: unknown) {
-      this.connected = false;
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.log(`[WARN] TelegramRelay: Ping error: ${errorMessage}`);
-      console.log(`[DEBUG] TelegramRelay: Ping error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-      
-      // Reconnect
-      console.log('[INFO] TelegramRelay: Attempting to reconnect after heartbeat error');
-      this.connect();
-    }
-  }
-  
-  /**
-   * Register an event handler
-   * 
-   * @param event - Event name
-   * @param handler - Event handler function
-   */
-  on(event: string, handler: (data: any) => void): void {
-    if (!this.eventHandlers[event]) {
-      this.eventHandlers[event] = [];
-    }
-    
-    this.eventHandlers[event].push(handler);
-  }
-  
-  /**
-   * Emit an event to all registered handlers
-   * 
-   * @param event - Event name
-   * @param data - Event data
-   */
-  private emit(event: string, data: any): void {
-    const handlers = this.eventHandlers[event] || [];
-    
-    for (const handler of handlers) {
-      try {
-        handler(data);
-      } catch (error: unknown) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        this.logger.error(`TelegramRelay: Error in event handler for '${event}': ${errorMessage}`);
-      }
-    }
-  }
-  
-  /**
-   * Get message queue status
-   * 
-   * @returns Queue status information
-   */
-  getQueueStatus(): { pending: number, processing: boolean } {
-    return {
-      pending: this.messageQueue.length,
-      processing: this.processingQueue
-    };
-  }
-  
-  /**
-   * Check if connected to relay server
-   * 
-   * @returns Connection status
-   */
-  isConnected(): boolean {
-    return this.connected;
-  }
-  
-  /**
-   * Start polling for updates from the relay server
-   */
-  private startUpdatePolling(): void {
-    if (this.updatePollingInterval) {
-      clearInterval(this.updatePollingInterval);
-    }
-    
-    this.updatePollingInterval = setInterval(() => {
-      this.pollForUpdates();
-    }, this.updatePollingMs);
-    
-    this.logger.info(`TelegramRelay: Started polling for updates every ${this.updatePollingMs}ms`);
-  }
-  
-  /**
-   * Poll for updates from the relay server
-   */
-  private async pollForUpdates(): Promise<void> {
-    if (!this.connected) {
-      return;
-    }
-    
-    try {
-      const requestUrl = `${this.config.relayServerUrl}/getUpdates?agent_id=${encodeURIComponent(this.config.agentId)}&token=${encodeURIComponent(this.config.authToken)}&offset=${this.lastUpdateId}`;
-      this.logger.debug(`TelegramRelay: Polling for updates from: ${requestUrl}`);
-      
-      const response = await fetch(
-        requestUrl,
-        {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${this.config.authToken}`
-          }
-        }
+      const response = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/health`,
+        { method: 'GET' }
       );
       
       if (!response.ok) {
-        this.logger.error(`TelegramRelay: Failed to get updates: ${response.status} ${response.statusText}`);
-        try {
-          const errorText = await response.text();
-          this.logger.error(`TelegramRelay: Error response: ${errorText}`);
-        } catch (e) {
-          // Ignore error reading response
-        }
-        return;
+        return [];
       }
       
       const data = await response.json();
-      
-      if (!data.success) {
-        this.logger.error(`TelegramRelay: Update request failed: ${data.error || 'Unknown error'}`);
-        return;
-      }
-      
-      const messages = data.messages || [];
-      
-      if (messages.length > 0) {
-        this.logger.debug(`TelegramRelay: Received ${messages.length} new messages`);
-        this.logger.debug(`TelegramRelay: Message details: ${JSON.stringify(messages)}`);
-        
-        // Update last update ID to only get newer messages next time
-        const maxUpdateId = Math.max(...messages.map((msg: any) => msg.update_id || 0));
-        if (maxUpdateId > 0) {
-          this.lastUpdateId = maxUpdateId + 1;
-          this.logger.debug(`TelegramRelay: Updated lastUpdateId to ${this.lastUpdateId}`);
-        }
-        
-        // Process each message
-        for (const message of messages) {
-          this.logger.debug(`TelegramRelay: Processing message: ${JSON.stringify(message)}`);
-          
-          // Handle different message types
-          if (message.message) {
-            // This is a chat message
-            this.logger.debug(`TelegramRelay: Handling chat message: ${JSON.stringify(message.message)}`);
-            this.handleIncomingMessage(message.message);
-          } else if (message.agent_updates) {
-            // This is an agent status update
-            this.logger.debug(`TelegramRelay: Handling agent updates: ${JSON.stringify(message.agent_updates)}`);
-            for (const update of message.agent_updates) {
-              this.emit('agentStatus', update);
-            }
-          } else if (message.text || message.content) {
-            // This might be a direct message format
-            this.logger.debug(`TelegramRelay: Handling direct message: ${JSON.stringify(message)}`);
-            this.handleIncomingMessage(message);
-          }
-        }
-      }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`TelegramRelay: Error polling for updates: ${errorMessage}`);
-      this.logger.error(`TelegramRelay: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
+      return data.agents_list || [];
+    } catch (error) {
+      this.logger.error(`Error getting available agents: ${error.message}`);
+      return [];
     }
-  }
-  
-  /**
-   * Handle an incoming message from the relay server
-   */
-  private handleIncomingMessage(message: any): void {
-    try {
-      this.logger.debug(`TelegramRelay: Original incoming message: ${JSON.stringify(message)}`);
-      
-      // Transform the message to a standardized format
-      const standardizedMessage = {
-        id: message.message_id || message.id || `msg_${Date.now()}`,
-        groupId: message.chat?.id?.toString() || message.groupId?.toString() || message.chat_id?.toString() || '-1002550618173', // Fallback to known group ID
-        content: message.text || message.content || '',
-        from: message.from || { username: message.sender_agent_id, is_bot: true },
-        date: message.date || Date.now() / 1000,
-        sender_agent_id: message.sender_agent_id || (message.from?.username ? message.from.username.replace('_bot', '') : null)
-      };
-      
-      this.logger.debug(`TelegramRelay: Standardized message: ${JSON.stringify(standardizedMessage)}`);
-      
-      // Call the message handler if one is registered
-      if (this.messageHandler) {
-        try {
-          this.logger.debug(`TelegramRelay: Calling message handler with: ${JSON.stringify(standardizedMessage)}`);
-          this.messageHandler(standardizedMessage);
-        } catch (error: unknown) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          this.logger.error(`TelegramRelay: Error in message handler: ${errorMessage}`);
-          this.logger.error(`TelegramRelay: Handler error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-        }
-      } else {
-        this.logger.warn(`TelegramRelay: No message handler registered to process: ${JSON.stringify(standardizedMessage)}`);
-      }
-      
-      // Also emit a message event
-      this.emit('message', standardizedMessage);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      this.logger.error(`TelegramRelay: Error handling incoming message: ${errorMessage}`);
-      this.logger.error(`TelegramRelay: Error stack: ${error instanceof Error ? error.stack : 'No stack trace'}`);
-    }
-  }
-  
-  /**
-   * Register a handler for incoming messages
-   */
-  onMessage(handler: (message: any) => void): void {
-    this.messageHandler = handler;
-    this.logger.info('TelegramRelay: Registered message handler');
   }
 } 

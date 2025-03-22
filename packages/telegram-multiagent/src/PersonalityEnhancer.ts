@@ -97,10 +97,11 @@ export class PersonalityEnhancer {
       if (typeof agentIdOrConfig === 'string') {
         this.agentId = agentIdOrConfig;
         this.logger = logger || {
-          debug: console.debug,
-          info: console.info,
-          warn: console.warn,
-          error: console.error
+          trace: (...data: any[]) => console.log('[TRACE] PersonalityEnhancer:', ...data),
+          debug: (...data: any[]) => console.log('[DEBUG] PersonalityEnhancer:', ...data),
+          info: (...data: any[]) => console.log('[INFO] PersonalityEnhancer:', ...data),
+          warn: (...data: any[]) => console.warn('[WARN] PersonalityEnhancer:', ...data),
+          error: (...data: any[]) => console.error('[ERROR] PersonalityEnhancer:', ...data)
         };
       } else {
         // Object parameter format
@@ -119,10 +120,11 @@ export class PersonalityEnhancer {
         this.interests = agentIdOrConfig.interests || [];
         
         this.logger = {
-          debug: console.debug,
-          info: console.info,
-          warn: console.warn,
-          error: console.error
+          trace: (...data: any[]) => console.log('[TRACE] PersonalityEnhancer:', ...data),
+          debug: (...data: any[]) => console.log('[DEBUG] PersonalityEnhancer:', ...data),
+          info: (...data: any[]) => console.log('[INFO] PersonalityEnhancer:', ...data),
+          warn: (...data: any[]) => console.warn('[WARN] PersonalityEnhancer:', ...data),
+          error: (...data: any[]) => console.error('[ERROR] PersonalityEnhancer:', ...data)
         };
       }
     } catch (error) {
@@ -135,10 +137,11 @@ export class PersonalityEnhancer {
       this.traits = this.getDefaultTraits();
       this.interests = [];
       this.logger = {
-        debug: console.debug,
-        info: console.info,
-        warn: console.warn,
-        error: console.error
+        trace: (...data: any[]) => console.log('[TRACE] PersonalityEnhancer:', ...data),
+        debug: (...data: any[]) => console.log('[DEBUG] PersonalityEnhancer:', ...data),
+        info: (...data: any[]) => console.log('[INFO] PersonalityEnhancer:', ...data),
+        warn: (...data: any[]) => console.warn('[WARN] PersonalityEnhancer:', ...data),
+        error: (...data: any[]) => console.error('[ERROR] PersonalityEnhancer:', ...data)
       };
     }
     
