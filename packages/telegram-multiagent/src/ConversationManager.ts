@@ -256,12 +256,35 @@ export class ConversationManager {
         return false;
       }
       
+      // Determine if message is from a bot by checking agent ID patterns
+      const isFromBot = fromAgentId && (
+        fromAgentId.includes('Bot') || 
+        fromAgentId.includes('_') || 
+        ['linda_evangelista_88', 'vc_shark_99', 'bitcoin_maxi_420', 
+         'bag_flipper_9000', 'code_samurai_77', 'eth_memelord_9000'].includes(fromAgentId)
+      );
+      
+      console.log(`[CONVO_MANAGER] Is message from bot? ${isFromBot}`);
+      
       // Always use a higher probability for bot-to-bot communication to ensure interactions happen
-      if (fromAgentId && fromAgentId.includes("Bot")) {
+      if (isFromBot) {
         console.log(`[CONVO_MANAGER] Message is from another bot (${fromAgentId}), using higher response probability`);
-        // 50% chance to respond to other bots to make sure interactions happen
-        const shouldRespond = Math.random() < 0.5;
-        console.log(`[CONVO_MANAGER] Bot-to-bot response decision: ${shouldRespond}`);
+        
+        // Check if this is a message specifically directed at this agent
+        const isDirectedToThisAgent = false; // TODO: Implement message parsing to check for @mentions
+        
+        if (isDirectedToThisAgent) {
+          console.log(`[CONVO_MANAGER] Message is directed at this agent, will respond`);
+          return true;
+        }
+        
+        // Use a probability-based approach to avoid infinite loops but ensure good conversation flow
+        // Higher probability means more responsive agents
+        const probabilityFactor = 0.4; // 40% chance to respond to other bots
+        
+        // Add randomness to avoid multiple agents responding at the same time
+        const shouldRespond = Math.random() < probabilityFactor;
+        console.log(`[CONVO_MANAGER] Bot-to-bot response decision: ${shouldRespond} (probability: ${probabilityFactor})`);
         return shouldRespond;
       }
       

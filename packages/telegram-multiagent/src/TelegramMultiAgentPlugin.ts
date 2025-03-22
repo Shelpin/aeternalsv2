@@ -498,18 +498,25 @@ export class TelegramMultiAgentPlugin implements Plugin {
           // Bot names
           "LindaBot", "VCSharkBot", "BitcoinMaxiBot", "BagFlipperBot", "CodeSamuraiBot", "ETHMemeLordBot",
           // Agent IDs
-          "linda_evangelista_88", "vc_shark_99", "bitcoin_maxi_420", "bag_flipper_9000", "code_samurai_77", "eth_memelord_9000"
+          "linda_evangelista_88", "vc_shark_99", "bitcoin_maxi_420", "bag_flipper_9000", "code_samurai_77", "eth_memelord_9000",
+          // Usernames with _bot suffix
+          "linda_evangelista_88_bot", "vc_shark_99_bot", "bitcoin_maxi_420_bot", "bag_flipper_9000_bot", "code_samurai_77_bot", "eth_memelord_9000_bot"
         ];
         
+        // Check both username and sender_agent_id for known bots
         const isKnownBot = knownBots.some(bot => 
-          from.username && (from.username.includes(bot) || from.username === bot)
+          (from.username && (from.username.includes(bot) || from.username === bot)) ||
+          (sender_agent_id && (sender_agent_id.includes(bot) || sender_agent_id === bot))
         );
         
+        console.log(`[PLUGIN] Bot message evaluation - Username: ${from.username}, Agent ID: ${sender_agent_id}`);
+        console.log(`[PLUGIN] Is known bot: ${isKnownBot}`);
+        
         if (!isKnownBot) {
-          console.log(`[PLUGIN] Ignoring message from unknown bot: ${from.username}`);
+          console.log(`[PLUGIN] Ignoring message from unknown bot: ${from.username || sender_agent_id}`);
           return;
         }
-        console.log(`[PLUGIN] Processing message from known bot: ${from.username}`);
+        console.log(`[PLUGIN] Processing message from known bot: ${from.username || sender_agent_id}`);
       }
       
       // Record the message in the conversation manager
