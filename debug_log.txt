@@ -1,0 +1,188 @@
+
+> eliza@ start /root/eliza
+> pnpm --filter "@elizaos/agent" start --isRoot "--character=characters/bitcoin_maxi_420.json" "--plugins=@elizaos/telegram-multiagent" "--log-level=debug"
+
+
+> @elizaos/agent@0.25.9 start /root/eliza/agent
+> node --loader ts-node/esm src/index.ts "--isRoot" "--character=characters/bitcoin_maxi_420.json" "--plugins=@elizaos/telegram-multiagent" "--log-level=debug"
+
+(node:2385996) ExperimentalWarning: `--experimental-loader` may be removed in the future; instead use `register()`:
+--import 'data:text/javascript,import { register } from "node:module"; import { pathToFileURL } from "node:url"; register("ts-node/esm", pathToFileURL("./"));'
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:2385996) [DEP0180] DeprecationWarning: fs.Stats constructor is deprecated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2025-03-23 10:50:12] [32mINFO[39m: [36mLoading embedding settings:[39m
+    USE_OPENAI_EMBEDDING: ""
+    USE_OLLAMA_EMBEDDING: ""
+    OLLAMA_EMBEDDING_MODEL: "false"
+(node:2385996) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36mLoading character settings:[39m
+    ARGV: [
+      "/root/.nvm/versions/node/v23.3.0/bin/node",
+      "/root/eliza/agent/src/index.ts",
+      "--isRoot",
+      "--character=characters/bitcoin_maxi_420.json",
+      "--plugins=@elizaos/telegram-multiagent",
+      "--log-level=debug"
+    ]
+    CHARACTER_ARG: "--character=characters/bitcoin_maxi_420.json"
+    CWD: "/root/eliza/agent"
+[2025-03-23 10:50:12] [37mLOG[39m: [36mLoaded .env file from: /root/eliza/.env[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mParsed settings:[39m
+    USE_OPENAI_EMBEDDING: ""
+    USE_OPENAI_EMBEDDING_TYPE: "string"
+    USE_OLLAMA_EMBEDDING: ""
+    USE_OLLAMA_EMBEDDING_TYPE: "string"
+    OLLAMA_EMBEDDING_MODEL: "false"
+[2025-03-23 10:50:12] [37mLOG[39m: [36mDirectClient constructor[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36mTrying paths:[39m
+    0: {
+      "path": "characters/bitcoin_maxi_420.json",
+      "exists": false
+    }
+    1: {
+      "path": "/root/eliza/agent/characters/bitcoin_maxi_420.json",
+      "exists": false
+    }
+    2: {
+      "path": "/root/eliza/agent/agent/characters/bitcoin_maxi_420.json",
+      "exists": false
+    }
+    3: {
+      "path": "/root/eliza/agent/src/characters/bitcoin_maxi_420.json",
+      "exists": false
+    }
+    4: {
+      "path": "/root/eliza/agent/src/characters/bitcoin_maxi_420.json",
+      "exists": false
+    }
+    5: {
+      "path": "/root/eliza/agent/characters/bitcoin_maxi_420.json",
+      "exists": false
+    }
+    6: {
+      "path": "/root/eliza/characters/bitcoin_maxi_420.json",
+      "exists": true
+    }
+[2025-03-23 10:50:12] [32mINFO[39m: [36mLoading embedding settings:[39m
+    USE_OPENAI_EMBEDDING: ""
+    USE_OLLAMA_EMBEDDING: ""
+    OLLAMA_EMBEDDING_MODEL: "false"
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36mLoading character settings:[39m
+    ARGV: [
+      "/root/.nvm/versions/node/v23.3.0/bin/node",
+      "/root/eliza/agent/src/index.ts",
+      "--isRoot",
+      "--character=characters/bitcoin_maxi_420.json",
+      "--plugins=@elizaos/telegram-multiagent",
+      "--log-level=debug"
+    ]
+    CHARACTER_ARG: "--character=characters/bitcoin_maxi_420.json"
+    CWD: "/root/eliza/agent"
+[2025-03-23 10:50:12] [37mLOG[39m: [36mLoaded .env file from: /root/eliza/.env[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mParsed settings:[39m
+    USE_OPENAI_EMBEDDING: ""
+    USE_OPENAI_EMBEDDING_TYPE: "string"
+    USE_OLLAMA_EMBEDDING: ""
+    USE_OLLAMA_EMBEDDING_TYPE: "string"
+    OLLAMA_EMBEDDING_MODEL: "false"
+[CONSTRUCTOR] TelegramMultiAgentPlugin: Constructor called
+[2025-03-23 10:50:12] [32mINFO[39m: [36mBitcoinMaxi420 loaded plugins: [
+    "@elizaos-plugins/plugin-coingecko", 
+    "@elizaos-plugins/plugin-giphy", 
+    "@elizaos-plugins/client-telegram", 
+    "@elizaos/telegram-multiagent"
+][39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mSuccessfully loaded character from: /root/eliza/characters/bitcoin_maxi_420.json[39m
+[2025-03-23 10:50:12] [37mLOG[39m: [36mCreating runtime for character BitcoinMaxi420[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Initializing AgentRuntime with options:[39m
+    character: "BitcoinMaxi420"
+    modelProvider: "deepseek"
+    characterModelProvider: "deepseek"
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[AgentRuntime] Process working directory: /root/eliza/agent[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[AgentRuntime] Process knowledgeRoot: /root/eliza/characters/knowledge[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mAgent ID: 35f31be5-d506-0e10-9607-d944746444cf[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Setting Model Provider:[39m
+    characterModelProvider: "deepseek"
+    optsModelProvider: "deepseek"
+    finalSelection: "deepseek"
+[2025-03-23 10:50:12] [32mINFO[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Selected model provider: deepseek[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Selected image model provider: deepseek[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Selected image vision model provider: deepseek[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_PRICE[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_TOKEN_PRICE_BY_ADDRESS[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_TRENDING[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_TRENDING_POOLS[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_MARKETS[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_TOP_GAINERS_LOSERS[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_NEW_COINS[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_NETWORK_TRENDING_POOLS[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: GET_NETWORK_NEW_POOLS[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: SEND_GIF[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: CONTINUE[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: FOLLOW_ROOM[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: UNFOLLOW_ROOM[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: IGNORE[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: NONE[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: MUTE_ROOM[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mBitcoinMaxi420(35f31be5-d506-0e10-9607-d944746444cf) - Registering action: UNMUTE_ROOM[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mInitializing SQLite database at /root/eliza/agent/data/db.sqlite...[39m
+Attempting to initialize plugin: coingecko
+Plugin coingecko does not have initialize method
+Attempting to initialize plugin: giphy
+Plugin giphy does not have initialize method
+Attempting to initialize plugin: telegram
+Plugin telegram does not have initialize method
+Attempting to initialize plugin: telegram-multiagent
+Plugin telegram-multiagent does not have initialize method
+Attempting to initialize plugin: bootstrap
+Plugin bootstrap does not have initialize method
+[2025-03-23 10:50:12] [37mLOG[39m: [36msqlite-vec extensions loaded successfully.[39m
+[2025-03-23 10:50:12] [37mSUCCESS[39m: [36mSuccessfully connected to SQLite database[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36mUsing Database Cache...[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36m[RAG Check] RAG Knowledge enabled: false[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36m[RAG Check] Knowledge items:[39m
+    0: "Bitcoin whitepaper: https://bitcoin.org/bitcoin.pdf"
+    1: "Bitcoin Improvement Proposals (BIPs): https://github.com/bitcoin/bips"
+    2: "Bitcoin core repository: https://github.com/bitcoin/bitcoin"
+    3: "Austrian Economics and Bitcoin: https://mises.org"
+    4: "Lightning Network official site: https://lightning.network/"
+    5: "Bitcoin-NG Consensus (related to Aeternity's implementation): https://www.usenix.org/conference/nsdi16/technical-sessions/presentation/eyal"
+[2025-03-23 10:50:12] [32mINFO[39m: [36m[RAG Cleanup] Starting cleanup of deleted knowledge files[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[Cleanup] Starting knowledge cleanup process, agent:  35f31be5-d506-0e10-9607-d944746444cf[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[Cleanup] Knowledge root path: /root/eliza/characters/knowledge[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[Knowledge List] Fetching all entries for agent: 35f31be5-d506-0e10-9607-d944746444cf[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[Knowledge List] Found 0 entries[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[Cleanup] Found 0 parent documents to check[39m
+[2025-03-23 10:50:12] [34mDEBUG[39m: [36m[Cleanup] Finished knowledge cleanup process[39m
+[2025-03-23 10:50:12] [32mINFO[39m: [36m[RAG Cleanup] Cleanup complete[39m
+[2025-03-23 10:50:12] [31mERROR[39m: [36mError starting agent for character BitcoinMaxi420:[39m
+[2025-03-23 10:50:12] [31mERROR[39m: 
+    err: {
+      "type": "Error",
+      "message": "Telegram configuration validation failed:\nTELEGRAM_BOT_TOKEN: Required",
+      "stack":
+          Error: Telegram configuration validation failed:
+          TELEGRAM_BOT_TOKEN: Required
+              at validateTelegramConfig (file:///root/eliza/node_modules/.pnpm/@elizaos-plugins+client-telegram@https+++codeload.github.com+elizaos-plugins+client-telegram+_faee2avxecqn6tznlk5dfjwhfq/node_modules/@elizaos-plugins/client-telegram/dist/index.js:5492:13)
+              at Object.start (file:///root/eliza/node_modules/.pnpm/@elizaos-plugins+client-telegram@https+++codeload.github.com+elizaos-plugins+client-telegram+_faee2avxecqn6tznlk5dfjwhfq/node_modules/@elizaos-plugins/client-telegram/dist/index.js:5505:11)
+              at initializeClients (file:///root/eliza/agent/src/index.ts:451:56)
+              at startAgent (file:///root/eliza/agent/src/index.ts:567:33)
+              at async startAgents (file:///root/eliza/agent/src/index.ts:632:13)
+    }
+[2025-03-23 10:50:12] [31mERROR[39m: [36mError starting agents:[39m
+[2025-03-23 10:50:12] [33mWARN[39m: [36mPort 3000 is in use, trying 3001[39m
+[2025-03-23 10:50:12] [33mWARN[39m: [36mPort 3001 is in use, trying 3002[39m
+[2025-03-23 10:50:12] [33mWARN[39m: [36mPort 3002 is in use, trying 3003[39m
+[2025-03-23 10:50:12] [33mWARN[39m: [36mPort 3003 is in use, trying 3004[39m
+[2025-03-23 10:50:12] [33mWARN[39m: [36mPort 3004 is in use, trying 3005[39m
+[2025-03-23 10:50:12] [33mWARN[39m: [36mPort 3005 is in use, trying 3006[39m
+[2025-03-23 10:50:13] [33mWARN[39m: [36mServer started on alternate port 3006[39m
+[2025-03-23 10:50:13] [32mINFO[39m: [36mRun `pnpm start:client` to start the client and visit the outputted URL (http://localhost:5173) to chat with your agents. When running multiple agents, use client with different port `SERVER_PORT=3001 pnpm start:client`[39m
+[2025-03-23 10:50:13] [37mSUCCESS[39m: [36mREST API bound to 0.0.0.0:3006. If running locally, access it at http://localhost:3006.[39m
+[2025-03-23 10:51:27] [37mLOG[39m: [36mReceived shutdown signal, closing server...[39m
+[2025-03-23 10:51:27] [37mSUCCESS[39m: [36mServer closed successfully[39m
+/root/eliza/agent:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @elizaos/agent@0.25.9 start: `node --loader ts-node/esm src/index.ts "--isRoot" "--character=characters/bitcoin_maxi_420.json" "--plugins=@elizaos/telegram-multiagent" "--log-level=debug"`
+Command failed with signal "SIGTERM"
+ ELIFECYCLE  Command failed.

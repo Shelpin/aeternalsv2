@@ -1,4 +1,9 @@
-import { ElizaLogger, Character, IAgentRuntime } from './types';
+import { 
+  IAgentRuntime, 
+  ElizaLogger, 
+  Character 
+} from './types.js';
+import { PluginComponent } from './PluginComponent.js';
 
 /**
  * PersonalityTraits define the behavioral characteristics of an agent
@@ -54,15 +59,14 @@ const DEFAULT_PERSONALITY: PersonalityStyle = {
 };
 
 /**
- * PersonalityEnhancer makes agent messages more natural and personalized
+ * PersonalityEnhancer adds character-specific personality to messages
+ * and generates topics based on character traits and preferences
  */
-export class PersonalityEnhancer {
+export class PersonalityEnhancer extends PluginComponent {
   private agentId: string;
-  private runtime: IAgentRuntime;
-  private character?: Character;
+  private character: Character | null = null;
   private traits: PersonalityTraits;
   private voice: PersonalityVoice;
-  private logger: ElizaLogger;
   private interests: string[];
   private style: PersonalityStyle;
   
@@ -77,77 +81,37 @@ export class PersonalityEnhancer {
   };
   
   /**
-   * Constructor overloads for PersonalityEnhancer
+   * Create a new PersonalityEnhancer
+   * 
+   * @param agentId - Agent ID
+   * @param runtime - Runtime instance (optional)
+   * @param logger - Logger instance
    */
-  constructor(config: {
-    agentId: string;
-    primary: string[];
-    secondary: string[];
-    interests: string[];
-  });
-  constructor(agentId: string, runtime: IAgentRuntime, logger: ElizaLogger);
-  constructor(agentIdOrConfig: string | {
-    agentId: string;
-    primary: string[];
-    secondary: string[];
-    interests: string[];
-  }, runtime?: IAgentRuntime, logger?: ElizaLogger) {
-    try {
-      // Handle different parameter formats
-      if (typeof agentIdOrConfig === 'string') {
-        this.agentId = agentIdOrConfig;
-        this.logger = logger || {
-          trace: (...data: any[]) => console.log('[TRACE] PersonalityEnhancer:', ...data),
-          debug: (...data: any[]) => console.log('[DEBUG] PersonalityEnhancer:', ...data),
-          info: (...data: any[]) => console.log('[INFO] PersonalityEnhancer:', ...data),
-          warn: (...data: any[]) => console.warn('[WARN] PersonalityEnhancer:', ...data),
-          error: (...data: any[]) => console.error('[ERROR] PersonalityEnhancer:', ...data)
-        };
-      } else {
-        // Object parameter format
-        this.agentId = agentIdOrConfig.agentId;
-        this.traits = this.getDefaultTraits();
-        
-        // Override with provided traits
-        if (agentIdOrConfig.primary && agentIdOrConfig.primary.length) {
-          this.applyTraitsFromPersonality(agentIdOrConfig.primary, 0.7);
-        }
-        
-        if (agentIdOrConfig.secondary && agentIdOrConfig.secondary.length) {
-          this.applyTraitsFromPersonality(agentIdOrConfig.secondary, 0.4);
-        }
-        
-        this.interests = agentIdOrConfig.interests || [];
-        
-        this.logger = {
-          trace: (...data: any[]) => console.log('[TRACE] PersonalityEnhancer:', ...data),
-          debug: (...data: any[]) => console.log('[DEBUG] PersonalityEnhancer:', ...data),
-          info: (...data: any[]) => console.log('[INFO] PersonalityEnhancer:', ...data),
-          warn: (...data: any[]) => console.warn('[WARN] PersonalityEnhancer:', ...data),
-          error: (...data: any[]) => console.error('[ERROR] PersonalityEnhancer:', ...data)
-        };
-      }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`PersonalityEnhancer initialization error: ${errorMessage}`);
-      
-      // Set defaults
-      this.agentId = typeof agentIdOrConfig === 'string' ? agentIdOrConfig : 
-                    (agentIdOrConfig as any)?.agentId || 'unknown';
-      this.traits = this.getDefaultTraits();
-      this.interests = [];
-      this.logger = {
-        trace: (...data: any[]) => console.log('[TRACE] PersonalityEnhancer:', ...data),
-        debug: (...data: any[]) => console.log('[DEBUG] PersonalityEnhancer:', ...data),
-        info: (...data: any[]) => console.log('[INFO] PersonalityEnhancer:', ...data),
-        warn: (...data: any[]) => console.warn('[WARN] PersonalityEnhancer:', ...data),
-        error: (...data: any[]) => console.error('[ERROR] PersonalityEnhancer:', ...data)
-      };
+  constructor(agentId: string, runtime: IAgentRuntime | null, logger: ElizaLogger) {
+    super(logger);
+    
+    this.agentId = agentId;
+    
+    if (runtime) {
+      this.setRuntime(runtime);
     }
     
     // Initialize
     this.loadPersonalityVoice();
     this.style = { ...DEFAULT_PERSONALITY };
+  }
+  
+  /**
+   * Initialize the personality enhancer
+   */
+  async initialize(): Promise<void> {
+    try {
+      const runtime = await this.waitForRuntime();
+      this.character = await runtime.getCharacter();
+      this.logger.info(`PersonalityEnhancer: Retrieved character for ${this.agentId}`);
+    } catch (error) {
+      this.logger.warn(`PersonalityEnhancer: Could not load character: ${error.message}`);
+    }
   }
   
   /**
@@ -698,14 +662,41 @@ export class PersonalityEnhancer {
   }
   
   /**
-   * Refine a topic to add personality
+   * Refine a topic to match the agent's personality
    * 
-   * @param topic - Original topic
-   * @returns Refined topic
+   * @param topic - The original topic
+   * @returns Topic refined to match personality
    */
-  refineTopic(topic: string): string {
-    // Already good enough, just return as is
-    return topic;
+  async refineTopic(topic: string): Promise<string> {
+    try {
+      // Try to update character info if not already loaded
+      if (!this.character) {
+        await this.updateCharacterInfo();
+      }
+      
+      // If we have a character, personalize the topic
+      if (this.character) {
+        // Use adjectives instead of traits since Character doesn't have a traits property
+        const adjectives = this.character.adjectives || [];
+        const name = this.character.name || this.agentId;
+        
+        // Personalize based on character adjectives
+        if (adjectives.includes('technical')) {
+          return `${topic}? From a technical perspective, this is quite interesting.`;
+        } else if (adjectives.includes('friendly')) {
+          return `Hey everyone! I was just thinking about ${topic}. What do you all think?`;
+        } else if (adjectives.includes('opinionated')) {
+          return `I've got some strong opinions about ${topic}. Anyone want to discuss?`;
+        } else if (adjectives.includes('curious')) {
+          return `I'm really curious about ${topic}. Has anyone looked into this lately?`;
+        }
+      }
+      
+      return topic;
+    } catch (error) {
+      this.logger.warn(`PersonalityEnhancer: Error refining topic: ${error.message}`);
+      return topic;
+    }
   }
   
   /**
@@ -871,48 +862,63 @@ export class PersonalityEnhancer {
   }
   
   /**
-   * Generate a conversation topic based on personality
+   * Generate a new topic based on character interests
    * 
-   * @returns Generated topic
+   * @returns A new topic
    */
-  generateTopic(): string {
-    // Default general topics
-    const topics = [
-      "recent technology trends",
-      "interesting science news",
-      "favorite movies or TV shows",
-      "weekend plans",
-      "good books to read",
-      "travel destinations",
-      "local events",
-      "interesting hobbies",
-      "current events",
-      "food and cooking"
-    ];
-    
-    // Add more technical topics if agent has technical personality
-    if (this.style.technical > 0.7) {
-      topics.push(
-        "AI development",
-        "programming languages",
-        "blockchain applications",
-        "quantum computing",
-        "latest gadgets",
-        "cybersecurity trends"
-      );
+  async generateTopic(): Promise<string> {
+    try {
+      // Try to update character info if not already loaded
+      if (!this.character) {
+        await this.updateCharacterInfo();
+      }
+      
+      // If we have character topics, use those
+      if (this.character && this.character.topics && this.character.topics.length > 0) {
+        const { topics } = this.character;
+        const randomIndex = Math.floor(Math.random() * topics.length);
+        return topics[randomIndex];
+      }
+      
+      // Fallback topics
+      const fallbackTopics = [
+        "the future of decentralized finance",
+        "latest NFT trends",
+        "Bitcoin's recent price movements",
+        "Layer 2 scaling solutions",
+        "the metaverse and its potential",
+        "Web3 adoption challenges",
+        "crypto regulations worldwide",
+        "blockchain interoperability"
+      ];
+      
+      const randomIndex = Math.floor(Math.random() * fallbackTopics.length);
+      return fallbackTopics[randomIndex];
+    } catch (error) {
+      this.logger.warn(`PersonalityEnhancer: Error generating topic: ${error.message}`);
+      
+      // Return a default topic
+      return "blockchain technology and its applications";
     }
-    
-    // Add more informal topics if agent has low formality
-    if (this.style.formality < 0.3) {
-      topics.push(
-        "favorite memes",
-        "funny videos",
-        "social media trends",
-        "streaming shows"
-      );
+  }
+  
+  /**
+   * Update character information from runtime
+   */
+  private async updateCharacterInfo(): Promise<void> {
+    try {
+      const runtime = await this.waitForRuntime();
+      this.character = await runtime.getCharacter();
+      this.logger.debug(`PersonalityEnhancer: Updated character info for ${this.agentId}`);
+    } catch (error) {
+      this.logger.warn(`PersonalityEnhancer: Could not update character info: ${error.message}`);
     }
-    
-    // Pick random topic
-    return topics[Math.floor(Math.random() * topics.length)];
+  }
+  
+  /**
+   * Shutdown the personality enhancer
+   */
+  async shutdown(): Promise<void> {
+    // No resources to clean up
   }
 } 

@@ -5,6 +5,15 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "agentConfig": {
+    "pluginType": "elizaos:plugin:1.0.0" 
+  },
   "scripts": {
     "build": "npm run clean && npm run build:esm && npm run build:types",
     "build:esm": "esbuild src/index.ts --bundle --platform=node --target=node16 --format=esm --outfile=dist/index.js --external:@elizaos/core --external:better-sqlite3 --external:sqlite --external:sqlite3 --external:uuid",

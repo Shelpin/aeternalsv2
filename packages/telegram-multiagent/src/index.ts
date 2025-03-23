@@ -4,41 +4,22 @@
  * Multi-agent coordination for Telegram bots in ElizaOS
  */
 
-// Import the plugin class
-import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin';
+// Import the plugin class with .js extension for ESM
+import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin.js';
+import { IAgentRuntime } from './types.js';
 
-// Export components for direct use if needed
-import { TelegramRelay } from './TelegramRelay';
-import { ConversationManager } from './ConversationManager';
-import { ConversationKickstarter } from './ConversationKickstarter';
+// Create a plugin instance
+const plugin = new TelegramMultiAgentPlugin();
 
-// Export types
-import * as Types from './types';
+// Store the original initialize method
+const originalInitialize = plugin.initialize.bind(plugin);
 
-// Export components (named exports)
-export { TelegramMultiAgentPlugin };
-export { TelegramRelay };
-export { ConversationManager };
-export { ConversationKickstarter };
-export { Types };
-
-// Create plugin instance
-const telegramMultiAgentPlugin = new TelegramMultiAgentPlugin();
-
-// CRITICAL FIX: Explicitly attach the initialize method to make it directly accessible
-// ElizaOS plugin system likely checks for the method directly, not via the prototype
-const pluginExport = {
-  ...telegramMultiAgentPlugin,
-  // Explicitly bind initialize method to the instance
-  initialize: telegramMultiAgentPlugin.initialize.bind(telegramMultiAgentPlugin),
-  // Explicitly bind shutdown method as well
-  shutdown: telegramMultiAgentPlugin.shutdown.bind(telegramMultiAgentPlugin)
+// Add direct initialize method to the plugin instance 
+(plugin as any).initialize = async function(runtime: IAgentRuntime) {
+  console.log('[TELEGRAM-MULTIAGENT] Direct initialize method called on plugin instance');
+  plugin.register(runtime);
+  return originalInitialize();
 };
 
-// Log the plugin instance for debugging
-console.log('[TELEGRAMMODULE] Creating plugin instance');
-console.log('[TELEGRAMMODULE] Plugin has initialize method:', typeof pluginExport.initialize === 'function');
-console.log('[TELEGRAMMODULE] Direct check if initialize exists:', 'initialize' in pluginExport);
-
-// Default export - plugin instance with explicitly attached methods
-export default pluginExport;
+// Export the plugin instance as default
+export default plugin;

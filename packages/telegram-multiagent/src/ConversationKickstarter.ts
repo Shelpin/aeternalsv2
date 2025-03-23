@@ -5,19 +5,18 @@ import {
   ElizaLogger, 
   KickstarterConfig,
   Topic
-} from './types';
-import { ConversationManager } from './ConversationManager';
-import { TelegramRelay } from './TelegramRelay';
+} from './types.js';
+import { ConversationManager } from './ConversationManager.js';
+import { TelegramRelay } from './TelegramRelay.js';
+import { PluginComponent } from './PluginComponent.js';
 
 /**
  * ConversationKickstarter initiates conversations between agents in Telegram groups
  */
-export class ConversationKickstarter {
-  private runtime: IAgentRuntime | null;
-  private logger: ElizaLogger;
+export class ConversationKickstarter extends PluginComponent {
+  private config: KickstarterConfig;
   private conversationManager: ConversationManager;
   private relay: TelegramRelay;
-  private config: KickstarterConfig;
   private knownAgents: string[] = [];
   private availableTopics: Map<string, Topic[]> = new Map();
   private lastKickstartTime: Map<string, number> = new Map();
@@ -30,7 +29,6 @@ export class ConversationKickstarter {
   /**
    * Create a new ConversationKickstarter
    * 
-   * @param runtime - Agent runtime (can be null for testing)
    * @param logger - Logger instance
    * @param conversationManager - Conversation manager
    * @param relay - Telegram relay
@@ -39,7 +37,6 @@ export class ConversationKickstarter {
    * @param personality - Personality enhancer for messages
    */
   constructor(
-    runtime: IAgentRuntime | null,
     logger: ElizaLogger,
     conversationManager: ConversationManager,
     relay: TelegramRelay,
@@ -47,8 +44,8 @@ export class ConversationKickstarter {
     groupId: string,
     personality: any
   ) {
-    this.runtime = runtime;
-    this.logger = logger;
+    super(logger);
+    
     this.conversationManager = conversationManager;
     this.relay = relay;
     this.config = {
@@ -60,23 +57,30 @@ export class ConversationKickstarter {
       ...config
     };
     this.groupId = groupId;
-    
-    // Get agent ID from runtime or fallback to environment variable
-    if (this.runtime) {
-      try {
-        this.agentId = this.runtime.getAgentId();
-      } catch (error) {
-        this.agentId = process.env.AGENT_ID || 'unknown-agent';
-        this.logger.warn(`ConversationKickstarter: Could not get agent ID from runtime, using fallback: ${this.agentId}`);
-      }
-    } else {
-      this.agentId = process.env.AGENT_ID || 'unknown-agent';
-      this.logger.warn(`ConversationKickstarter: Runtime not available, using fallback agent ID: ${this.agentId}`);
-    }
-    
     this.personality = personality;
     
-    this.logger.info('ConversationKickstarter: Initialized');
+    // Get agent ID from environment variable for now, will be replaced by runtime
+    this.agentId = process.env.AGENT_ID || 'unknown-agent';
+    
+    this.logger.info(`ConversationKickstarter: Initialized for group ${groupId}`);
+  }
+  
+  /**
+   * Initialize the kickstarter
+   */
+  async initialize(): Promise<void> {
+    this.logger.info(`ConversationKickstarter: Initializing for group ${this.groupId}`);
+    
+    try {
+      // Try to get runtime for agent ID if available
+      const runtime = await this.waitForRuntime();
+      this.agentId = runtime.getAgentId();
+      this.logger.info(`ConversationKickstarter: Using agent ID from runtime: ${this.agentId}`);
+    } catch (error) {
+      // Fallback to environment variable
+      this.agentId = process.env.AGENT_ID || 'unknown-agent';
+      this.logger.warn(`ConversationKickstarter: Could not get agent ID from runtime, using fallback: ${this.agentId}`);
+    }
   }
   
   /**
@@ -86,10 +90,7 @@ export class ConversationKickstarter {
    */
   updateKnownAgents(agents: string[]): void {
     // Filter out this agent and any invalid IDs
-    this.knownAgents = agents.filter(id => 
-      id && id !== this.runtime?.getAgentId()
-    );
-    
+    this.knownAgents = agents.filter(id => id && id !== this.agentId);
     this.logger.debug(`ConversationKickstarter: Updated known agents, ${this.knownAgents.length} available`);
   }
   
@@ -157,34 +158,24 @@ export class ConversationKickstarter {
       return;
     }
     
-    // Clear any existing scheduled kickstart
+    // Clear any existing timeout
     if (this.nextScheduledKickstart) {
       clearTimeout(this.nextScheduledKickstart);
-      this.nextScheduledKickstart = null;
     }
     
-    // Calculate delay until next kickstart attempt
-    const currentTime = Date.now();
-    const timeSinceLastKickstart = currentTime - (this.lastKickstartTime.get(this.groupId) || 0);
+    // Calculate delay - random between 10-20 minutes
+    const minDelay = 10 * 60 * 1000; // 10 minutes
+    const maxDelay = 20 * 60 * 1000; // 20 minutes
+    const delay = Math.floor(Math.random() * (maxDelay - minDelay)) + minDelay;
     
-    // Ensure minimum interval has passed
-    let delay = this.config.minIntervalMs;
-    if (timeSinceLastKickstart < this.config.minIntervalMs) {
-      delay = this.config.minIntervalMs - timeSinceLastKickstart;
-    }
+    this.logger.debug(`ConversationKickstarter: Scheduling next kickstart attempt in ${delay / 1000} seconds`);
     
-    // Add some randomness to the delay (up to 30 minutes extra)
-    const randomAdditionalDelay = Math.floor(Math.random() * (30 * 60 * 1000));
-    delay += randomAdditionalDelay;
-    
-    // Schedule the next kickstart attempt
+    // Schedule next kickstart
     this.nextScheduledKickstart = setTimeout(() => {
-      this.attemptKickstart().finally(() => {
-        this.scheduleNextKickstart();
+      this.attemptKickstart().catch(error => {
+        this.logger.error(`ConversationKickstarter: Error in kickstart attempt: ${error}`);
       });
     }, delay);
-    
-    this.logger.debug(`ConversationKickstarter: Next kickstart attempt scheduled in ${Math.floor(delay / 1000 / 60)} minutes`);
   }
   
   /**
@@ -192,197 +183,210 @@ export class ConversationKickstarter {
    */
   async attemptKickstart(): Promise<void> {
     try {
-      this.lastKickstartTime.set(this.groupId, Date.now());
+      if (!this.isActive) {
+        this.logger.debug('ConversationKickstarter: Not active, skipping kickstart');
+        return;
+      }
+      
+      this.logger.info(`[KICKSTART] Attempting to kickstart conversation in group ${this.groupId}`);
+      
+      // Check if it's a good time to kickstart
+      const canKickstart = await this.conversationManager.canKickstartConversation(
+        this.groupId,
+        this.config.minIntervalMs || 300000
+      );
+      
+      if (!canKickstart) {
+        this.logger.debug('ConversationKickstarter: Not a good time to kickstart, conversation too recent');
+        this.scheduleNextKickstart();
+        return;
+      }
+      
+      // Check the last kickstart time for this group
+      const lastKickstart = this.lastKickstartTime.get(this.groupId) || 0;
+      const timeSinceLastKickstart = Date.now() - lastKickstart;
+      
+      if (timeSinceLastKickstart < this.config.minIntervalMs) {
+        this.logger.debug(`ConversationKickstarter: Last kickstart was too recent (${timeSinceLastKickstart}ms ago)`);
+        this.scheduleNextKickstart();
+        return;
+      }
+      
+      // Check if we have any agents to tag
+      if (this.knownAgents.length === 0) {
+        this.logger.debug('ConversationKickstarter: No known agents to tag, skipping kickstart');
+        this.scheduleNextKickstart();
+        return;
+      }
       
       // Check if we should kickstart based on probability
-      if (Math.random() >= this.config.probabilityFactor) {
-        this.logger.debug('ConversationKickstarter: Skipping kickstart (probability check)');
+      const shouldKickstart = Math.random() < (this.config.probabilityFactor || 0.2);
+      
+      if (!shouldKickstart) {
+        this.logger.debug('ConversationKickstarter: Random probability check failed, skipping kickstart');
+        this.scheduleNextKickstart();
         return;
       }
       
-      // Check if a conversation is already active
-      const isActive = await this.conversationManager.isConversationActive(this.groupId);
-      if (isActive) {
-        this.logger.debug('ConversationKickstarter: Skipping kickstart (conversation already active)');
+      // Generate kickstart message
+      const message = await this.generateKickstartMessage();
+      
+      if (!message) {
+        this.logger.debug('ConversationKickstarter: Failed to generate kickstart message');
+        this.scheduleNextKickstart();
         return;
       }
       
-      // Make sure there are other agents to talk to
-      if (this.knownAgents.length === 0) {
-        this.logger.debug('ConversationKickstarter: Skipping kickstart (no other agents)');
-        return;
-      }
+      // Update last kickstart time
+      this.lastKickstartTime.set(this.groupId, Date.now());
       
-      // Select a topic
-      const topic = await this.selectTopic(this.groupId);
-      if (!topic) {
-        this.logger.debug('ConversationKickstarter: Skipping kickstart (no suitable topic)');
-        return;
-      }
+      // Send the message
+      await this.relay.sendMessage(this.groupId, message);
+      this.logger.info(`[KICKSTART] Successfully kickstarted conversation in group ${this.groupId}`);
       
-      // Kickstart the conversation
-      await this.kickstartConversation(topic);
+      // Record the message
+      await this.conversationManager.recordMessage(
+        this.groupId,
+        this.agentId,
+        message
+      );
       
-      this.logger.info(`ConversationKickstarter: Successfully kickstarted conversation in group ${this.groupId}`);
+      // Schedule next kickstart
+      this.scheduleNextKickstart();
     } catch (error) {
-      this.logger.error(`ConversationKickstarter: Error during kickstart attempt: ${error}`);
+      this.logger.error(`ConversationKickstarter: Kickstart attempt failed: ${error}`);
+      this.scheduleNextKickstart();
     }
   }
   
   /**
-   * Select a topic for conversation
+   * Generate a kickstart message
    * 
-   * @param groupId - Group ID
-   * @returns Selected topic or null if none suitable
+   * @returns The generated message
    */
-  private async selectTopic(groupId: string): Promise<string | null> {
+  private async generateKickstartMessage(): Promise<string | null> {
     try {
-      // Check for cached topics for this group
-      const groupTopics = this.availableTopics.get(groupId) || [];
+      // Get a random topic
+      const topic = await this.getRandomTopic();
       
-      if (groupTopics.length > 0) {
-        // Select a random topic
-        const randomIndex = Math.floor(Math.random() * groupTopics.length);
-        const selectedTopic = groupTopics[randomIndex];
+      // Use the runtime for character-driven topic generation if available
+      try {
+        const runtime = await this.waitForRuntime();
         
-        this.logger.debug(`ConversationKickstarter: Selected topic "${selectedTopic.name}" for group ${groupId}`);
-        return selectedTopic.name;
+        // Get agent's character traits
+        const { character } = runtime;
+        
+        if (character) {
+          // Use character to influence topic
+          const traits = character.traits || [];
+          const style = character.style || {};
+          
+          this.logger.debug(`ConversationKickstarter: Using character traits for kickstart: ${traits.join(', ')}`);
+          
+          // Enhance the topic with character-appropriate phrasing
+          if (this.personality && this.personality.refineTopic) {
+            return this.personality.refineTopic(topic);
+          }
+        }
+      } catch (error) {
+        // Continue with fallback if runtime is not available
+        this.logger.debug(`ConversationKickstarter: Not using character for kickstart: ${error.message}`);
       }
       
-      // If no topics available, use a general topic
-      const generalTopics = [
-        "the latest trends in blockchain technology",
-        "decentralized finance innovations",
-        "NFT use cases beyond digital art",
-        "how crypto is changing traditional finance",
-        "web3 community building strategies",
-        "blockchain scalability solutions",
-        "cryptocurrency market trends",
-        "decentralized social media platforms",
-        "blockchain interoperability",
-        "the future of DAOs"
-      ];
+      // Get agents to tag
+      const agentsToTag = this.getAgentsToTag();
+      const tagString = agentsToTag.length > 0 
+        ? agentsToTag.map(agent => `@${agent}`).join(' ') + ' '
+        : '';
       
-      const randomIndex = Math.floor(Math.random() * generalTopics.length);
-      const generalTopic = generalTopics[randomIndex];
+      // Create the message
+      let message = `${tagString}${topic}`;
       
-      this.logger.debug(`ConversationKickstarter: Selected general topic "${generalTopic}" for group ${groupId}`);
-      return generalTopic;
+      return message;
     } catch (error) {
-      this.logger.error(`ConversationKickstarter: Error selecting topic: ${error.message}`);
+      this.logger.error(`ConversationKickstarter: Failed to generate kickstart message: ${error}`);
       return null;
     }
   }
   
   /**
-   * Kickstart a conversation with a specific topic
+   * Get a random topic
    * 
-   * @param topic - Topic to discuss
+   * @returns A random topic
    */
-  private async kickstartConversation(topic: string): Promise<void> {
-    try {
-      // Create the topic title/name with personality
-      const topicTitle = topic;
-      const enhancedTopic = this.personality ? this.personality.refineTopic(topicTitle) : topicTitle;
-      
-      // Check if we should persist this conversation
-      const shouldPersist = false;
-      
-      // Select agents to tag if enabled
-      const agentsToTag: string[] = [];
-      if (this.config.shouldTagAgents && this.knownAgents.length > 0) {
-        const availableAgents = [...this.knownAgents].filter(id => id !== this.agentId);
-        
-        // Randomly select up to maxAgentsToTag agents
-        const shuffledAgents = availableAgents.sort(() => Math.random() - 0.5);
-        const selectedCount = Math.min(this.config.maxAgentsToTag, shuffledAgents.length);
-        
-        for (let i = 0; i < selectedCount; i++) {
-          agentsToTag.push(shuffledAgents[i]);
+  private async getRandomTopic(): Promise<string> {
+    // First try to get a topic from personality if available
+    if (this.personality && this.personality.generateTopic) {
+      try {
+        const topic = this.personality.generateTopic();
+        if (topic) {
+          return topic;
         }
+      } catch (error) {
+        this.logger.debug(`ConversationKickstarter: Error generating topic from personality: ${error}`);
       }
-      
-      // Generate the kickstart message
-      const message = this.generateKickstartMessage(enhancedTopic, agentsToTag);
-      
-      // Send the message
-      await this.relay.sendMessage(this.groupId, message);
-      
-      // Record this message in the conversation
-      await this.conversationManager.recordMessage(
-        this.groupId, 
-        this.agentId, 
-        message
-      );
-      
-      this.logger.info(`ConversationKickstarter: Kickstarted conversation about "${enhancedTopic}" in group ${this.groupId}`);
-    } catch (error) {
-      this.logger.error(`ConversationKickstarter: Error kickstarting conversation: ${error}`);
     }
-  }
-  
-  /**
-   * Generate a kickstart message with optional agent tagging
-   * 
-   * @param topic - Topic for discussion
-   * @param agentsToTag - Array of agent IDs to tag
-   * @returns Generated message text
-   */
-  private generateKickstartMessage(topic: string, agentsToTag: string[] = []): string {
-    // Different opening templates
-    const openingTemplates = [
-      `I've been thinking about ${topic} lately. {{tags}} What do you all think?`,
-      `Has anyone here considered ${topic}? {{tags}} I'm curious about your thoughts.`,
-      `I'd like to discuss ${topic}. {{tags}} Any insights on this?`,
-      `${topic} is something I find fascinating. {{tags}} Do you agree?`,
-      `Let's talk about ${topic}. {{tags}} What's your perspective?`
+    
+    // Then try to get a topic from character if available
+    try {
+      const runtime = await this.waitForRuntime();
+      
+      if (runtime.character && runtime.character.topics && runtime.character.topics.length > 0) {
+        const { topics } = runtime.character;
+        const randomIndex = Math.floor(Math.random() * topics.length);
+        return topics[randomIndex];
+      }
+    } catch (error) {
+      this.logger.debug(`ConversationKickstarter: Not using character topics: ${error.message}`);
+    }
+    
+    // Then try to use available topics
+    const topics = this.availableTopics.get(this.groupId) || [];
+    
+    if (topics.length > 0) {
+      const randomIndex = Math.floor(Math.random() * topics.length);
+      return topics[randomIndex].title;
+    }
+    
+    // Fallback topics
+    const fallbackTopics = [
+      "What's your take on the current state of crypto?",
+      "Have you heard about the latest advances in AI?",
+      "Is DeFi still relevant or has it been overhyped?",
+      "What blockchain projects are you excited about?",
+      "What are your thoughts on Layer 2 solutions?",
+      "Will NFTs ever make a comeback?",
+      "How does the recent price action affect your strategies?",
+      "What's the most undervalued project right now?"
     ];
     
-    // Select a random template
-    const templateIndex = Math.floor(Math.random() * openingTemplates.length);
-    const template = openingTemplates[templateIndex];
-    
-    // Add tags if there are agents to tag
-    let tagsText = '';
-    if (agentsToTag.length > 0) {
-      tagsText = agentsToTag.map(id => `@${id}`).join(' ');
-    }
-    
-    // Replace the tags placeholder
-    let message = template.replace('{{tags}}', tagsText);
-    
-    // Clean up any double spaces that might have been created
-    message = message.replace(/\s+/g, ' ').trim();
-    
-    return message;
+    const randomIndex = Math.floor(Math.random() * fallbackTopics.length);
+    return fallbackTopics[randomIndex];
   }
   
   /**
-   * Force a kickstart (ignoring probability and timing checks)
+   * Get a list of agents to tag
    * 
-   * @param topic - Optional specific topic to use
+   * @returns List of agent IDs
    */
-  async forceKickstart(topic?: string): Promise<void> {
-    try {
-      this.lastKickstartTime.set(this.groupId, Date.now());
-      
-      // Use provided topic or select one
-      let selectedTopic: string;
-      if (topic) {
-        selectedTopic = topic;
-      } else {
-        const autoSelectedTopic = await this.selectTopic(this.groupId);
-        if (!autoSelectedTopic) {
-          this.logger.error('ConversationKickstarter: Cannot force kickstart, no topic available');
-          return;
-        }
-        selectedTopic = autoSelectedTopic;
-      }
-      
-      await this.kickstartConversation(selectedTopic);
-      this.logger.info(`ConversationKickstarter: Forced kickstart with topic '${selectedTopic}'`);
-    } catch (error) {
-      this.logger.error(`ConversationKickstarter: Error during forced kickstart: ${error}`);
+  private getAgentsToTag(): string[] {
+    if (!this.config.shouldTagAgents || this.knownAgents.length === 0) {
+      return [];
     }
+    
+    // Shuffle the known agents
+    const shuffled = [...this.knownAgents].sort(() => 0.5 - Math.random());
+    
+    // Take the first N agents based on maxAgentsToTag config
+    const maxAgents = Math.min(shuffled.length, this.config.maxAgentsToTag || 2);
+    return shuffled.slice(0, maxAgents);
+  }
+  
+  /**
+   * Shutdown the kickstarter
+   */
+  async shutdown(): Promise<void> {
+    this.logger.info('ConversationKickstarter: Shutting down');
+    this.stop();
   }
 } 

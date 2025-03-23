@@ -1,4 +1,9 @@
-import { ElizaLogger, TelegramRelayConfig, MessageStatus, RelayMessage } from './types';
+import { 
+  RelayMessage, 
+  TelegramRelayConfig,
+  MessageStatus,
+  ElizaLogger
+} from './types.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -57,6 +62,8 @@ export class TelegramRelay {
    */
   async connect(): Promise<boolean> {
     this.logger.info(`Connecting to relay server at ${this.config.relayServerUrl}`);
+    console.log(`[RELAY] Attempting registration to ${this.config.relayServerUrl}/register`);
+    console.log(`[RELAY] Using auth token: ${this.config.authToken.slice(0, 6)}****`);
     
     if (!this.config.agentId) {
       this.logger.error('No agent ID provided, cannot connect');
@@ -79,18 +86,19 @@ export class TelegramRelay {
       
       // Register with the relay server
       const payload = {
-        agent_id: this.config.agentId,
-        token: this.config.authToken
+        agent_id: this.config.agentId
       };
       
       this.logger.debug(`Registration payload: ${JSON.stringify(payload)}`);
+      console.log(`[RELAY] Sending registration for agent: ${this.config.agentId}`);
       
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/register`,
         {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.authToken}`
           },
           body: JSON.stringify(payload)
         }
@@ -99,6 +107,7 @@ export class TelegramRelay {
       if (!response.ok) {
         const errorText = await response.text();
         this.logger.error(`Registration failed: Status ${response.status}, Response: ${errorText}`);
+        console.log(`[RELAY] Registration failed: ${response.status}, Response: ${errorText}`);
         return false;
       }
       
@@ -106,10 +115,12 @@ export class TelegramRelay {
       
       if (!data.success) {
         this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
+        console.log(`[RELAY] Registration failed: ${data.error || 'Unknown error'}`);
         return false;
       }
       
       this.logger.info(`Successfully registered with relay server: ${JSON.stringify(data)}`);
+      console.log(`[RELAY] Successfully registered with relay server`);
       this.connected = true;
       
       // Start ping interval
@@ -118,17 +129,10 @@ export class TelegramRelay {
       // Start update polling
       this.startUpdatePolling();
       
-      // Fetch available agents
-      const agents = await this.getAvailableAgents();
-      this.logger.info(`Available agents: ${agents.join(', ')}`);
-      
-      // Notify agent update handlers
-      this.agentUpdateHandlers.forEach(handler => handler(agents));
-      
       return true;
     } catch (error) {
-      this.logger.error(`Failed to connect to relay server: ${error.message}`);
-      this.scheduleReconnect();
+      this.logger.error(`Error connecting to relay server: ${error.message}`);
+      console.log(`[RELAY] Error connecting to relay server: ${error.message}`);
       return false;
     }
   }
@@ -146,17 +150,19 @@ export class TelegramRelay {
       this.clearTimers();
       
       // Unregister from the relay server
-      await fetch(`${this.config.relayServerUrl}/unregister`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.authToken}`
-        },
-        body: JSON.stringify({
-          agent_id: this.config.agentId,
-          token: this.config.authToken
-        })
-      });
+      await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/unregister`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.authToken}`
+          },
+          body: JSON.stringify({
+            agent_id: this.config.agentId
+          })
+        }
+      );
       
       this.connected = false;
       this.logger.info('Disconnected from relay server');
@@ -270,7 +276,7 @@ export class TelegramRelay {
   /**
    * Send a message to the relay server
    * 
-   * @param message - Message to send
+   * @param message - The message to send
    * @returns True if sent successfully, false otherwise
    */
   private async sendMessageToRelay(message: QueuedMessage): Promise<boolean> {
@@ -293,7 +299,6 @@ export class TelegramRelay {
           },
           body: JSON.stringify({
             agent_id: this.config.agentId,
-            token: this.config.authToken,
             chat_id: message.groupId,
             text: message.text
           })
@@ -345,12 +350,17 @@ export class TelegramRelay {
    * Poll the relay server for updates
    */
   private async pollForUpdates(): Promise<void> {
-    this.logger.debug(`Polling for updates from: ${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&token=${this.config.authToken}&offset=${this.lastUpdateId}`);
+    this.logger.debug(`Polling for updates from: ${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=${this.lastUpdateId}`);
     
     try {
       const response = await this.fetchWithTimeout(
-        `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&token=${this.config.authToken}&offset=${this.lastUpdateId}`,
-        { method: 'GET' }
+        `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=${this.lastUpdateId}`,
+        { 
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${this.config.authToken}`
+          }
+        }
       );
       
       if (!response.ok) {
@@ -436,8 +446,7 @@ export class TelegramRelay {
             'Authorization': `Bearer ${this.config.authToken}`
           },
           body: JSON.stringify({
-            agent_id: this.config.agentId,
-            token: this.config.authToken
+            agent_id: this.config.agentId
           })
         }
       );

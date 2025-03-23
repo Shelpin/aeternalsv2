@@ -5,6 +5,8 @@
  * For production use, a more robust implementation is recommended.
  */
 
+require('dotenv').config({ path: '../.env' });
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -13,6 +15,52 @@ const cors = require('cors');
 const app = express();
 app.use(cors());
 app.use(bodyParser.json());
+
+// Load API key from environment variable
+const RELAY_API_KEY = process.env.RELAY_API_KEY || 'elizaos-secure-relay-key';
+logWithTime(`🔑 Using relay API key: ${RELAY_API_KEY.substring(0, 5)}****`);
+
+// API key authentication middleware
+const authenticateApiKey = (req, res, next) => {
+  // Check header first (Bearer token)
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7); // Remove "Bearer " prefix
+    if (token === RELAY_API_KEY) {
+      return next(); // Valid token in header
+    }
+  }
+  
+  // Then check body token as fallback
+  if (req.body && req.body.token === RELAY_API_KEY) {
+    return next(); // Valid token in body
+  }
+  
+  // Skip auth for health endpoint
+  if (req.path === '/health') {
+    return next();
+  }
+  
+  // Log auth failure
+  logWithTime(`❌ Authentication failed for ${req.path}`);
+  logWithTime(`🔍 Auth header: ${req.headers.authorization || 'None'}`);
+  if (req.body && req.body.token) {
+    logWithTime(`🔍 Auth body token: ${req.body.token.substring(0, 5)}****`);
+  }
+  
+  return res.status(401).json({ 
+    success: false, 
+    error: 'Unauthorized - Invalid API key' 
+  });
+};
+
+// Apply auth middleware to all routes except health
+app.use((req, res, next) => {
+  if (req.path === '/health') {
+    return next();
+  }
+  authenticateApiKey(req, res, next);
+});
 
 // Logging function with timestamps
 function logWithTime(message) {
@@ -29,17 +77,35 @@ let updateId = 1;                  // Incremental update ID
 app.post('/register', (req, res) => {
   logWithTime(`🔍 Registration attempt received - Full request body: ${JSON.stringify(req.body)}`);
   logWithTime(`🔍 Authorization header: ${req.headers.authorization || 'None'}`);
+  logWithTime(`🔍 Expected key: ${RELAY_API_KEY.substring(0, 5)}****`);
   
-  const { agent_id, token } = req.body;
+  // Enhanced debugging for auth
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    logWithTime(`🔍 Bearer token: ${token.substring(0, 5)}****`);
+    logWithTime(`🔍 Token match: ${token === RELAY_API_KEY}`);
+  } else {
+    logWithTime(`⚠️ No Bearer token in authorization header`);
+  }
   
-  if (!agent_id || !token) {
-    logWithTime(`❌ Registration failed: Missing agent_id or token`);
-    return res.json({ success: false, error: 'Missing agent_id or token' });
+  if (req.body && req.body.token) {
+    logWithTime(`🔍 Body token: ${req.body.token.substring(0, 5)}****`);
+    logWithTime(`🔍 Body token match: ${req.body.token === RELAY_API_KEY}`);
+  } else {
+    logWithTime(`⚠️ No token in request body`);
+  }
+  
+  const { agent_id } = req.body;
+  
+  if (!agent_id) {
+    logWithTime(`❌ Registration failed: Missing agent_id`);
+    return res.json({ success: false, error: 'Missing agent_id' });
   }
   
   // Register the agent
   connectedAgents.set(agent_id, { 
-    token, 
+    token: 'via-auth-header', // Token is now validated via middleware
     lastSeen: Date.now(),
     updateOffset: 0
   });
@@ -75,18 +141,18 @@ app.post('/register', (req, res) => {
 
 // Unregister an agent
 app.post('/unregister', (req, res) => {
-  const { agent_id, token } = req.body;
+  const { agent_id } = req.body;
   
-  if (!agent_id || !token) {
-    logWithTime(`❌ Unregister failed: Missing agent_id or token`);
-    return res.json({ success: false, error: 'Missing agent_id or token' });
+  if (!agent_id) {
+    logWithTime(`❌ Unregister failed: Missing agent_id`);
+    return res.json({ success: false, error: 'Missing agent_id' });
   }
   
-  // Check if agent exists and token is valid
+  // Check if agent exists
   const agent = connectedAgents.get(agent_id);
-  if (!agent || agent.token !== token) {
-    logWithTime(`❌ Unregister failed: Invalid agent_id or token for ${agent_id}`);
-    return res.json({ success: false, error: 'Invalid agent_id or token' });
+  if (!agent) {
+    logWithTime(`❌ Unregister failed: Agent not registered: ${agent_id}`);
+    return res.json({ success: false, error: 'Agent not registered' });
   }
   
   // Remove the agent
@@ -110,41 +176,40 @@ app.post('/unregister', (req, res) => {
 
 // Send a heartbeat to keep the connection alive
 app.post('/heartbeat', (req, res) => {
-  const { agent_id, token } = req.body;
+  const { agent_id } = req.body;
   
-  if (!agent_id || !token) {
-    logWithTime(`❌ Heartbeat failed: Missing agent_id or token`);
-    return res.json({ success: false, error: 'Missing agent_id or token' });
+  if (!agent_id) {
+    logWithTime(`❌ Heartbeat failed: Missing agent_id`);
+    return res.json({ success: false, error: 'Missing agent_id' });
   }
   
-  // Check if agent exists and token is valid
+  // Check if agent exists
   const agent = connectedAgents.get(agent_id);
-  if (!agent || agent.token !== token) {
-    logWithTime(`❌ Heartbeat failed: Invalid agent_id or token for ${agent_id}`);
-    return res.json({ success: false, error: 'Invalid agent_id or token' });
+  if (!agent) {
+    logWithTime(`❌ Heartbeat failed: Agent not registered: ${agent_id}`);
+    return res.json({ success: false, error: 'Agent not registered' });
   }
   
-  // Update last seen timestamp
+  // Update last seen time
   agent.lastSeen = Date.now();
-  logWithTime(`💓 Heartbeat from ${agent_id}`);
   
   return res.json({ success: true });
 });
 
 // Get updates for an agent
 app.get('/getUpdates', (req, res) => {
-  const { agent_id, token, offset } = req.query;
+  const { agent_id, offset } = req.query;
   
-  if (!agent_id || !token) {
-    logWithTime(`❌ GetUpdates failed: Missing agent_id or token`);
-    return res.json({ success: false, error: 'Missing agent_id or token' });
+  if (!agent_id) {
+    logWithTime(`❌ GetUpdates failed: Missing agent_id`);
+    return res.json({ success: false, error: 'Missing agent_id' });
   }
   
-  // Check if agent exists and token is valid
+  // Check if agent exists
   const agent = connectedAgents.get(agent_id);
-  if (!agent || agent.token !== token) {
-    logWithTime(`❌ GetUpdates failed: Invalid agent_id or token for ${agent_id}`);
-    return res.json({ success: false, error: 'Invalid agent_id or token' });
+  if (!agent) {
+    logWithTime(`❌ GetUpdates failed: Agent not registered: ${agent_id}`);
+    return res.json({ success: false, error: 'Agent not registered' });
   }
   
   // Update last seen timestamp
@@ -178,9 +243,9 @@ app.get('/getUpdates', (req, res) => {
 
 // Send a message
 app.post('/sendMessage', (req, res) => {
-  const { agent_id, token, chat_id, text } = req.body;
+  const { agent_id, chat_id, text } = req.body;
   
-  if (!agent_id || !token || !chat_id || !text) {
+  if (!agent_id || !chat_id || !text) {
     logWithTime(`❌ SendMessage failed: Missing required parameters`);
     return res.json({ 
       success: false, 
@@ -188,11 +253,11 @@ app.post('/sendMessage', (req, res) => {
     });
   }
   
-  // Check if agent exists and token is valid
+  // Check if agent exists
   const agent = connectedAgents.get(agent_id);
-  if (!agent || agent.token !== token) {
-    logWithTime(`❌ SendMessage failed: Invalid agent_id or token for ${agent_id}`);
-    return res.json({ success: false, error: 'Invalid agent_id or token' });
+  if (!agent) {
+    logWithTime(`❌ SendMessage failed: Agent not registered: ${agent_id}`);
+    return res.json({ success: false, error: 'Agent not registered' });
   }
   
   // Create a message object
@@ -235,9 +300,9 @@ app.post('/sendMessage', (req, res) => {
 
 // Send a chat action (typing, etc.)
 app.post('/sendChatAction', (req, res) => {
-  const { agent_id, token, chat_id, action } = req.body;
+  const { agent_id, chat_id, action } = req.body;
   
-  if (!agent_id || !token || !chat_id || !action) {
+  if (!agent_id || !chat_id || !action) {
     logWithTime(`❌ SendChatAction failed: Missing required parameters`);
     return res.json({ 
       success: false, 
@@ -245,11 +310,11 @@ app.post('/sendChatAction', (req, res) => {
     });
   }
   
-  // Check if agent exists and token is valid
+  // Check if agent exists
   const agent = connectedAgents.get(agent_id);
-  if (!agent || agent.token !== token) {
-    logWithTime(`❌ SendChatAction failed: Invalid agent_id or token for ${agent_id}`);
-    return res.json({ success: false, error: 'Invalid agent_id or token' });
+  if (!agent) {
+    logWithTime(`❌ SendChatAction failed: Agent not registered: ${agent_id}`);
+    return res.json({ success: false, error: 'Agent not registered' });
   }
   
   logWithTime(`⌨️ Chat action from ${agent_id}: ${action}`);
