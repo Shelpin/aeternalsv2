@@ -62,9 +62,54 @@ PLUGIN_DIR="/root/eliza/agent/config/plugins"
 mkdir -p $PLUGIN_DIR
 
 CONFIG_FILE="$PLUGIN_DIR/telegram-multiagent.json"
-cat > $CONFIG_FILE << EOF
+
+# Determine server IP - try to get external IP if available
+SERVER_IP="207.180.245.243"  # Default external IP
+if [ -z "$SERVER_IP" ]; then
+  # If external IP not available, try to get local IP
+  SERVER_IP=$(hostname -I | awk '{print $1}')
+  if [ -z "$SERVER_IP" ]; then
+    # Fall back to localhost only if no other IP is available
+    SERVER_IP="localhost"
+    echo "⚠️ Warning: Using localhost for relay server. This may not work for external connections."
+  fi
+fi
+
+# Check if config already exists and preserve it
+if [ -f "$CONFIG_FILE" ]; then
+  echo "  - Found existing config at $CONFIG_FILE"
+  # Make a backup
+  cp "$CONFIG_FILE" "${CONFIG_FILE}.bak"
+  
+  # Check if the config contains localhost
+  if grep -q '"relayServerUrl": "http://localhost:4000"' "$CONFIG_FILE"; then
+    echo "  - Updating relay server URL from localhost to external IP"
+    # Replace localhost with server IP in existing config
+    sed -i "s|\"relayServerUrl\": \"http://localhost:4000\"|\"relayServerUrl\": \"http://${SERVER_IP}:4000\"|g" "$CONFIG_FILE"
+    echo "  - Updated relay server URL to http://${SERVER_IP}:4000"
+  else
+    echo "  - Keeping existing configuration"
+  fi
+  
+  # Check if auth token is empty and fix it
+  if grep -q '"authToken": ""' "$CONFIG_FILE"; then
+    echo "  - Auth token is empty, setting it to the default value"
+    sed -i 's|"authToken": ""|"authToken": "elizaos-secure-relay-key"|g' "$CONFIG_FILE"
+    echo "  - Updated auth token in configuration"
+  fi
+  
+  # Ensure the plugin is enabled
+  if grep -q '"enabled": false' "$CONFIG_FILE"; then
+    echo "  - Plugin is disabled, enabling it"
+    sed -i 's|"enabled": false|"enabled": true|g' "$CONFIG_FILE"
+    echo "  - Enabled the plugin in configuration"
+  fi
+else
+  # Create new config file with external IP
+  echo "  - Creating new config file with relay server at http://${SERVER_IP}:4000"
+  cat > $CONFIG_FILE << EOF
 {
-  "relayServerUrl": "http://localhost:4000", 
+  "relayServerUrl": "http://${SERVER_IP}:4000", 
   "authToken": "elizaos-secure-relay-key",
   "groupIds": [-1002550618173],
   "conversationCheckIntervalMs": 30000,
@@ -76,8 +121,14 @@ cat > $CONFIG_FILE << EOF
   }
 }
 EOF
+fi
+
 chmod 640 $CONFIG_FILE
-echo "  - Created config at $CONFIG_FILE"
+echo "  - Permissions set on $CONFIG_FILE"
+
+# Display the final configuration for verification
+echo "  - Final configuration:"
+grep -e "relayServerUrl" -e "authToken" -e "enabled" "$CONFIG_FILE" | sed 's/"authToken": "[^"]*"/"authToken": "******"/g'
 
 # Start the relay server
 echo "🚀 Starting relay server..."

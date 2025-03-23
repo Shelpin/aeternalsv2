@@ -36,6 +36,8 @@ export class TelegramRelay {
   private lastUpdateId = 0;
   private messageHandlers: Array<(message: RelayMessage) => void> = [];
   private agentUpdateHandlers: Array<(agents: string[]) => void> = [];
+  private connectionAttempts: number = 0;
+  private maxConnectionAttempts: number = 5;
 
   /**
    * Create a new TelegramRelay
@@ -57,12 +59,105 @@ export class TelegramRelay {
   }
 
   /**
+   * Register agent with the relay server with retries
+   * @returns True if registered successfully
+   */
+  private async registerAgent(): Promise<boolean> {
+    if (!this.config.agentId) {
+      this.logger.error('No agent ID provided, cannot register');
+      return false;
+    }
+    
+    const maxRetries = 3;
+    let attempt = 0;
+    
+    while (attempt < maxRetries) {
+      attempt++;
+      this.logger.info(`Registration attempt ${attempt}/${maxRetries}`);
+      
+      try {
+        const payload = {
+          agent_id: this.config.agentId
+        };
+        
+        this.logger.debug(`Registration payload: ${JSON.stringify(payload)}`);
+        console.log(`[RELAY] Sending registration for agent: ${this.config.agentId}`);
+        
+        // If URL is localhost and contains underscores, warn about potential issues
+        if (this.config.relayServerUrl.includes('localhost') && this.config.agentId.includes('_')) {
+          this.logger.warn('Using localhost with agent ID containing underscores may cause registration issues');
+          console.log('[RELAY] Warning: Using localhost with agent ID containing underscores may cause registration issues');
+        }
+        
+        const response = await this.fetchWithTimeout(
+          `${this.config.relayServerUrl}/register`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.config.authToken}`
+            },
+            body: JSON.stringify(payload)
+          },
+          10000 // 10 second timeout
+        );
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          this.logger.error(`Registration failed: Status ${response.status}, Response: ${errorText}`);
+          console.log(`[RELAY] Registration failed: ${response.status}, Response: ${errorText}`);
+          
+          // Wait before retrying
+          if (attempt < maxRetries) {
+            const delay = attempt * 2000; // Exponential backoff
+            this.logger.info(`Retrying registration in ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
+          }
+          continue;
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
+          console.log(`[RELAY] Registration failed: ${data.error || 'Unknown error'}`);
+          
+          // Wait before retrying
+          if (attempt < maxRetries) {
+            const delay = attempt * 2000; // Exponential backoff
+            this.logger.info(`Retrying registration in ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
+          }
+          continue;
+        }
+        
+        this.logger.info(`Successfully registered with relay server: ${JSON.stringify(data)}`);
+        console.log(`[RELAY] Successfully registered with relay server`);
+        return true;
+      } catch (error) {
+        this.logger.error(`Registration error: ${error.message}`);
+        console.log(`[RELAY] Registration error: ${error.message}`);
+        
+        if (attempt < maxRetries) {
+          const delay = attempt * 2000; // Exponential backoff
+          this.logger.info(`Retrying registration in ${delay}ms...`);
+          await new Promise(r => setTimeout(r, delay));
+        }
+      }
+    }
+    
+    this.logger.error(`Failed to register after ${maxRetries} attempts`);
+    console.log(`[RELAY] Failed to register after ${maxRetries} attempts`);
+    return false;
+  }
+
+  /**
    * Connect to the relay server
    * @returns True if connected successfully, false otherwise
    */
   async connect(): Promise<boolean> {
     this.logger.info(`Connecting to relay server at ${this.config.relayServerUrl}`);
-    console.log(`[RELAY] Attempting registration to ${this.config.relayServerUrl}/register`);
+    console.log(`[RELAY] Attempting to connect to relay server at ${this.config.relayServerUrl}`);
     console.log(`[RELAY] Using auth token: ${this.config.authToken.slice(0, 6)}****`);
     
     if (!this.config.agentId) {
@@ -70,58 +165,53 @@ export class TelegramRelay {
       return false;
     }
     
+    // Increment connection attempts counter
+    this.connectionAttempts++;
+    
+    // Log connection attempt with counter
+    this.logger.info(`Connection attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}`);
+    
+    // Reset connected state for fresh attempt
+    this.connected = false;
+    
     try {
       // Check if the server is available
-      const healthCheck = await this.fetchWithTimeout(
-        `${this.config.relayServerUrl}/health`,
-        { method: 'GET' }
-      );
+      let healthCheck;
+      try {
+        healthCheck = await this.fetchWithTimeout(
+          `${this.config.relayServerUrl}/health`,
+          { method: 'GET' },
+          5000  // 5 second timeout for health check
+        );
+      } catch (error) {
+        this.logger.error(`Health check failed: ${error.message}`);
+        console.log(`[RELAY] Health check failed: ${error.message}`);
+        if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
+          this.logger.warn('Connection issue detected. Please check if relay server is running and network is accessible');
+          console.log('[RELAY] Connection issue detected. Please check if relay server is running and network is accessible');
+        }
+        return false;
+      }
       
       if (!healthCheck.ok) {
         this.logger.warn(`Relay server health check failed with status ${healthCheck.status}`);
+        const responseText = await healthCheck.text();
+        this.logger.error(`Health check response: ${responseText}`);
         return false;
       }
       
       this.logger.debug(`Health check succeeded, registering agent: ${this.config.agentId}`);
       
-      // Register with the relay server
-      const payload = {
-        agent_id: this.config.agentId
-      };
-      
-      this.logger.debug(`Registration payload: ${JSON.stringify(payload)}`);
-      console.log(`[RELAY] Sending registration for agent: ${this.config.agentId}`);
-      
-      const response = await this.fetchWithTimeout(
-        `${this.config.relayServerUrl}/register`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.authToken}`
-          },
-          body: JSON.stringify(payload)
-        }
-      );
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        this.logger.error(`Registration failed: Status ${response.status}, Response: ${errorText}`);
-        console.log(`[RELAY] Registration failed: ${response.status}, Response: ${errorText}`);
+      // Register the agent with retries
+      const registered = await this.registerAgent();
+      if (!registered) {
         return false;
       }
       
-      const data = await response.json();
-      
-      if (!data.success) {
-        this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
-        console.log(`[RELAY] Registration failed: ${data.error || 'Unknown error'}`);
-        return false;
-      }
-      
-      this.logger.info(`Successfully registered with relay server: ${JSON.stringify(data)}`);
-      console.log(`[RELAY] Successfully registered with relay server`);
       this.connected = true;
+      
+      // Reset connection attempts on success
+      this.connectionAttempts = 0;
       
       // Start ping interval
       this.setupPingInterval();
@@ -131,8 +221,11 @@ export class TelegramRelay {
       
       return true;
     } catch (error) {
-      this.logger.error(`Error connecting to relay server: ${error.message}`);
-      console.log(`[RELAY] Error connecting to relay server: ${error.message}`);
+      this.logger.error(`Unexpected error connecting to relay server: ${error.message}`);
+      if (error.stack) {
+        this.logger.debug(`Error stack: ${error.stack}`);
+      }
+      console.log(`[RELAY] Unexpected error connecting to relay server: ${error.message}`);
       return false;
     }
   }
@@ -510,26 +603,36 @@ export class TelegramRelay {
   }
 
   /**
-   * Fetch with a timeout
-   * 
+   * Fetch with timeout to prevent hanging requests
    * @param url - URL to fetch
    * @param options - Fetch options
-   * @param timeout - Timeout in milliseconds
+   * @param timeoutMs - Timeout in milliseconds
    * @returns Response
    */
-  private async fetchWithTimeout(url: string, options: RequestInit, timeout: number = 10000): Promise<Response> {
+  private async fetchWithTimeout(
+    url: string,
+    options: RequestInit = {},
+    timeoutMs: number = 8000
+  ): Promise<Response> {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     
     try {
       const response = await fetch(url, {
         ...options,
-        signal: controller.signal
+        signal: controller.signal,
       });
-      
-      return response;
-    } finally {
       clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      
+      // Enhance error message if it's an abort error
+      if (error.name === 'AbortError') {
+        throw new Error(`Request timed out after ${timeoutMs}ms: ${url}`);
+      }
+      
+      throw error;
     }
   }
 
