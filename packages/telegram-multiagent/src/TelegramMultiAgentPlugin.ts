@@ -19,7 +19,7 @@ import fs from 'fs';
 const DEFAULT_CONFIG: TelegramMultiAgentConfig = {
   enabled: true,
   relayServerUrl: 'http://207.180.245.243:4000',
-  authToken: '',
+  authToken: 'elizaos-secure-relay-key',
   groupIds: [],
   dbPath: './data/telegram-multiagent.db',
   logLevel: 'info',
@@ -55,8 +55,14 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private checkIntervalId: ReturnType<typeof setInterval> | null = null;
   private initialized = false;
   private agentId: string = "unknown";
-  private initializeCalled: boolean = false;
+  private initializePromise: Promise<void> | null = null;
   
+  /**
+   * Create a new TelegramMultiAgentPlugin
+   * Constructor should only handle basic setup, not accessing runtime
+   * 
+   * @param options - Configuration options
+   */
   constructor(options?: Partial<TelegramMultiAgentConfig>) {
     // Create a default logger before we get the real one from the runtime
     const defaultLogger: ElizaLogger = {
@@ -100,39 +106,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   register(runtime: IAgentRuntime): Plugin | boolean {
     try {
-      console.log(`[REGISTER] TelegramMultiAgentPlugin: Register method called`);
+      console.log(`[REGISTER] ${this.name}: Register method called`);
       
-      // Just set the runtime reference in parent class, don't try to access methods yet
+      // Just set the runtime reference in parent class
       super.setRuntime(runtime);
-      
-      // Setup listeners for runtime events if available
-      if (runtime.on && typeof runtime.on === 'function') {
-        try {
-          console.log(`[REGISTER] ${this.name}: Setting up runtime event listeners`);
-          runtime.on('ready', () => {
-            console.log(`[REGISTER] ${this.name}: Runtime ready event received!`);
-            this.onRuntimeReady(runtime);
-          });
-        } catch (error) {
-          console.warn(`[REGISTER] ${this.name}: Could not setup runtime event listeners: ${error}`);
-        }
-      } else {
-        console.log(`[REGISTER] ${this.name}: Runtime does not support events, will use polling`);
-      }
+      console.log(`[REGISTER] ${this.name}: Runtime reference set`);
       
       // Get a logger from the runtime if available, but don't fail if not
       try {
         this.logger = runtime.getLogger();
-        this.logger.info(`[REGISTER] ${this.name}: Registered with runtime`);
+        this.logger.info(`[REGISTER] ${this.name}: Got logger from runtime`);
       } catch (error) {
-        console.warn(`[REGISTER] ${this.name}: Could not get logger yet, will retry during initialization`);
-      }
-        
-      // Register this plugin as a service so other plugins can access it
-      try {
-        runtime.registerService("telegramMultiAgentPlugin", this);
-      } catch (error) {
-        console.warn(`[REGISTER] ${this.name}: Could not register service yet: ${error}`);
+        console.warn(`[REGISTER] ${this.name}: Could not get logger yet, will retry during initialization: ${error}`);
       }
         
       return this;
@@ -143,70 +128,38 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   }
   
   /**
-   * Called when the runtime is ready
-   * This is our opportunity to initialize properly
-   */
-  private onRuntimeReady(runtime: IAgentRuntime): void {
-    console.log(`[RUNTIME] ${this.name}: Runtime ready event received, proceeding with initialization`);
-    
-    // Check if we're already initialized
-    if (this.initialized) {
-      console.log(`[RUNTIME] ${this.name}: Already initialized, skipping`);
-      return;
-    }
-    
-    // Update the logger
-    try {
-      this.logger = runtime.getLogger();
-      this.logger.info(`[RUNTIME] ${this.name}: Got logger from ready runtime`);
-    } catch (error) {
-      console.warn(`[RUNTIME] ${this.name}: Could not get logger from ready runtime: ${error}`);
-    }
-    
-    // Get agent ID
-    try {
-      this.agentId = runtime.getAgentId();
-      console.log(`[RUNTIME] ${this.name}: Got agent ID from ready runtime: ${this.agentId}`);
-    } catch (error) {
-      console.warn(`[RUNTIME] ${this.name}: Could not get agent ID from ready runtime: ${error}`);
-    }
-    
-    // Register service again just in case
-    try {
-      runtime.registerService("telegramMultiAgentPlugin", this);
-    } catch (error) {
-      console.warn(`[RUNTIME] ${this.name}: Could not register service with ready runtime: ${error}`);
-    }
-    
-    // Continue with initialization via the initialize method
-    // We'll try the initialize method from the event if not called directly
-    if (!this.initializeCalled) {
-      console.log(`[RUNTIME] ${this.name}: Calling initialize from runtime ready event`);
-      this.initialize().catch(error => {
-        console.error(`[RUNTIME] ${this.name}: Error initializing from ready event: ${error}`);
-      });
-    }
-  }
-  
-  /**
    * Load configuration from file if present
    * Will merge with default configuration
    */
   private async loadConfig(): Promise<void> {
     try {
-      const runtime = await this.waitForRuntime();
+      // Start with default config
+      this.config = { ...DEFAULT_CONFIG };
       
-      // Get the config path from the runtime
-      let configPath = './config/plugins/telegram-multiagent.json';
-      try {
-        // Try to use the runtime's config path
-        const configDir = runtime.getConfigDir ? runtime.getConfigDir() : './config';
-        configPath = path.join(configDir, 'plugins', 'telegram-multiagent.json');
-      } catch (error) {
-        this.logger.warn(`${this.name}: Could not get config directory from runtime: ${error}`);
+      let configPath = './agent/config/plugins/telegram-multiagent.json';
+      
+      // Log environment variables for debugging
+      this.logger.debug(`${this.name}: Environment variables:
+        RELAY_SERVER_URL=${process.env.RELAY_SERVER_URL || 'not set'}
+        RELAY_AUTH_TOKEN=${process.env.RELAY_AUTH_TOKEN ? '(set)' : 'not set'}
+        AGENT_ID=${process.env.AGENT_ID || 'not set'}
+      `);
+      
+      // First check for environment variables - highest priority
+      if (process.env.RELAY_SERVER_URL) {
+        this.logger.info(`${this.name}: Using relay server URL from environment: ${process.env.RELAY_SERVER_URL}`);
+        this.config.relayServerUrl = process.env.RELAY_SERVER_URL;
       }
       
-      // Check if config file exists
+      if (process.env.RELAY_AUTH_TOKEN) {
+        this.logger.info(`${this.name}: Using auth token from RELAY_AUTH_TOKEN environment variable`);
+        this.config.authToken = process.env.RELAY_AUTH_TOKEN;
+      } else if (process.env.RELAY_API_KEY) {
+        this.logger.info(`${this.name}: Using auth token from RELAY_API_KEY environment variable`);
+        this.config.authToken = process.env.RELAY_API_KEY;
+      }
+      
+      // Check if config file exists - second priority
       if (fs.existsSync(configPath)) {
         this.logger.info(`${this.name}: Loading configuration from ${configPath}`);
         
@@ -214,21 +167,38 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           const configData = fs.readFileSync(configPath, 'utf8');
           const fileConfig = JSON.parse(configData);
           
-          // Merge with defaults and any constructor options
+          // Remember environment values
+          const relayServerUrl = this.config.relayServerUrl; // Save from env
+          const authToken = this.config.authToken; // Save from env
+          
+          // Merge with file config
           this.config = {
-            ...DEFAULT_CONFIG,
+            ...this.config,
             ...fileConfig
           };
           
+          // Environment variables override file config
+          if (process.env.RELAY_SERVER_URL) {
+            this.config.relayServerUrl = relayServerUrl;
+          }
+          
+          if (process.env.RELAY_AUTH_TOKEN || process.env.RELAY_API_KEY) {
+            this.config.authToken = authToken;
+          }
+          
           this.logger.info(`${this.name}: Configuration loaded successfully`);
-          this.logger.debug(`${this.name}: Using relay server: ${this.config.relayServerUrl}`);
         } catch (error) {
           this.logger.error(`${this.name}: Error parsing config file: ${error}`);
-          throw new Error(`Failed to parse config: ${error.message}`);
+          // Continue with defaults and env vars
         }
       } else {
-        this.logger.warn(`${this.name}: No configuration file found at ${configPath}, using defaults`);
+        this.logger.warn(`${this.name}: No configuration file found at ${configPath}, using defaults and environment variables`);
       }
+      
+      // Log what we're using
+      this.logger.info(`${this.name}: Using relay server URL: ${this.config.relayServerUrl}`);
+      const authTokenLength = this.config.authToken ? this.config.authToken.length : 0;
+      this.logger.debug(`${this.name}: Using auth token, length: ${authTokenLength}`);
       
       // Verify critical config values
       if (!this.config.relayServerUrl) {
@@ -241,12 +211,6 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         throw new Error('No authentication token configured');
       }
       
-      // Check if relayServerUrl is localhost and needs to be fixed
-      if (this.config.relayServerUrl.includes('localhost')) {
-        this.logger.warn(`${this.name}: Relay server URL contains localhost, which may not work for external connections`);
-        this.logger.info(`${this.name}: Consider using the public IP or hostname instead`);
-      }
-      
       // Log configuration details
       this.logger.info(`${this.name}: Configuration loaded with relay server ${this.config.relayServerUrl}`);
       this.logger.info(`${this.name}: Plugin ${this.config.enabled ? 'enabled' : 'disabled'}`);
@@ -257,111 +221,100 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   }
   
   /**
-   * Initialize the conversation manager
-   */
-  private async initializeConversationManager(): Promise<void> {
-    try {
-      const runtime = await this.waitForRuntime();
-      
-      // Update logger
-      this.logger = runtime.getLogger();
-      
-      // Set conversation manager runtime
-      this.conversationManager.setRuntime(runtime);
-      
-      // Initialize the conversation manager
-      await this.conversationManager.initialize();
-      
-      // Register it as a service
-      runtime.registerService("conversationManager", this.conversationManager);
-      
-      this.logger.info(`${this.name}: Conversation manager initialized`);
-    } catch (error) {
-      this.logger.error(`${this.name}: Failed to initialize conversation manager: ${error}`);
-      throw error;
-    }
-  }
-  
-  /**
    * Initialize the plugin - this should be called after register
    * and follows the ElizaOS plugin lifecycle pattern
    */
   async initialize(): Promise<void> {
-    this.initializeCalled = true;
-    
-    try {
-      console.log(`[ELIZAOS] TelegramMultiAgentPlugin: initialize method called`);
-      
-      // Add a delay to ensure runtime is fully initialized
-      console.log(`[ELIZAOS] TelegramMultiAgentPlugin: Waiting for runtime initialization...`);
-      await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
-      console.log(`[ELIZAOS] TelegramMultiAgentPlugin: Continuing initialization after delay`);
-      
-      // Skip the rest of initialization if already initialized or in progress
-      if (this.initialized) {
-        console.log(`[ELIZAOS] TelegramMultiAgentPlugin: Already initialized, skipping`);
-        return;
-      }
-      
-      // Use a direct runtime reference and skip waitForRuntime if possible
-      if (this.runtime) {
-        try {
-          // Try to access a method to check if runtime is ready
-          const agentId = this.runtime.getAgentId();
-          console.log(`[ELIZAOS] TelegramMultiAgentPlugin: Runtime verified with agent ID: ${agentId}`);
-          this.agentId = agentId;
-          
-          // Update logger
-          this.logger = this.runtime.getLogger();
-          this.logger.info(`${this.name}: Starting plugin initialization`);
-          
-          // Continue with initialization process
-          await this.completeInitialization(this.runtime);
-          return;
-        } catch (error) {
-          console.log(`[ELIZAOS] TelegramMultiAgentPlugin: Runtime exists but is not ready: ${error}`);
-          // Fall back to waitForRuntime below
-        }
-      }
-      
-      // Get runtime by waiting for it to be fully available
-      let runtime;
-      try {
-        runtime = await this.waitForRuntime();
-      } catch (error) {
-        console.error(`[ELIZAOS] TelegramMultiAgentPlugin: Runtime wait failed: ${error}`);
-        console.log(`[ELIZAOS] TelegramMultiAgentPlugin: Will try to initialize when runtime emits ready event`);
-        // We'll retry when runtime emits ready event
-        return;
-      }
-      
-      // Complete initialization with the obtained runtime
-      await this.completeInitialization(runtime);
-      
-    } catch (error) {
-      this.logger.error(`${this.name}: Error during plugin initialization: ${error}`);
-      console.error(`[ELIZAOS] TelegramMultiAgentPlugin: Error during initialize: ${error}`);
-      // We don't rethrow here to allow ElizaOS to continue without our plugin
+    // Return existing promise if initialization already started
+    if (this.initializePromise) {
+      return this.initializePromise;
     }
+    
+    // Create a new initialization promise
+    this.initializePromise = this._initialize();
+    return this.initializePromise;
   }
   
   /**
-   * Complete the initialization process once we have a valid runtime
+   * Internal initialization implementation
    */
-  private async completeInitialization(runtime: IAgentRuntime): Promise<void> {
+  private async _initialize(): Promise<void> {
     try {
-      // Update logger
-      this.logger = runtime.getLogger();
+      console.log(`[ELIZAOS] ${this.name}: Initialize method called`);
       
-      // Get agent ID if not already set
-      if (!this.agentId || this.agentId === "unknown") {
-        this.agentId = runtime.getAgentId();
+      // Skip if already initialized
+      if (this.initialized) {
+        console.log(`[ELIZAOS] ${this.name}: Already initialized, skipping`);
+        return;
       }
       
-      this.logger.info(`${this.name}: Using agent ID: ${this.agentId}`);
+      // Try to get runtime, but don't depend on it
+      let runtime = null;
+      try {
+        runtime = await this.waitForRuntime(20000); // 20 second timeout
+        console.log(`[ELIZAOS] ${this.name}: Runtime is now available!`);
+      } catch (error) {
+        console.error(`[ELIZAOS] ${this.name}: ${error.message}`);
+        console.log(`[ELIZAOS] ${this.name}: Continuing with limited functionality`);
+      }
       
-      // Load configuration
-      await this.loadConfig();
+      // Get logger
+      if (runtime) {
+        try {
+          this.logger = runtime.getLogger();
+        } catch (error) {
+          console.warn(`[ELIZAOS] ${this.name}: Could not get logger from runtime: ${error}`);
+          // Continue with default logger
+        }
+      }
+      
+      this.logger.info(`${this.name}: Starting plugin initialization`);
+      
+      // Get agent ID - Environment variable takes precedence
+      if (process.env.AGENT_ID) {
+        this.agentId = process.env.AGENT_ID;
+        this.logger.info(`${this.name}: Using agent ID from environment: ${this.agentId}`);
+      } else if (runtime) {
+        try {
+          this.agentId = runtime.getAgentId();
+          this.logger.info(`${this.name}: Got agent ID from runtime: ${this.agentId}`);
+        } catch (error) {
+          this.logger.warn(`${this.name}: Could not get agent ID from runtime: ${error}`);
+        }
+      }
+      
+      // Critical check: we must have an agent ID
+      if (this.agentId === "unknown") {
+        this.logger.error(`${this.name}: No agent ID available, cannot continue`);
+        return;
+      }
+      
+      // Load configuration - if it fails, use environment variables directly
+      try {
+        await this.loadConfig();
+      } catch (error) {
+        this.logger.error(`${this.name}: Failed to load configuration from file: ${error}`);
+        this.logger.info(`${this.name}: Attempting to use environment variables directly`);
+        
+        // Set configuration directly from environment variables
+        this.config = { ...DEFAULT_CONFIG };
+        
+        if (process.env.RELAY_SERVER_URL) {
+          this.config.relayServerUrl = process.env.RELAY_SERVER_URL;
+          this.logger.info(`${this.name}: Using relay server URL from environment: ${this.config.relayServerUrl}`);
+        }
+        
+        if (process.env.RELAY_AUTH_TOKEN) {
+          this.config.authToken = process.env.RELAY_AUTH_TOKEN;
+          this.logger.info(`${this.name}: Using auth token from environment`);
+        }
+      }
+      
+      // Final check on configuration
+      if (!this.config.relayServerUrl || !this.config.authToken) {
+        this.logger.error(`${this.name}: Missing critical configuration (relayServerUrl or authToken), cannot continue`);
+        return;
+      }
       
       // Check if plugin is enabled
       if (!this.config.enabled) {
@@ -369,42 +322,49 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         return; // Return without error even if disabled
       }
       
+      // Register this plugin as a service if runtime available
+      if (runtime) {
+        try {
+          runtime.registerService("telegramMultiAgentPlugin", this);
+          this.logger.info(`${this.name}: Registered as service with runtime`);
+        } catch (error) {
+          this.logger.warn(`${this.name}: Could not register service: ${error}`);
+        }
+      }
+      
       // Initialize conversation manager
-      await this.initializeConversationManager();
-      
-      // Initialize components
-      await this.initializeComponents();
-      
-      // Setup conversation check interval
-      this.setupConversationCheck();
-      
-      // Mark as initialized
-      this.initialized = true;
-      
-      this.logger.info(`${this.name}: Plugin initialized successfully`);
-    } catch (error) {
-      this.logger.error(`${this.name}: Error during plugin initialization: ${error}`);
-      throw error; // Rethrow to allow caller to handle
-    }
-  }
-  
-  /**
-   * Initialize plugin components
-   */
-  private async initializeComponents(): Promise<void> {
-    try {
-      // Get runtime - we already know it's available
-      const runtime = this.runtime!;
+      try {
+        this.logger.info(`${this.name}: Initializing conversation manager`);
+        if (runtime) {
+          this.conversationManager.setRuntime(runtime);
+        }
+        await this.conversationManager.initialize();
+        
+        // Register conversation manager as a service
+        if (runtime) {
+          try {
+            runtime.registerService("conversationManager", this.conversationManager);
+          } catch (error) {
+            this.logger.warn(`${this.name}: Could not register conversation manager service: ${error}`);
+          }
+        }
+      } catch (error) {
+        this.logger.error(`${this.name}: Failed to initialize conversation manager: ${error}`);
+        // Continue anyway
+      }
       
       // Try to get character from runtime
-      try {
-        this.character = await runtime.getCharacter();
-        this.logger.info(`${this.name}: Got character information from runtime`);
-      } catch (error) {
-        this.logger.warn(`${this.name}: Could not get character from runtime: ${error}`);
+      if (runtime) {
+        try {
+          this.character = await runtime.getCharacter();
+          this.logger.info(`${this.name}: Got character information from runtime`);
+        } catch (error) {
+          this.logger.warn(`${this.name}: Could not get character from runtime: ${error}`);
+        }
       }
       
       // Create relay with the agent ID
+      this.logger.info(`${this.name}: Creating relay with agent ID: ${this.agentId}`);
       this.relay = new TelegramRelay({
         relayServerUrl: this.config.relayServerUrl,
         authToken: this.config.authToken,
@@ -416,38 +376,40 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       // Register message handler
       this.relay.onMessage(this.handleIncomingMessage.bind(this));
       
-      // Add kickstarters for each group
-      this.setupKickstarters(
-        this.config.groupIds || [],
-        this.relay,
-        this.character
-      );
-      
       // Connect to relay server
+      this.logger.info(`${this.name}: Connecting to relay server at ${this.config.relayServerUrl}`);
       try {
         const connected = await this.relay.connect();
         if (connected) {
-          this.logger.info(`${this.name}: Connected to relay server`);
-          console.log(`[RELAY] ${this.name}: Connected to relay server at ${this.config.relayServerUrl}`);
+          this.logger.info(`${this.name}: Successfully connected to relay server`);
+          
+          // Add kickstarters for each group
+          this.setupKickstarters(
+            this.config.groupIds || [],
+            this.relay,
+            this.character
+          );
+          
+          // Setup conversation check interval
+          this.setupConversationCheck();
         } else {
           this.logger.error(`${this.name}: Failed to connect to relay server`);
-          console.log(`[ERROR] ${this.name}: Failed to connect to relay server`);
-          
           // Schedule reconnect attempts
           this.scheduleReconnect();
         }
       } catch (error) {
         this.logger.error(`${this.name}: Error connecting to relay server: ${error}`);
-        console.log(`[ERROR] ${this.name}: Error connecting to relay server: ${error}`);
-        
         // Schedule reconnect attempts
         this.scheduleReconnect();
       }
       
-      this.logger.info(`${this.name}: All components initialized`);
+      // Mark as initialized
+      this.initialized = true;
+      
+      this.logger.info(`${this.name}: Plugin initialized successfully`);
     } catch (error) {
-      this.logger.error(`${this.name}: Error initializing components: ${error}`);
-      throw error;
+      this.logger.error(`${this.name}: Error during plugin initialization: ${error}`);
+      // We don't rethrow here to allow ElizaOS to continue without our plugin
     }
   }
   

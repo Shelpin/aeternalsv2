@@ -2,13 +2,11 @@ import { IAgentRuntime, ElizaLogger } from './types.js';
 
 /**
  * Base class for plugin components that require runtime access
- * 
- * Implements the waitForRuntime() guard pattern for reliable 
- * runtime access across all components
  */
 export abstract class PluginComponent {
   protected runtime: IAgentRuntime | null = null;
   protected logger: ElizaLogger;
+  private waitingPromises: {resolve: Function, reject: Function}[] = [];
   
   /**
    * Create a new plugin component
@@ -27,74 +25,50 @@ export abstract class PluginComponent {
    */
   setRuntime(runtime: IAgentRuntime): void {
     this.runtime = runtime;
-    this.logger.debug(`Runtime set for ${this.constructor.name}`);
+    this.logger.debug(`Runtime reference set for ${this.constructor.name}`);
+    
+    // Resolve any waiting promises
+    if (this.waitingPromises.length > 0) {
+      this.logger.debug(`Resolving ${this.waitingPromises.length} waiting promises`);
+      for (const {resolve} of this.waitingPromises) {
+        resolve(runtime);
+      }
+      this.waitingPromises = [];
+    }
   }
   
   /**
-   * Wait for the runtime to be available and fully initialized
-   * This is a critical pattern for ElizaOS plugins to ensure
-   * runtime is ready before attempting to access its services
+   * Wait for the runtime to be available
+   * This is a simpler approach that just waits for the runtime reference to be set
    * 
+   * @param timeoutMs - Maximum time to wait in milliseconds (default: 30000)
    * @returns Promise resolving to the runtime instance
-   * @throws Error if runtime is not available after max attempts
+   * @throws Error if runtime is not available after timeout
    */
-  protected async waitForRuntime(): Promise<IAgentRuntime> {
-    const maxAttempts = 40; // Increased from 20 to allow more time
-    const delayMs = 500;    // Keep 500ms delay between checks
-    const timeoutMs = maxAttempts * delayMs;
+  protected async waitForRuntime(timeoutMs: number = 30000): Promise<IAgentRuntime> {
+    // If runtime is already available, return it immediately
+    if (this.runtime) {
+      return this.runtime;
+    }
     
     this.logger.debug(`Waiting for runtime to be available (timeout: ${timeoutMs}ms)`);
     
-    // Set a timeout promise
-    const timeoutPromise = new Promise<never>((_resolve, reject) => {
-      setTimeout(() => reject(new Error(`Runtime wait timed out after ${timeoutMs}ms`)), timeoutMs);
-    });
-    
-    // Set a runtime check promise
-    const runtimePromise = new Promise<IAgentRuntime>(async (resolve, reject) => {
-      let attempts = 0;
+    // Create a new promise that will be resolved when runtime is set
+    return new Promise<IAgentRuntime>((resolve, reject) => {
+      // Store the promise handlers for later resolution
+      this.waitingPromises.push({resolve, reject});
       
-      while (attempts < maxAttempts) {
-        try {
-          // Check if runtime is available
-          if (this.runtime) {
-            // Verify runtime has critical methods initialized
-            if (typeof this.runtime.getAgentId === 'function') {
-              try {
-                // Try to actually call a method to verify it's working
-                const agentId = this.runtime.getAgentId();
-                this.logger.debug(`[RUNTIME] Runtime verified with agentId: ${agentId}`);
-                resolve(this.runtime);
-                return;
-              } catch (methodError) {
-                this.logger.debug(`[RUNTIME] Runtime found but getAgentId not ready yet: ${methodError.message}`);
-              }
-            }
-          }
-          
-          // Wait and try again
-          await new Promise(r => setTimeout(r, delayMs));
-          attempts++;
-          
-          if (attempts % 5 === 0) {
-            this.logger.debug(`[RUNTIME] Still waiting for runtime (attempt ${attempts}/${maxAttempts})`);
-          }
-        } catch (error) {
-          reject(new Error(`Error while waiting for runtime: ${error.message}`));
-          return;
-        }
-      }
-      
-      reject(new Error(`Runtime not fully initialized after ${maxAttempts} attempts`));
+      // Set a timeout to reject the promise if runtime is not set in time
+      setTimeout(() => {
+        // Remove this promise from the waiting list
+        this.waitingPromises = this.waitingPromises.filter(p => p.resolve !== resolve);
+        
+        // Reject with timeout error
+        const error = new Error(`Runtime wait timed out after ${timeoutMs}ms`);
+        this.logger.error(`[RUNTIME] ${error.message}`);
+        reject(error);
+      }, timeoutMs);
     });
-    
-    try {
-      // Race the runtime check against the timeout
-      return await Promise.race([runtimePromise, timeoutPromise]);
-    } catch (error) {
-      this.logger.error(`[RUNTIME] ${error.message}`);
-      throw error;
-    }
   }
   
   /**

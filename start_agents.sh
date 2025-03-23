@@ -333,7 +333,7 @@ start_agent() {
     # Export variables (only in this process, not leaked to environment)
     export TELEGRAM_BOT_TOKEN="${token_value}"
     export HTTP_PORT="${port}"
-    export RELAY_SERVER_URL="http://localhost:4000"
+    export RELAY_SERVER_URL="http://207.180.245.243:4000"
     export RELAY_AUTH_TOKEN="elizaos-secure-relay-key"
     export AGENT_ID="${character}"
     

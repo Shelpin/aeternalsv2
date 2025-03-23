@@ -68,7 +68,7 @@ export class TelegramRelay {
       return false;
     }
     
-    const maxRetries = 3;
+    const maxRetries = 5;  // Increased from 3 to 5
     let attempt = 0;
     
     while (attempt < maxRetries) {
@@ -81,31 +81,68 @@ export class TelegramRelay {
         };
         
         this.logger.debug(`Registration payload: ${JSON.stringify(payload)}`);
-        console.log(`[RELAY] Sending registration for agent: ${this.config.agentId}`);
+        this.logger.info(`Sending registration for agent: ${this.config.agentId}`);
         
         // If URL is localhost and contains underscores, warn about potential issues
         if (this.config.relayServerUrl.includes('localhost') && this.config.agentId.includes('_')) {
           this.logger.warn('Using localhost with agent ID containing underscores may cause registration issues');
-          console.log('[RELAY] Warning: Using localhost with agent ID containing underscores may cause registration issues');
+          this.logger.info('Consider using the public IP or hostname instead');
         }
         
+        // Use an explicit URL to ensure no path issues
+        const registrationUrl = `${this.config.relayServerUrl}/register`;
+        this.logger.debug(`Using registration URL: ${registrationUrl}`);
+        
+        // Verify we have the auth token
+        if (!this.config.authToken) {
+          this.logger.error('No auth token provided, cannot register');
+          return false;
+        }
+        
+        // Log the auth token (first 5 chars) for debugging
+        this.logger.debug(`Using auth token: ${this.config.authToken.substring(0, 5)}****`);
+        
+        // Make sure headers are set correctly
+        const headers = {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.authToken}`
+        };
+        
+        this.logger.debug(`Headers: ${JSON.stringify(headers)}`);
+        
         const response = await this.fetchWithTimeout(
-          `${this.config.relayServerUrl}/register`,
+          registrationUrl,
           {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${this.config.authToken}`
-            },
+            headers,
             body: JSON.stringify(payload)
           },
-          10000 // 10 second timeout
+          15000 // 15 second timeout (increased from 10s)
         );
         
         if (!response.ok) {
-          const errorText = await response.text();
+          let errorText;
+          try {
+            errorText = await response.text();
+          } catch (e) {
+            errorText = 'Could not read error response';
+          }
+          
           this.logger.error(`Registration failed: Status ${response.status}, Response: ${errorText}`);
-          console.log(`[RELAY] Registration failed: ${response.status}, Response: ${errorText}`);
+          
+          // Check for specific HTTP status codes
+          if (response.status === 401) {
+            this.logger.error('Authentication failed. Check auth token and try again.');
+            
+            // If we have auth error and token is too short, suggest fixing it
+            if (this.config.authToken.length < 10) {
+              this.logger.error(`Auth token "${this.config.authToken}" seems too short. Check configuration.`);
+            }
+          } else if (response.status === 404) {
+            this.logger.error('Registration endpoint not found. Check relay server URL.');
+          } else if (response.status >= 500) {
+            this.logger.error('Server error. The relay server is experiencing issues.');
+          }
           
           // Wait before retrying
           if (attempt < maxRetries) {
@@ -116,11 +153,23 @@ export class TelegramRelay {
           continue;
         }
         
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (error) {
+          this.logger.error(`Failed to parse registration response: ${error.message}`);
+          
+          // Wait before retrying
+          if (attempt < maxRetries) {
+            const delay = attempt * 1000; // Exponential backoff
+            this.logger.info(`Retrying registration in ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
+          }
+          continue;
+        }
         
         if (!data.success) {
           this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
-          console.log(`[RELAY] Registration failed: ${data.error || 'Unknown error'}`);
           
           // Wait before retrying
           if (attempt < maxRetries) {
@@ -132,11 +181,19 @@ export class TelegramRelay {
         }
         
         this.logger.info(`Successfully registered with relay server: ${JSON.stringify(data)}`);
-        console.log(`[RELAY] Successfully registered with relay server`);
         return true;
       } catch (error) {
         this.logger.error(`Registration error: ${error.message}`);
-        console.log(`[RELAY] Registration error: ${error.message}`);
+        
+        if (error.message.includes('ECONNREFUSED')) {
+          this.logger.error('Connection refused. Is the relay server running?');
+        } else if (error.message.includes('ETIMEDOUT') || error.message.includes('timeout')) {
+          this.logger.error('Connection timed out. Check network connectivity or firewall settings.');
+        } else if (error.message.includes('ENOTFOUND')) {
+          this.logger.error('Host not found. Check the relay server URL.');
+        } else if (error.stack) {
+          this.logger.debug(`Error stack: ${error.stack}`);
+        }
         
         if (attempt < maxRetries) {
           const delay = attempt * 2000; // Exponential backoff
@@ -147,7 +204,6 @@ export class TelegramRelay {
     }
     
     this.logger.error(`Failed to register after ${maxRetries} attempts`);
-    console.log(`[RELAY] Failed to register after ${maxRetries} attempts`);
     return false;
   }
 
@@ -156,9 +212,10 @@ export class TelegramRelay {
    * @returns True if connected successfully, false otherwise
    */
   async connect(): Promise<boolean> {
+    // Reset connection state
+    this.connected = false;
+    
     this.logger.info(`Connecting to relay server at ${this.config.relayServerUrl}`);
-    console.log(`[RELAY] Attempting to connect to relay server at ${this.config.relayServerUrl}`);
-    console.log(`[RELAY] Using auth token: ${this.config.authToken.slice(0, 6)}****`);
     
     if (!this.config.agentId) {
       this.logger.error('No agent ID provided, cannot connect');
@@ -171,36 +228,41 @@ export class TelegramRelay {
     // Log connection attempt with counter
     this.logger.info(`Connection attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}`);
     
-    // Reset connected state for fresh attempt
-    this.connected = false;
-    
     try {
       // Check if the server is available
       let healthCheck;
       try {
+        // Explicitly form the health URL
+        const healthUrl = `${this.config.relayServerUrl}/health`;
+        this.logger.debug(`Checking relay server health at: ${healthUrl}`);
+        
         healthCheck = await this.fetchWithTimeout(
-          `${this.config.relayServerUrl}/health`,
+          healthUrl,
           { method: 'GET' },
           5000  // 5 second timeout for health check
         );
       } catch (error) {
         this.logger.error(`Health check failed: ${error.message}`);
-        console.log(`[RELAY] Health check failed: ${error.message}`);
+        
         if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
           this.logger.warn('Connection issue detected. Please check if relay server is running and network is accessible');
-          console.log('[RELAY] Connection issue detected. Please check if relay server is running and network is accessible');
         }
         return false;
       }
       
       if (!healthCheck.ok) {
         this.logger.warn(`Relay server health check failed with status ${healthCheck.status}`);
-        const responseText = await healthCheck.text();
-        this.logger.error(`Health check response: ${responseText}`);
+        try {
+          const responseText = await healthCheck.text();
+          this.logger.error(`Health check response: ${responseText}`);
+        } catch (e) {
+          this.logger.error('Could not read health check response');
+        }
         return false;
       }
       
-      this.logger.debug(`Health check succeeded, registering agent: ${this.config.agentId}`);
+      // Health check passed
+      this.logger.info(`Health check passed, relay server is running`);
       
       // Register the agent with retries
       const registered = await this.registerAgent();
@@ -225,7 +287,6 @@ export class TelegramRelay {
       if (error.stack) {
         this.logger.debug(`Error stack: ${error.stack}`);
       }
-      console.log(`[RELAY] Unexpected error connecting to relay server: ${error.message}`);
       return false;
     }
   }
