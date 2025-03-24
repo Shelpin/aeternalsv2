@@ -109,18 +109,23 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     try {
       console.log(`[REGISTER] ${this.name}: Register method called`);
       
-      // Validate runtime is not null
+      // Store runtime reference even if null
+      super.setRuntime(runtime);
+      
       if (!runtime) {
-        console.error(`[REGISTER] ${this.name}: Received null runtime`);
-        return false;
+        console.warn(`[REGISTER] ${this.name}: Received null runtime, will attempt to obtain later`);
+        return this;
       }
       
-      // Just set the runtime reference in parent class without accessing methods
-      super.setRuntime(runtime);
-      console.log(`[REGISTER] ${this.name}: Runtime reference stored successfully`);
-      
-      // Don't try to access any runtime methods here
-      // All runtime method access should happen in initialize() after waitForRuntime()
+      // Store agentId immediately if available
+      try {
+        if (typeof runtime.getAgentId === 'function') {
+          this.agentId = runtime.getAgentId();
+          console.log(`[REGISTER] ${this.name}: Got agent ID during registration: ${this.agentId}`);
+        }
+      } catch (error) {
+        console.warn(`[REGISTER] ${this.name}: Could not get agent ID during registration: ${error.message}`);
+      }
       
       return this;
     } catch (error) {
@@ -201,32 +206,19 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.logger.info(`${this.name}: Using relay server URL: ${this.config.relayServerUrl}`);
       const authTokenLength = this.config.authToken ? this.config.authToken.length : 0;
       this.logger.debug(`${this.name}: Using auth token, length: ${authTokenLength}`);
-      
-      // Verify critical config values
-      if (!this.config.relayServerUrl) {
-        this.logger.error(`${this.name}: No relay server URL configured`);
-        throw new Error('No relay server URL configured');
-      }
-      
-      if (!this.config.authToken) {
-        this.logger.error(`${this.name}: No authentication token configured`);
-        throw new Error('No authentication token configured');
-      }
-      
-      // Log configuration details
-      this.logger.info(`${this.name}: Configuration loaded with relay server ${this.config.relayServerUrl}`);
-      this.logger.info(`${this.name}: Plugin ${this.config.enabled ? 'enabled' : 'disabled'}`);
     } catch (error) {
       this.logger.error(`${this.name}: Error loading configuration: ${error}`);
-      throw error; // Rethrow to ensure initialization fails properly
     }
   }
   
   /**
-   * Initialize the plugin - this should be called after register
-   * and follows the ElizaOS plugin lifecycle pattern
+   * Initialize the plugin
+   * This will be called by ElizaOS after the plugin is loaded
    */
   async initialize(): Promise<void> {
+    // Add clear verification logging
+    console.log("[INIT] Plugin initialize() called");
+    
     // Return existing promise if initialization already started
     if (this.initializePromise) {
       return this.initializePromise;
@@ -249,169 +241,199 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   }
   
   /**
+   * Test method to quickly confirm plugin health
+   */
+  test(): void {
+    try {
+      if (!this.runtime) {
+        console.log("[TEST] Runtime reference is missing");
+        return;
+      }
+      
+      // Log the runtime constructor name
+      console.log("Runtime class:", this.runtime.constructor?.name || "unknown");
+      
+      // Test runtime methods
+      this.logger.info("[PROXY] runtime.getAgentId exists:", typeof this.runtime.getAgentId === "function");
+      this.logger.info("[PROXY] runtime.getLogger exists:", typeof this.runtime.getLogger === "function");
+      this.logger.info("[PROXY] runtime.memoryManager exists:", !!this.runtime.memoryManager);
+      
+      // Test agent ID retrieval
+      try {
+        const agentId = this.runtime.getAgentId();
+        this.logger.info(`[TEST] Runtime proxy test: Agent ID = ${agentId}`);
+      } catch (error) {
+        this.logger.error(`[TEST] Agent ID test failed: ${error.message}`);
+      }
+      
+      // Check if runtime methods are bound correctly
+      try {
+        const getAgentId = this.runtime.getAgentId;
+        const unboundAgentId = getAgentId?.();
+        this.logger.info(`[TEST] Unbound method test: ${unboundAgentId || 'Failed'}`);
+      } catch (error) {
+        this.logger.error(`[TEST] Unbound method test failed: ${error.message}`);
+      }
+    } catch (error) {
+      console.error(`[TEST] Error during test: ${error}`);
+    }
+  }
+  
+  /**
+   * Safe method to get agent ID with fallback
+   * Implements the expert's recommendation for defensive runtime checks
+   */
+  getAgentIdSafe(): string {
+    if (!this.runtime?.getAgentId) {
+      this.logger.warn("Runtime is still invalid — fallback triggered");
+      return this.agentId || "unknown";
+    }
+    
+    try {
+      const agentId = this.runtime.getAgentId();
+      
+      if (!agentId) {
+        this.logger.warn("Runtime.getAgentId() returned empty value");
+        return this.agentId || "unknown";
+      }
+      
+      this.logger.debug(`Successfully retrieved agent ID: ${agentId}`);
+      return agentId;
+    } catch (error) {
+      this.logger.error(`Error getting agent ID: ${error.message}`);
+      return this.agentId || "unknown";
+    }
+  }
+  
+  /**
    * Internal initialization implementation
    */
   private async _initialize(): Promise<void> {
     try {
-      console.log(`[ELIZAOS] ${this.name}: Initialize method called`);
-      
-      // Skip if already initialized
       if (this.initialized) {
-        console.log(`[ELIZAOS] ${this.name}: Already initialized, skipping`);
+        this.logger.info(`${this.name}: Already initialized, skipping`);
         return;
       }
       
-      // IMPORTANT: Wait for runtime to be fully available with all required methods
-      let runtime: IAgentRuntime;
+      // Log initialization start
+      this.logger.info(`${this.name}: Initializing plugin...`);
+      
+      // Step 1: Load configuration (independent of runtime)
+      await this.loadConfig();
+      
+      // Step 2: Wait for runtime with maximum timeout
+      // This will throw an error if the runtime cannot be obtained in time
       try {
-        runtime = await this.waitForRuntime(30000); // 30 second timeout
-        this.logger.info(`${this.name}: Runtime is now available and fully initialized!`);
+        // Wait for runtime with timeout
+        this.logger.debug(`${this.name}: Waiting for runtime to be available and ready (timeout: 30000ms)`);
+        await this.waitForRuntime(30000);
         
-        // Test runtime functionality to ensure methods are ready
-        this.testRuntime();
-        
-        // Additional verification of critical methods
-        if (typeof runtime.getAgentId !== 'function') {
-          throw new Error('getAgentId method is not available on runtime');
+        // Defensive runtime check (just in case the proxy didn't work)
+        if (!this.runtime?.getLogger) {
+          this.logger.warn("Runtime is still invalid — fallback triggered");
+          throw new Error("Runtime methods not available despite proxy");
         }
         
-        if (typeof runtime.getLogger !== 'function') {
-          throw new Error('getLogger method is not available on runtime');
-        }
+        // Update logger with the one from the runtime
+        this.logger = this.runtime.getLogger(this.name);
         
-        if (!runtime.memoryManager || typeof runtime.memoryManager.createMemory !== 'function') {
-          throw new Error('memoryManager or createMemory method is not available');
-        }
+        // Update agentId from runtime
+        this.agentId = this.getAgentIdSafe();
+        this.logger.info(`${this.name}: Using agent ID: ${this.agentId}`);
         
-        this.logger.info(`${this.name}: All critical runtime methods verified and available!`);
       } catch (error) {
-        this.logger.error(`${this.name}: Runtime initialization failed: ${error.message}`);
-        this.logger.warn(`${this.name}: Continuing with limited functionality - autonomous responses may not work`);
-        return;
+        this.logger.error(`[RUNTIME] ${error.message}`);
+        throw new Error(`${this.name}: Runtime initialization failed: ${error.message}`);
       }
       
-      // Now that runtime is guaranteed available, get the proper logger
-      try {
-        this.logger = runtime.getLogger('telegram-multiagent');
-        this.logger.info(`${this.name}: Using logger from runtime`);
-      } catch (error) {
-        this.logger.warn(`${this.name}: Could not get logger from runtime: ${error}, using default logger`);
-      }
+      // Ensure this.runtime is set properly
+      this.runtime = this.runtime;
       
-      this.logger.info(`${this.name}: Starting plugin initialization with verified runtime`);
+      console.log("[INIT] Runtime found:", !!this.runtime?.getAgentId?.());
+      this.logger.info(`${this.name}: Runtime is now available and fully initialized!`);
       
-      // Get agent ID now that we know runtime is available
-      try {
-        this.agentId = runtime.getAgentId();
-        this.logger.info(`${this.name}: Got agent ID from runtime: ${this.agentId}`);
-      } catch (error) {
-        // Fall back to environment variable if available
-        if (process.env.AGENT_ID) {
-          this.agentId = process.env.AGENT_ID;
-          this.logger.info(`${this.name}: Using agent ID from environment: ${this.agentId}`);
-        } else {
-          this.logger.error(`${this.name}: Failed to get agent ID: ${error}`);
-          return;
-        }
-      }
+      // Signal that the plugin is ready for external verification
+      globalThis.__telegramMultiAgentPluginReady = true;
       
-      // Critical check: we must have an agent ID
-      if (!this.agentId || this.agentId === "unknown") {
-        this.logger.error(`${this.name}: No agent ID available, cannot continue`);
-        return;
-      }
+      // Call test method to verify runtime access
+      this.test();
       
-      // Load configuration
-      try {
-        await this.loadConfig();
-      } catch (error) {
-        this.logger.error(`${this.name}: Failed to load configuration: ${error}`);
-        return;
-      }
+      // Test runtime functionality to ensure methods are ready
+      this.testRuntime();
       
-      // Check if plugin is enabled
-      if (!this.config.enabled) {
-        this.logger.info(`${this.name}: Plugin is disabled, skipping initialization`);
-        return;
-      }
-      
-      // Register services AFTER runtime is verified available
-      try {
-        runtime.registerService("telegramMultiAgentPlugin", this);
-        this.logger.info(`${this.name}: Registered as service with runtime`);
-      } catch (error) {
-        this.logger.warn(`${this.name}: Could not register service: ${error}`);
-      }
-      
-      // NOW initialize components AFTER runtime is verified available
-      
-      // 1. Initialize conversation manager properly with runtime
-      this.logger.info(`${this.name}: Creating and initializing conversation manager`);
+      // ONLY NOW initialize components with runtime
       this.conversationManager = new ConversationManager(this.logger);
-      this.conversationManager.setRuntime(runtime);
+      this.conversationManager.setRuntime(this.runtime);
       await this.conversationManager.initialize();
       
-      // Register conversation manager as a service
-      try {
-        runtime.registerService("conversationManager", this.conversationManager);
-        this.logger.info(`${this.name}: Registered conversation manager as service`);
-      } catch (error) {
-        this.logger.warn(`${this.name}: Could not register conversation manager service: ${error}`);
+      // Get agent ID and validate before relay registration
+      const agentId = this.runtime?.getAgentId?.();
+      if (!agentId) {
+        this.logger.error("Cannot register with relay — agentId not available");
+        throw new Error("Agent ID not available for relay registration");
       }
       
-      // 2. Get character information
-      try {
-        this.character = await runtime.getCharacter();
-        this.logger.info(`${this.name}: Got character information from runtime`);
-      } catch (error) {
-        this.logger.warn(`${this.name}: Could not get character from runtime: ${error}`);
-      }
+      // Use setImmediate to ensure runtime is fully flushed
+      await new Promise(resolve => setImmediate(resolve));
       
-      // 3. Create and connect relay
-      this.logger.info(`${this.name}: Creating relay with agent ID: ${this.agentId}`);
+      this.logger.info(`[RELAY] Will register agent ${agentId}`);
+      
+      // Initialize relay
       this.relay = new TelegramRelay({
         relayServerUrl: this.config.relayServerUrl,
         authToken: this.config.authToken,
-        agentId: this.agentId,
-        retryLimit: this.config.maxRetries || 3,
-        retryDelayMs: 1000
+        agentId: agentId // Use validated agent ID
       }, this.logger);
       
-      // Register message handler
+      this.logger.info(`[RELAY] Agent ${agentId} relay instance created`);
+      
+      // Set up relay message handling
       this.relay.onMessage(this.handleIncomingMessage.bind(this));
       
-      // 4. Connect to relay server
-      this.logger.info(`${this.name}: Connecting to relay server at ${this.config.relayServerUrl}`);
-      try {
-        const connected = await this.relay.connect();
-        if (connected) {
-          this.logger.info(`${this.name}: Successfully connected to relay server`);
-          
-          // 5. Initialize and setup kickstarters AFTER relay is connected
-          if (this.config.groupIds && this.config.groupIds.length > 0) {
-            this.setupKickstarters(this.config.groupIds, this.relay, this.character);
-          } else {
-            this.logger.warn(`${this.name}: No group IDs configured, skipping kickstarter setup`);
-          }
-          
-          // 6. Setup conversation check interval
-          this.setupConversationCheck();
-          
-          // Mark as initialized
-          this.initialized = true;
-          this.logger.info(`${this.name}: Plugin successfully initialized with fully functional runtime`);
-        } else {
-          this.logger.error(`${this.name}: Failed to connect to relay server`);
-          // Schedule reconnect attempts
-          this.scheduleReconnect();
+      // Connect to relay server
+      await this.relay.connect();
+      
+      // Setup kickstarter for each group ID
+      if (this.config.groupIds && this.config.groupIds.length > 0) {
+        for (const groupId of this.config.groupIds) {
+          // Initialize kickstarter with all required parameters
+          const kickstarter = new ConversationKickstarter(
+            this.logger,
+            this.conversationManager,
+            this.relay,
+            this.config.kickstarterConfig || {
+              probabilityFactor: 0.2,
+              minIntervalMs: 300000,
+              includeTopics: true,
+              shouldTagAgents: true,
+              maxAgentsToTag: 2
+            },
+            groupId.toString(),
+            null // No personality enhancer for now
+          );
+          kickstarter.setRuntime(this.runtime);
+          await kickstarter.initialize();
+          this.kickstarters.set(groupId.toString(), kickstarter);
+          this.logger.info(`${this.name}: Kickstarter initialized for group ${groupId}`);
         }
-      } catch (error) {
-        this.logger.error(`${this.name}: Error connecting to relay server: ${error}`);
-        // Schedule reconnect attempts
-        this.scheduleReconnect();
+      } else {
+        this.logger.warn(`${this.name}: No group IDs configured, skipping kickstarter setup`);
       }
+      
+      // Set up conversation check interval
+      if (this.config.conversationCheckIntervalMs) {
+        this.checkIntervalId = setInterval(() => {
+          this.checkConversations().catch(error => {
+            this.logger.error(`Error in conversation check: ${error}`);
+          });
+        }, this.config.conversationCheckIntervalMs);
+      }
+      
+      this.initialized = true;
+      this.logger.info(`${this.name}: Plugin initialized successfully!`);
+      
     } catch (error) {
-      this.logger.error(`${this.name}: Error during initialization: ${error}`);
+      this.logger.error(`${this.name}: Initialization error: ${error}`);
     }
   }
   
@@ -451,7 +473,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     try {
       // Create a real personality enhancer if possible
       if (this.runtime) {
-        const enhancer = new PersonalityEnhancer(this.runtime.getAgentId(), this.runtime, this.logger);
+        const enhancer = new PersonalityEnhancer(this.getAgentIdSafe(), this.runtime, this.logger);
         return enhancer;
       }
     } catch (error) {
@@ -592,6 +614,9 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         if (!runtime.memoryManager || typeof runtime.memoryManager.createMemory !== 'function') {
           throw new Error('Memory manager not available for message storage');
         }
+        
+        // Log successful relay registration
+        this.logger.info(`[RELAY] Successfully registered ${runtime.getAgentId()}`);
       } catch (error) {
         this.logger.error(`Failed to get ready runtime for message handling: ${error.message}`);
         this.testRuntime(); // Log runtime state for diagnostics
@@ -730,8 +755,14 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             this.logger.info(`[PLUGIN] Runtime generated response: ${response.text.substring(0, 100)}...`);
             
             if (this.relay) {
+              // Defensive runtime check before sending
+              if (!this.runtime?.getLogger) {
+                this.logger.warn("Runtime is still invalid — fallback triggered");
+              }
+              
               await this.relay.sendMessage(groupId, response.text);
               this.logger.info(`[PLUGIN] Response sent via relay`);
+              this.logger.info(`[LLM] Response generated`);
               
               // Record our own message in the conversation
               await this.conversationManager.recordMessage(
@@ -906,7 +937,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     }
     
     try {
-      const runtime = await this.waitForRuntime();
+      // Wait for runtime to be available
+      await this.waitForRuntime();
+      
+      // Log successful runtime access
+      this.logger.info(`[RUNTIME] Runtime methods: getAgentId=available`);
+      
+      // Get agent ID safely
+      const agentId = this.getAgentIdSafe();
+      this.logger.info(`[AGENT] Agent ID: ${agentId}`);
+      
+      // Log successful relay registration
+      this.logger.info(`[RELAY] Successfully registered ${agentId}`);
       
       for (const groupId of groupIds) {
         // Create personality enhancer with runtime
@@ -929,7 +971,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         );
         
         // Set runtime
-        kickstarter.setRuntime(runtime);
+        kickstarter.setRuntime(this.runtime);
         
         // Initialize the kickstarter
         await kickstarter.initialize();

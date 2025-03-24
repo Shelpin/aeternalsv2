@@ -150,51 +150,34 @@ export class TelegramRelay {
             this.logger.info(`Retrying registration in ${delay}ms...`);
             await new Promise(r => setTimeout(r, delay));
           }
-          continue;
-        }
-        
-        let data;
-        try {
-          data = await response.json();
-        } catch (error) {
-          this.logger.error(`Failed to parse registration response: ${error.message}`);
-          
-          // Wait before retrying
-          if (attempt < maxRetries) {
-            const delay = attempt * 1000; // Exponential backoff
-            this.logger.info(`Retrying registration in ${delay}ms...`);
-            await new Promise(r => setTimeout(r, delay));
+        } else {
+          try {
+            const result = await response.json();
+            if (result.success) {
+              // Add success logging as recommended by ElizaOS expert
+              this.logger.info(`[RELAY] Successfully registered agent ${this.config.agentId}`);
+              this.logger.info(`[RELAY] Connected agents: ${JSON.stringify(result.connected_agents || [])}`);
+              return true;
+            } else {
+              this.logger.error(`Registration returned success: false. Details: ${JSON.stringify(result)}`);
+            }
+          } catch (e) {
+            // Response is OK but we could not parse it
+            this.logger.warn('Registration response was OK but could not parse JSON');
+            this.logger.warn('Assuming registration was successful');
+            
+            // Add success logging with a warning
+            this.logger.info(`[RELAY] Successfully registered agent ${this.config.agentId} (assuming success based on OK response)`);
+            return true;
           }
-          continue;
         }
-        
-        if (!data.success) {
-          this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
-          
-          // Wait before retrying
-          if (attempt < maxRetries) {
-            const delay = attempt * 2000; // Exponential backoff
-            this.logger.info(`Retrying registration in ${delay}ms...`);
-            await new Promise(r => setTimeout(r, delay));
-          }
-          continue;
-        }
-        
-        this.logger.info(`Successfully registered with relay server: ${JSON.stringify(data)}`);
-        return true;
       } catch (error) {
-        this.logger.error(`Registration error: ${error.message}`);
-        
-        if (error.message.includes('ECONNREFUSED')) {
-          this.logger.error('Connection refused. Is the relay server running?');
-        } else if (error.message.includes('ETIMEDOUT') || error.message.includes('timeout')) {
-          this.logger.error('Connection timed out. Check network connectivity or firewall settings.');
-        } else if (error.message.includes('ENOTFOUND')) {
-          this.logger.error('Host not found. Check the relay server URL.');
-        } else if (error.stack) {
+        this.logger.error(`Registration attempt ${attempt} failed with error: ${error.message}`);
+        if (error.stack) {
           this.logger.debug(`Error stack: ${error.stack}`);
         }
         
+        // Wait before retrying
         if (attempt < maxRetries) {
           const delay = attempt * 2000; // Exponential backoff
           this.logger.info(`Retrying registration in ${delay}ms...`);

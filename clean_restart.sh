@@ -133,16 +133,21 @@ grep -e "relayServerUrl" -e "authToken" -e "enabled" "$CONFIG_FILE" | sed 's/"au
 # Start the relay server
 echo "🚀 Starting relay server..."
 cd /root/eliza && ./relay-server/start-relay.sh > logs/relay-server.log 2>&1 &
-sleep 5
 
-# Verify relay server is running
-echo "🔍 Verifying relay server..."
-if curl -s http://localhost:4000/health | grep -q "status.*ok"; then
-  echo "✅ Relay server is running correctly"
-else
-  echo "❌ Relay server failed to start. Check logs/relay-server.log"
-  exit 1
-fi
+# Wait up to 20 seconds for relay server to start
+echo "🔄 Waiting for relay server to start..."
+for i in {1..20}; do
+  if curl -s http://localhost:4000/health | grep -q "status.*ok"; then
+    echo "✅ Relay server is running correctly"
+    break
+  elif [ $i -eq 20 ]; then
+    echo "❌ Relay server failed to start after 20 seconds. Check logs/relay-server.log"
+    exit 1
+  else
+    echo "⏳ Waiting... ($i/20)"
+    sleep 1
+  fi
+done
 
 # Start all agents
 echo "🚀 Starting all agents..."

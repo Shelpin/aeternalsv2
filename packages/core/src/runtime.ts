@@ -457,6 +457,12 @@ export class AgentRuntime implements IAgentRuntime {
     }
 
     async initialize() {
+        // Expose runtime globally for custom plugin compatibility (TelegramMultiAgentPlugin)
+        if (!globalThis.__elizaRuntime) {
+            globalThis.__elizaRuntime = this;
+            console.log("[RUNTIME PATCH] Exposed runtime globally");
+        }
+        
         this.initializeDatabase();
 
         for (const [serviceType, service] of this.services.entries()) {
@@ -595,6 +601,10 @@ export class AgentRuntime implements IAgentRuntime {
             await this.ragKnowledgeManager.cleanupDeletedKnowledgeFiles();
             elizaLogger.info(`[RAG Cleanup] Cleanup complete`);
         }
+        
+        // Signal that the runtime is fully initialized and ready for plugins
+        globalThis.__elizaRuntimeReady = true;
+        console.log("[RUNTIME PATCH] Runtime fully initialized and ready");
     }
 
     async stop() {

@@ -6,20 +6,19 @@
 
 // Import the plugin class with .js extension for ESM
 import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin.js';
-import { IAgentRuntime } from './types.js';
 
 // Create a plugin instance
 const plugin = new TelegramMultiAgentPlugin();
 
-// Store the original initialize method
-const originalInitialize = plugin.initialize.bind(plugin);
+// Explicitly bind initialize as a direct property on the object
+// This ensures ElizaOS can detect it with typeof plugin.initialize === 'function'
+plugin.initialize = plugin.initialize.bind(plugin);
 
-// Add direct initialize method to the plugin instance 
-(plugin as any).initialize = async function(runtime: IAgentRuntime) {
-  console.log('[TELEGRAM-MULTIAGENT] Direct initialize method called on plugin instance');
-  plugin.register(runtime);
-  return originalInitialize();
-};
+// Verification logging to confirm initialize is now a direct property
+console.log("[TELEGRAM-MULTIAGENT] Plugin created with these properties:");
+console.log("Own keys:", Object.keys(plugin)); // Should include 'initialize'
+console.log("Has initialize:", typeof plugin.initialize === 'function'); // Should be true
+console.log("plugin instanceof TelegramMultiAgentPlugin:", plugin instanceof TelegramMultiAgentPlugin);
 
 // Export the plugin instance as default
 export default plugin;
