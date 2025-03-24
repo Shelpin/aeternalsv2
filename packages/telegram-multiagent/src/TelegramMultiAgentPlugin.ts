@@ -143,6 +143,17 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         console.warn(`[REGISTER] ${this.name}: Could not get agent ID during registration: ${error.message}`);
       }
       
+      // Register onMessage handler
+      if (runtime.onMessage) {
+        runtime.onMessage(async (message) => {
+          this.logger.info(`[PLUGIN] Received message from relay: ${JSON.stringify(message)}`);
+          await this.handleIncomingMessage(message);
+        });
+        this.logger.info(`[PLUGIN] Registered onMessage handler`);
+      } else {
+        console.warn(`[REGISTER] ${this.name}: runtime.onMessage not available, relay messages may not be received`);
+      }
+      
       return this;
     } catch (error) {
       console.error(`[ERROR] ${this.name}: Unexpected error during plugin registration: ${error}`);
@@ -397,6 +408,94 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       // Set up relay message handling
       this.relay.onMessage(this.handleIncomingMessage.bind(this));
       
+      // VALHALLA FIX: Set up message polling interval
+      this.logger.info(`[PLUGIN] Starting internal message poller for agent ${this.agentId}`);
+      
+      setInterval(async () => {
+        try {
+          if (!this.relay) {
+            this.logger.warn('[PLUGIN] Relay not initialized for polling');
+            return;
+          }
+          
+          // Try to get available agents to verify connection
+          const availableAgents = await this.relay.getAvailableAgents();
+          this.logger.debug(`[PLUGIN] Active agents from relay: ${availableAgents.join(', ')}`);
+          
+          // Poll for new messages - FIXED: Using correct getUpdates endpoint
+          const response = await fetch(`${this.config.relayServerUrl}/getUpdates?agent_id=${this.agentId}&offset=0`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${this.config.authToken}`
+            }
+          });
+          
+          if (!response.ok) {
+            this.logger.warn(`[PLUGIN] Failed to poll messages: ${response.status} ${response.statusText}`);
+            return;
+          }
+          
+          const data = await response.json();
+          
+          if (data.updates && data.updates.length > 0) {
+            this.logger.info(`[PLUGIN] Found ${data.updates.length} new messages via polling`);
+            
+            for (const update of data.updates) {
+              this.logger.info(`[PLUGIN] Processing polled message: "${update.message?.text?.substring(0, 50)}..."`);
+              if (update.message) {
+                await this.handleIncomingMessage(update.message);
+              }
+            }
+          }
+        } catch (error) {
+          this.logger.error(`[PLUGIN] Error in message polling: ${error.message}`);
+        }
+      }, 2000); // Poll every 2 seconds
+      
+      // Add an HTTP endpoint for direct message testing
+      try {
+        // Set up a simple Express-like server on the runtime if available
+        if (this.runtime && this.runtime.app) {
+          this.logger.info(`[TEST] Setting up /message test endpoint`);
+          
+          this.runtime.app.post("/message", async (req, res) => {
+            this.logger.info(`[TEST] Received direct test message: ${JSON.stringify(req.body)}`);
+            try {
+              await this.handleIncomingMessage({
+                message_id: Math.floor(Math.random() * 1000000),
+                from: {
+                  id: 12345,
+                  is_bot: false,
+                  first_name: "Test",
+                  username: req.body.sender || "test_user"
+                },
+                chat: {
+                  id: req.body.chatId || "-1002550618173",
+                  type: "group",
+                  title: "Test Group"
+                },
+                date: Math.floor(Date.now() / 1000),
+                text: req.body.text || "Test message",
+                sender_agent_id: req.body.sender
+              });
+              res.json({ success: true });
+            } catch (error) {
+              this.logger.error(`[TEST] Error handling test message: ${error.message}`);
+              res.status(500).json({ success: false, error: error.message });
+            }
+          });
+          
+          // Add ping endpoint
+          this.runtime.app.get("/ping", (req, res) => res.send("pong"));
+          
+          this.logger.info(`[TEST] Test endpoints configured successfully`);
+        } else {
+          this.logger.warn(`[TEST] Cannot set up test endpoints: runtime.app not available`);
+        }
+      } catch (error) {
+        this.logger.error(`[TEST] Error setting up test endpoints: ${error.message}`);
+      }
+      
       // Connect to relay server with timeout and error handling
       try {
         this.logger.info(`[RELAY] Connecting to relay server at ${this.config.relayServerUrl}`);
@@ -614,6 +713,9 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   private async handleIncomingMessage(message: RelayMessage): Promise<void> {
     try {
+      // Log entry to this method for debugging
+      this.logger.info(`[PLUGIN] handleIncomingMessage triggered for message ID: ${message.message_id}`);
+      
       // Ensure we have a runtime
       const runtime = await this.waitForRuntime();
       
@@ -798,11 +900,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             
             this.logger.info(`${this.name}: Got response from runtime, sending to Telegram`);
             
-            // Send the response back to Telegram via the relay
-            if (response && response.text) {
-              await this.sendResponse(groupId, response.text);
+            // VALHALLA FIX: Check for response content regardless of action
+            if (response?.text?.length > 0) {
+              const cleanedText = response.text.replace(/\(NONE\)$/i, "").trim();
+              
+              if (response.content?.action?.toUpperCase() === 'NONE') {
+                this.logger.info(`[PLUGIN] Bypassing action=NONE to relay message`);
+              }
+              
+              this.logger.info(`[PLUGIN] Forcing relay send of content: "${cleanedText.substring(0, 50)}..."`);
+              await this.sendResponse(groupId, cleanedText);
             } else {
-              this.logger.warn(`${this.name}: Received empty response from runtime`);
+              this.logger.warn(`[PLUGIN] Runtime returned empty or ignored response`);
             }
           } else {
             this.logger.info(`${this.name}: Plugin layer decided not to respond`);

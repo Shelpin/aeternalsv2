@@ -243,6 +243,9 @@ app.get('/getUpdates', (req, res) => {
 
 // Send a message
 app.post('/sendMessage', (req, res) => {
+  // Enhanced debugging for message relay
+  logWithTime(`➡️ Incoming relay message ${JSON.stringify(req.body)}`);
+  
   const { agent_id, chat_id, text } = req.body;
   
   if (!agent_id || !chat_id || !text) {
@@ -252,6 +255,9 @@ app.post('/sendMessage', (req, res) => {
       error: 'Missing required parameters' 
     });
   }
+  
+  // Log authorization header for validation
+  logWithTime(`🔐 Received auth header: ${req.headers.authorization || 'None'}`);
   
   // Check if agent exists
   const agent = connectedAgents.get(agent_id);
@@ -289,6 +295,7 @@ app.post('/sendMessage', (req, res) => {
     if (id !== agent_id) {
       messages.push(message);
       logWithTime(`📤 Queued message for ${id} from ${agent_id}`);
+      logWithTime(`🎯 Target agent resolved to: ${id}`);
     }
   }
   
@@ -338,6 +345,12 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Simple ping endpoint for connectivity testing
+app.get('/ping', (req, res) => {
+  logWithTime(`🏓 Ping request received`);
+  return res.send('pong');
+});
+
 // Clean up inactive agents periodically
 setInterval(() => {
   const now = Date.now();
@@ -377,4 +390,5 @@ app.listen(PORT, () => {
   logWithTime(`  POST /sendMessage - Send a message`);
   logWithTime(`  POST /sendChatAction - Send a chat action`);
   logWithTime(`  GET /health - Health check`);
+  logWithTime(`  GET /ping - Simple ping endpoint`);
 }); 
