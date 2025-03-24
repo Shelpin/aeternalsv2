@@ -38,37 +38,67 @@ export abstract class PluginComponent {
   }
   
   /**
-   * Wait for the runtime to be available
-   * This is a simpler approach that just waits for the runtime reference to be set
+   * Wait for the runtime to be available and ready to use
+   * Verifies that critical methods like getAgentId and getLogger are available
    * 
    * @param timeoutMs - Maximum time to wait in milliseconds (default: 30000)
    * @returns Promise resolving to the runtime instance
    * @throws Error if runtime is not available after timeout
    */
   protected async waitForRuntime(timeoutMs: number = 30000): Promise<IAgentRuntime> {
-    // If runtime is already available, return it immediately
-    if (this.runtime) {
+    // If runtime is already available AND its methods are defined, return it immediately
+    if (this.runtime && 
+        typeof this.runtime.getAgentId === 'function' && 
+        typeof this.runtime.getLogger === 'function') {
       return this.runtime;
     }
     
-    this.logger.debug(`Waiting for runtime to be available (timeout: ${timeoutMs}ms)`);
+    this.logger.debug(`Waiting for runtime to be available and ready (timeout: ${timeoutMs}ms)`);
     
-    // Create a new promise that will be resolved when runtime is set
-    return new Promise<IAgentRuntime>((resolve, reject) => {
-      // Store the promise handlers for later resolution
-      this.waitingPromises.push({resolve, reject});
+    const interval = 100;
+    let elapsed = 0;
+    
+    // Use polling with timeout instead of Promise resolution
+    while (elapsed < timeoutMs) {
+      // Check if runtime is available and critical methods are defined
+      if (this.runtime && 
+          typeof this.runtime.getAgentId === 'function' && 
+          typeof this.runtime.getLogger === 'function') {
+        this.logger.debug('Runtime is available and ready with all required methods');
+        return this.runtime;
+      }
       
-      // Set a timeout to reject the promise if runtime is not set in time
-      setTimeout(() => {
-        // Remove this promise from the waiting list
-        this.waitingPromises = this.waitingPromises.filter(p => p.resolve !== resolve);
-        
-        // Reject with timeout error
-        const error = new Error(`Runtime wait timed out after ${timeoutMs}ms`);
-        this.logger.error(`[RUNTIME] ${error.message}`);
-        reject(error);
-      }, timeoutMs);
-    });
+      // Wait for a short interval
+      await new Promise(resolve => setTimeout(resolve, interval));
+      elapsed += interval;
+    }
+    
+    // If we get here, timeout occurred
+    const error = new Error(`Runtime wait timed out after ${timeoutMs}ms`);
+    this.logger.error(`[RUNTIME] ${error.message}`);
+    throw error;
+  }
+  
+  /**
+   * Test if the runtime is ready with all critical methods
+   * Useful for debugging runtime availability issues
+   */
+  protected testRuntime(): void {
+    if (!this.runtime) {
+      this.logger.error('Runtime reference is null');
+      return;
+    }
+    
+    this.logger.info('Testing runtime readiness:');
+    this.logger.info(`- runtime object: ${this.runtime ? 'exists' : 'missing'}`);
+    this.logger.info(`- getAgentId: ${typeof this.runtime.getAgentId === 'function' ? 'function' : 'missing'}`);
+    this.logger.info(`- getLogger: ${typeof this.runtime.getLogger === 'function' ? 'function' : 'missing'}`);
+    this.logger.info(`- memoryManager: ${this.runtime.memoryManager ? 'exists' : 'missing'}`);
+    
+    if (this.runtime.memoryManager) {
+      this.logger.info(`- memoryManager.createMemory: ${typeof this.runtime.memoryManager.createMemory === 'function' ? 'function' : 'missing'}`);
+      this.logger.info(`- memoryManager.getMemories: ${typeof this.runtime.memoryManager.getMemories === 'function' ? 'function' : 'missing'}`);
+    }
   }
   
   /**

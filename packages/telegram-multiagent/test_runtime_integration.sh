@@ -111,4 +111,173 @@ grep -n "\[BOT MSG DEBUG\]" /root/eliza/logs/vc_shark_99.log | tail -n 15
 echo -e "\n${GREEN}Test completed. Check the full logs for more details.${NC}"
 echo -e "${YELLOW}Full log commands:${NC}"
 echo "- Linda's logs: tail -f /root/eliza/logs/linda_evangelista_88.log | grep -E \"\[BOT MSG DEBUG\]|TelegramMultiAgentPlugin\""
-echo "- VCShark's logs: tail -f /root/eliza/logs/vc_shark_99.log | grep -E \"\[BOT MSG DEBUG\]|TelegramMultiAgentPlugin\"" 
+echo "- VCShark's logs: tail -f /root/eliza/logs/vc_shark_99.log | grep -E \"\[BOT MSG DEBUG\]|TelegramMultiAgentPlugin\""
+
+# Test script to verify runtime integration and waitForRuntime pattern
+# This script should be run after ElizaOS is running
+
+echo "===== TELEGRAM MULTI-AGENT RUNTIME INTEGRATION TEST ====="
+echo "Testing runtime availability and waitForRuntime pattern"
+echo "This script will help diagnose runtime integration issues"
+echo
+
+# Check for required environment variables
+echo "Checking environment..."
+if [ -z "$AGENT_ID" ]; then
+  echo "⚠️  WARNING: AGENT_ID environment variable not set"
+  echo "   This may cause the plugin to fall back to 'unknown' agent ID"
+else
+  echo "✅ AGENT_ID is set to: $AGENT_ID"
+fi
+
+if [ -z "$RELAY_SERVER_URL" ]; then
+  echo "⚠️  WARNING: RELAY_SERVER_URL not set, will use default"
+else
+  echo "✅ RELAY_SERVER_URL is set to: $RELAY_SERVER_URL"
+fi
+
+if [ -z "$RELAY_AUTH_TOKEN" ]; then
+  echo "⚠️  WARNING: RELAY_AUTH_TOKEN not set, will use default"
+else
+  echo "✅ RELAY_AUTH_TOKEN is set (value hidden)"
+fi
+
+# Create a simple test script to verify runtime methods
+echo "Creating test script..."
+cat > /tmp/runtime_test.js << 'EOF'
+import { PluginComponent } from './src/PluginComponent.js';
+
+// Simple test class to verify runtime is fully available
+class RuntimeTester extends PluginComponent {
+  constructor() {
+    const logger = {
+      trace: (msg) => console.log(`[TRACE] ${msg}`),
+      debug: (msg) => console.log(`[DEBUG] ${msg}`),
+      info: (msg) => console.log(`[INFO] ${msg}`),
+      warn: (msg) => console.log(`[WARN] ${msg}`),
+      error: (msg) => console.error(`[ERROR] ${msg}`)
+    };
+    super(logger);
+  }
+
+  async testRuntimeAvailability(runtime) {
+    this.setRuntime(runtime);
+    
+    console.log("\n===== RUNTIME AVAILABILITY TEST =====");
+    console.log("Testing waitForRuntime pattern...");
+    
+    try {
+      console.log("Waiting for runtime to be available (10 second timeout)...");
+      const startTime = Date.now();
+      const runtimeInstance = await this.waitForRuntime(10000);
+      const elapsed = Date.now() - startTime;
+      console.log(`✅ SUCCESS: Runtime available after ${elapsed}ms`);
+      
+      // Verify critical methods
+      console.log("\nVerifying critical runtime methods:");
+      
+      // Check getAgentId
+      try {
+        const agentId = runtimeInstance.getAgentId();
+        console.log(`✅ getAgentId: "${agentId}"`);
+      } catch (error) {
+        console.error(`❌ getAgentId failed: ${error.message}`);
+      }
+      
+      // Check getLogger
+      try {
+        const logger = runtimeInstance.getLogger();
+        console.log("✅ getLogger: available");
+      } catch (error) {
+        console.error(`❌ getLogger failed: ${error.message}`);
+      }
+      
+      // Check memoryManager
+      if (runtimeInstance.memoryManager) {
+        console.log("✅ memoryManager: available");
+        
+        try {
+          const createMemory = runtimeInstance.memoryManager.createMemory;
+          if (typeof createMemory === 'function') {
+            console.log("✅ memoryManager.createMemory: available");
+          } else {
+            console.error("❌ memoryManager.createMemory: not a function");
+          }
+        } catch (error) {
+          console.error(`❌ memoryManager.createMemory access error: ${error.message}`);
+        }
+        
+        try {
+          const getMemories = runtimeInstance.memoryManager.getMemories;
+          if (typeof getMemories === 'function') {
+            console.log("✅ memoryManager.getMemories: available");
+          } else {
+            console.error("❌ memoryManager.getMemories: not a function");
+          }
+        } catch (error) {
+          console.error(`❌ memoryManager.getMemories access error: ${error.message}`);
+        }
+      } else {
+        console.error("❌ memoryManager: not available");
+      }
+      
+      // Check handleMessage
+      try {
+        const handleMessage = runtimeInstance.handleMessage;
+        if (typeof handleMessage === 'function') {
+          console.log("✅ handleMessage: available");
+        } else {
+          console.error("❌ handleMessage: not a function");
+        }
+      } catch (error) {
+        console.error(`❌ handleMessage access error: ${error.message}`);
+      }
+      
+      // Check getCharacter
+      try {
+        const getCharacter = runtimeInstance.getCharacter;
+        if (typeof getCharacter === 'function') {
+          console.log("✅ getCharacter: available");
+        } else {
+          console.error("❌ getCharacter: not a function");
+        }
+      } catch (error) {
+        console.error(`❌ getCharacter access error: ${error.message}`);
+      }
+      
+      console.log("\n===== TEST COMPLETE =====");
+      console.log("Runtime integration test completed.");
+      
+      return true;
+    } catch (error) {
+      console.error(`❌ FAILED: Runtime wait failed: ${error.message}`);
+      return false;
+    }
+  }
+}
+
+// Export the tester
+export const runtimeTester = new RuntimeTester();
+EOF
+
+echo "Converting file to ESM format..."
+
+# Check recent logs
+echo "Checking recent logs for runtime issues..."
+if [ -f "/root/eliza/logs/vc_shark_99.log" ]; then
+  echo "Recent log entries containing waitForRuntime or isRuntimeAvailable:"
+  grep -n "isRuntimeAvailable\|waitForRuntime" /root/eliza/logs/vc_shark_99.log | tail -n 10
+else
+  echo "No recent logs found. Run the agent first to generate logs."
+fi
+
+echo
+echo "===== TEST COMPLETE ====="
+echo
+echo "To run the test, make sure ElizaOS is running, then:"
+echo "1. Navigate to the telegram-multiagent directory"
+echo "2. Run 'node --experimental-modules /tmp/runtime_test.js'"
+echo
+echo "You should see runtime method checks in the output."
+echo "If waitForRuntime times out or methods are undefined, the issue is with"
+echo "the runtime not being fully initialized before access." 
