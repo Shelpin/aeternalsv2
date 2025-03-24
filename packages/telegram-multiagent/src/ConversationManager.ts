@@ -7,6 +7,7 @@ import {
   MemoryQuery
 } from './types.js';
 import { PluginComponent } from './PluginComponent.js';
+import { FallbackMemoryManager } from './FallbackMemoryManager.js';
 
 // Conversation states
 enum ConversationState {
@@ -22,6 +23,7 @@ enum ConversationState {
  */
 export class ConversationManager extends PluginComponent {
   private memoryNamespace = 'telegram-multiagent';
+  private fallbackMemory: FallbackMemoryManager | null = null;
   
   /**
    * Create a new ConversationManager
@@ -41,6 +43,10 @@ export class ConversationManager extends PluginComponent {
     this.logger.info('ConversationManager: Initializing');
     
     try {
+      // Create fallback memory manager
+      this.fallbackMemory = new FallbackMemoryManager();
+      this.logger.info('ConversationManager: Fallback memory manager created');
+      
       await this.ensureMemoryNamespaceExists();
       this.logger.info('ConversationManager: Memory namespace initialized');
     } catch (error) {
@@ -70,7 +76,9 @@ export class ConversationManager extends PluginComponent {
         type: memoryKey
       };
       
-      const memories = await runtime.memoryManager.getMemories(query);
+      // Get memory manager - use fallback if runtime memory manager is unavailable
+      const memoryManager = this.getMemoryManager();
+      const memories = await memoryManager.getMemories(query);
       
       if (memories && memories.length > 0) {
         // Get the most recent state
@@ -101,9 +109,6 @@ export class ConversationManager extends PluginComponent {
    */
   async storeConversationState(groupId: string | number, state: ConversationStateTracking): Promise<boolean> {
     try {
-      // Use waitForRuntime to ensure runtime is available
-      const runtime = await this.waitForRuntime();
-
       await this.ensureMemoryNamespaceExists();
       
       const memoryKey = this.getMemoryKey(groupId);
@@ -122,7 +127,9 @@ export class ConversationManager extends PluginComponent {
         type: memoryKey
       };
       
-      await runtime.memoryManager.createMemory(memoryData);
+      // Get memory manager - use fallback if runtime memory manager is unavailable
+      const memoryManager = this.getMemoryManager();
+      await memoryManager.createMemory(memoryData);
       this.logger.debug(`[MEMORY] Stored conversation state for group ${groupId}`);
       
       return true;
@@ -136,12 +143,12 @@ export class ConversationManager extends PluginComponent {
    * Ensure the memory namespace exists
    */
   private async ensureMemoryNamespaceExists(): Promise<void> {
-    // Use waitForRuntime to ensure runtime is available
-    const runtime = await this.waitForRuntime();
+    // Get memory manager - use fallback if runtime memory manager is unavailable
+    const memoryManager = this.getMemoryManager();
     
     // Just write a dummy record if needed to create the namespace
     // Using count instead of limit for the query as per MemoryQuery type
-    const existingMemory = await runtime.memoryManager.getMemories({
+    const existingMemory = await memoryManager.getMemories({
       roomId: this.memoryNamespace,
       count: 1
     });
@@ -160,19 +167,59 @@ export class ConversationManager extends PluginComponent {
         type: 'namespace_init'
       };
       
-      await runtime.memoryManager.createMemory(initData);
+      await memoryManager.createMemory(initData);
       this.logger.info(`[MEMORY] Created memory namespace: ${this.memoryNamespace}`);
     }
   }
-
+  
   /**
-   * Get the memory key for a group
+   * Get the memory key for a conversation
    * 
    * @param groupId - Telegram group ID
-   * @returns The memory key
+   * @returns Memory key
    */
   private getMemoryKey(groupId: string | number): string {
-    return `conversation_state_${groupId}`;
+    return `conversation-state-${groupId}`;
+  }
+  
+  /**
+   * Get the memory manager to use - either runtime's or fallback
+   * 
+   * @returns Memory manager to use
+   */
+  private getMemoryManager(): any {
+    try {
+      // Check if runtime exists
+      if (!this.runtime) {
+        this.logger.warn("Memory manager unavailable (no runtime), using fallback.");
+        if (!this.fallbackMemory) {
+          this.fallbackMemory = new FallbackMemoryManager();
+        }
+        return this.fallbackMemory;
+      }
+      
+      // Check if runtime.memoryManager exists and has required methods
+      if (this.runtime.memoryManager?.createMemory && this.runtime.memoryManager.getMemories) {
+        return this.runtime.memoryManager;
+      }
+      
+      // Fall back to our in-memory implementation
+      if (!this.fallbackMemory) {
+        this.logger.warn("Memory manager unavailable, creating fallback memory manager");
+        this.fallbackMemory = new FallbackMemoryManager();
+      }
+      
+      this.logger.debug("Using fallback memory manager");
+      return this.fallbackMemory;
+    } catch (error) {
+      // In case of any error, use fallback
+      if (!this.fallbackMemory) {
+        this.fallbackMemory = new FallbackMemoryManager();
+      }
+      
+      this.logger.warn(`Error accessing memory manager: ${error.message}, using fallback`);
+      return this.fallbackMemory;
+    }
   }
   
   /**
@@ -249,8 +296,6 @@ export class ConversationManager extends PluginComponent {
     messageText: string
   ): Promise<void> {
     try {
-      const runtime = await this.waitForRuntime();
-      
       const memoryData: MemoryData = {
         roomId: groupId.toString(),
         userId: agentId,
@@ -264,7 +309,9 @@ export class ConversationManager extends PluginComponent {
         type: 'telegram-message'
       };
       
-      await runtime.memoryManager.createMemory(memoryData);
+      // Get memory manager - use fallback if runtime memory manager is unavailable
+      const memoryManager = this.getMemoryManager();
+      await memoryManager.createMemory(memoryData);
       this.logger.debug(`[MEMORY] Stored message from ${agentId} in group ${groupId}`);
     } catch (error) {
       this.logger.error(`ConversationManager: Error storing message: ${error.message}`);
@@ -287,94 +334,168 @@ export class ConversationManager extends PluginComponent {
     messageText?: string
   ): Promise<boolean> {
     try {
-      console.log(`[CONVO_MANAGER] Checking if ${agentId} should respond to message from ${fromAgentId || 'unknown'} in group ${groupId}`);
+      this.logger.debug(`[CONVO_MANAGER] Checking if ${agentId} should respond to message from ${fromAgentId || 'unknown'} in group ${groupId}`);
       
       // Get current conversation state
       const state = await this.getConversationState(groupId);
       
-      if (!state) {
-        // No conversation in progress, allow response
-        console.log(`[CONVO_MANAGER] No conversation state, ${agentId} can respond to ${fromAgentId || 'human'}`);
-        this.logger.debug(`ConversationManager: No conversation state, ${agentId} can respond to ${fromAgentId || 'human'}`);
-        return true;
-      }
-      
       // Don't respond to our own messages
       if (fromAgentId === agentId) {
-        console.log(`[CONVO_MANAGER] Agent ${agentId} should not respond to itself`);
-        this.logger.debug(`ConversationManager: Agent ${agentId} should not respond to itself`);
+        this.logger.debug(`[CONVO_MANAGER] Agent ${agentId} should not respond to itself`);
         return false;
       }
       
-      // If this is the first message in conversation, any agent can respond
-      if (state.messageCount === 0) {
-        console.log(`[CONVO_MANAGER] First message in conversation, ${agentId} can respond`);
-        this.logger.debug(`ConversationManager: First message in conversation, ${agentId} can respond`);
-        return true;
+      // Get runtime to access character information
+      let runtime: IAgentRuntime;
+      try {
+        runtime = await this.waitForRuntime();
+      } catch (error) {
+        this.logger.warn(`[CONVO_MANAGER] Error getting runtime: ${error.message}, using basic response logic`);
+        // If runtime not available, use basic decision logic
+        return this.basicShouldRespond(agentId, fromAgentId, messageText);
       }
       
-      // Don't respond if we were the last speaker
-      if (state.lastSpeakerId === agentId) {
-        console.log(`[CONVO_MANAGER] Agent ${agentId} was the last speaker, should not respond`);
-        this.logger.debug(`ConversationManager: Agent ${agentId} was the last speaker, should not respond`);
-        return false;
+      // Try to get character information
+      let character;
+      let agentName = agentId;
+      let persona = "";
+      let topics: string[] = [];
+      let interests: string[] = [];
+      
+      try {
+        character = runtime.character;
+        if (character) {
+          agentName = character.name || agentId;
+          persona = character.bio || "";
+          topics = character.topics || [];
+          interests = character.interests || [];
+        }
+      } catch (error) {
+        this.logger.warn(`[CONVO_MANAGER] Error getting character: ${error.message}`);
       }
       
-      // Determine if message is from a bot by checking agent ID patterns
-      const isFromBot = fromAgentId && (
-        fromAgentId.includes('Bot') || 
-        fromAgentId.includes('_') || 
-        ['linda_evangelista_88', 'vc_shark_99', 'bitcoin_maxi_420', 
-         'bag_flipper_9000', 'code_samurai_77', 'eth_memelord_9000'].includes(fromAgentId)
-      );
-      
-      console.log(`[CONVO_MANAGER] Is message from bot? ${isFromBot}`);
-      
-      // Check if this message directly mentions this agent
-      const runtime = await this.waitForRuntime();
-      const agentName = runtime.character?.name || agentId;
-      
-      const isDirectedToThisAgent = messageText && (
-        messageText.toLowerCase().includes(agentName.toLowerCase()) || 
-        messageText.toLowerCase().includes(agentId.toLowerCase())
-      );
-      
-      if (isDirectedToThisAgent) {
-        console.log(`[CONVO_MANAGER] Message is directed at this agent, will respond`);
-        this.logger.debug(`ConversationManager: Message is directed at this agent, will respond`);
-        return true;
-      }
-      
-      // Always use a higher probability for bot-to-bot communication to ensure interactions happen
-      if (isFromBot) {
-        console.log(`[CONVO_MANAGER] Message is from another bot (${fromAgentId}), using higher response probability`);
+      // Get conversation history
+      let history = "";
+      let participants: string[] = [];
+      try {
+        const memoryManager = this.getMemoryManager();
+        const recentMessages = await memoryManager.getMemories({
+          roomId: groupId.toString(),
+          type: "telegram-message",
+          count: 5
+        });
         
-        // Use a probability-based approach to avoid infinite loops but ensure good conversation flow
-        // Higher probability means more responsive agents
-        const probabilityFactor = 0.4; // 40% chance to respond to other bots
+        if (recentMessages && recentMessages.length > 0) {
+          history = recentMessages.map(m => `${m.userId}: ${m.content.text}`).join("\n");
+        }
         
-        // Add randomness to avoid multiple agents responding at the same time
-        const shouldRespond = Math.random() < probabilityFactor;
-        console.log(`[CONVO_MANAGER] Bot-to-bot response decision: ${shouldRespond} (probability: ${probabilityFactor})`);
-        return shouldRespond;
+        // Get unique participants from the conversation state
+        if (state && state.participants) {
+          participants = state.participants;
+        }
+      } catch (error) {
+        this.logger.warn(`[CONVO_MANAGER] Error getting history: ${error.message}`);
       }
       
-      // Randomize response probability based on number of participants
-      // to prevent all agents from responding simultaneously
-      const participantCount = state.participants.length || 1;
-      const responseChance = 1 / participantCount;
-      const shouldRespond = Math.random() <= responseChance;
+      // Enhanced prompt with richer context for better decision making
+      const prompt = `You are ${agentName}, an AI participating in a group chat.
+
+Your persona:
+${persona}
+
+Your interests: ${interests.join(', ')}
+Topics you know about: ${topics.join(', ')}
+
+Current group chat: Telegram group ${groupId}
+Other participants: ${participants.length > 0 ? participants.filter(p => p !== agentId).join(', ') : 'None identified yet'}
+
+Recent conversation:
+${history || 'No recent messages'}
+
+Message just received:
+FROM: ${fromAgentId || 'Unknown user'}
+MESSAGE: "${messageText || ""}"
+
+Should you respond to this message? Consider:
+- If it's directed at you
+- If it's about a topic you're interested in
+- If you have something valuable to add
+- If it's natural for you to join the conversation at this point
+
+Reply with ONLY ONE of these exact options:
+[RESPOND] - if you want to speak
+[IGNORE] - if you choose to remain silent`;
       
-      console.log(`[CONVO_MANAGER] Agent ${agentId} response probability ${responseChance}, shouldRespond=${shouldRespond}`);
-      this.logger.debug(`ConversationManager: Agent ${agentId} response probability ${responseChance}, shouldRespond=${shouldRespond}`);
+      // Use the agent's language model to decide
+      try {
+        if (runtime.modelProvider) {
+          const result = await runtime.modelProvider.generateText({
+            prompt,
+            temperature: 0.7,
+            maxTokens: 50
+          });
+          
+          const decision = result.includes("RESPOND") ? true : false;
+          this.logger.info(`[CONVO_MANAGER] LLM response decision for ${agentId}: ${decision ? "RESPOND" : "IGNORE"}`);
+          return decision;
+        }
+      } catch (error) {
+        this.logger.warn(`[CONVO_MANAGER] Error generating LLM response: ${error.message}, falling back to basic logic`);
+      }
       
-      return shouldRespond;
+      // Fallback to basic logic if LLM is unavailable
+      return this.basicShouldRespond(agentId, fromAgentId, messageText);
+      
     } catch (error) {
-      console.error(`[CONVO_MANAGER] Error checking if agent should respond:`, error);
-      this.logger.error(`ConversationManager: Error checking if agent should respond: ${error.message}`);
+      this.logger.error(`[CONVO_MANAGER] Error checking if agent should respond: ${error.message}`);
       // Default to allowing response in case of error
       return true;
     }
+  }
+  
+  /**
+   * Basic response decision logic without using runtime
+   */
+  private basicShouldRespond(agentId: string, fromAgentId: string | null, messageText?: string): boolean {
+    // Determine if message is from a bot by checking agent ID patterns
+    const isFromBot = fromAgentId && (
+      fromAgentId.includes('Bot') || 
+      fromAgentId.includes('_') || 
+      ['linda_evangelista_88', 'vc_shark_99', 'bitcoin_maxi_420', 
+       'bag_flipper_9000', 'code_samurai_77', 'eth_memelord_9000'].includes(fromAgentId)
+    );
+    
+    this.logger.debug(`[CONVO_MANAGER] Is message from bot? ${isFromBot}`);
+    
+    // Check if this message directly mentions this agent (simple check)
+    const isDirectedToThisAgent = messageText && (
+      messageText.toLowerCase().includes(agentId.toLowerCase())
+    );
+    
+    if (isDirectedToThisAgent) {
+      this.logger.debug(`[CONVO_MANAGER] Message is directed at this agent, will respond`);
+      return true;
+    }
+    
+    // Always use a higher probability for bot-to-bot communication to ensure interactions happen
+    if (isFromBot) {
+      // Use a probability-based approach to avoid infinite loops but ensure good conversation flow
+      // Higher probability means more responsive agents
+      const probabilityFactor = 0.4; // 40% chance to respond to other bots
+      
+      // Add randomness to avoid multiple agents responding at the same time
+      const shouldRespond = Math.random() < probabilityFactor;
+      this.logger.debug(`[CONVO_MANAGER] Bot-to-bot response decision: ${shouldRespond} (probability: ${probabilityFactor})`);
+      return shouldRespond;
+    }
+    
+    // For messages from humans (not bots)
+    const responseChance = 0.3; // 30% chance to respond to human messages
+    const shouldRespond = Math.random() <= responseChance;
+    
+    this.logger.debug(`[CONVO_MANAGER] Human message response probability ${responseChance}, shouldRespond=${shouldRespond}`);
+    
+    return shouldRespond;
   }
   
   /**

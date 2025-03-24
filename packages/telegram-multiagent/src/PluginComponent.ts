@@ -38,9 +38,63 @@ export abstract class PluginComponent {
   }
   
   /**
+   * Create a runtime wrapper that adapts the actual runtime structure 
+   * to match the expected IAgentRuntime interface
+   */
+  protected createRuntimeWrapper(runtime: any): IAgentRuntime {
+    // Create a wrapper that adapts the actual runtime structure to our expected interface
+    return {
+      // Direct property access for ID
+      getAgentId: () => runtime.agentId ?? "unknown-agent",
+      
+      // Create logger wrapper
+      getLogger: (name: string) => {
+        // If there's a logging system available, use it
+        const loggerService = runtime.logger || runtime.loggerService;
+        if (loggerService?.getLogger) {
+          return loggerService.getLogger(name);
+        }
+        
+        // Fallback to console logging
+        return {
+          trace: (message: string, ...args: any[]) => console.log(`[TRACE][${name}]: ${message}`, ...args),
+          debug: (message: string, ...args: any[]) => console.log(`[DEBUG][${name}]: ${message}`, ...args),
+          info: (message: string, ...args: any[]) => console.log(`[INFO][${name}]: ${message}`, ...args),
+          warn: (message: string, ...args: any[]) => console.warn(`[WARN][${name}]: ${message}`, ...args),
+          error: (message: string, ...args: any[]) => console.error(`[ERROR][${name}]: ${message}`, ...args)
+        };
+      },
+      
+      // Pass through existing properties
+      ...runtime
+    };
+  }
+  
+  /**
+   * Validate that the runtime has the necessary properties
+   * This focuses on the actual properties we need rather than methods
+   */
+  protected runtimeIsValid(runtime: any): boolean {
+    if (!runtime) return false;
+    
+    // Check for critical properties
+    if (typeof runtime.agentId !== 'string' || !runtime.agentId) {
+      this.logger.debug('Runtime missing agentId property');
+      return false;
+    }
+    
+    // Don't check for memoryManager since it may not be available immediately
+    // Just log it for debugging
+    if (!runtime.memoryManager) {
+      this.logger.debug('Runtime missing memoryManager (continuing anyway)');
+    }
+    
+    return true;
+  }
+  
+  /**
    * Wait for the runtime to be available and ready to use
-   * Verifies that critical methods like getAgentId and getLogger are available
-   * Uses exponential backoff for retries
+   * Uses adapter pattern to bridge interface/implementation mismatch
    * 
    * @param timeoutMs - Maximum time to wait in milliseconds (default: 60000)
    * @returns Promise resolving to the runtime instance
@@ -48,108 +102,58 @@ export abstract class PluginComponent {
    */
   protected async waitForRuntime(timeoutMs: number = 60000): Promise<IAgentRuntime> {
     const start = Date.now();
-    const maxDelay = 5000; // Max 5 seconds between attempts
-    let delay = 100; // Start with 100ms delay
+    const maxDelay = 5000;
+    let delay = 100;
 
     this.logger.debug(`Waiting for runtime to be available (timeout: ${timeoutMs}ms)`);
 
     while (Date.now() - start < timeoutMs) {
-      // Check this.runtime first
-      if (this.runtime && 
-          typeof this.runtime.getAgentId === 'function' && 
-          typeof this.runtime.getLogger === 'function') {
-        this.logger.debug('Runtime found via this.runtime with all required methods');
+      // Check this.runtime first if it's already a wrapped instance
+      if (this.runtime && this.runtimeIsValid(this.runtime)) {
         return this.runtime;
       }
 
       // Check globalThis.__elizaRuntime
-      if (globalThis.__elizaRuntime) {
-        // Log detailed runtime analysis
-        this.logger.info(`[RUNTIME-DEBUG] __elizaRuntime exists`);
-        this.logger.info(`[RUNTIME-DEBUG] Runtime constructor: ${globalThis.__elizaRuntime.constructor?.name || 'unknown'}`);
-        this.logger.info(`[RUNTIME-DEBUG] Direct keys: ${Object.keys(globalThis.__elizaRuntime).join(', ')}`);
-        
-        // Check prototype
-        const proto = Object.getPrototypeOf(globalThis.__elizaRuntime);
-        if (proto) {
-          this.logger.info(`[RUNTIME-DEBUG] Prototype exists: ${proto.constructor?.name || 'unknown'}`);
-          this.logger.info(`[RUNTIME-DEBUG] Prototype keys: ${Object.getOwnPropertyNames(proto).join(', ')}`);
+      const rawRt = globalThis.__elizaRuntime;
+      if (rawRt) {
+        // Extra verbose debugging for what properties actually exist
+        this.logger.debug(`[RUNTIME-DEBUG] Found __elizaRuntime, checking properties:`);
+        this.logger.debug(`[RUNTIME-DEBUG] Has agentId? ${typeof rawRt.agentId === 'string'}`);
+        this.logger.debug(`[RUNTIME-DEBUG] agentId value: ${rawRt.agentId}`);
+        this.logger.debug(`[RUNTIME-DEBUG] Has memoryManager? ${!!rawRt.memoryManager}`);
+        this.logger.debug(`[RUNTIME-DEBUG] Has memoryManagers? ${!!rawRt.memoryManagers}`);
+        this.logger.debug(`[RUNTIME-DEBUG] Has clients? ${!!rawRt.clients}`);
+      
+        // Check if the runtime is valid for our needs
+        if (this.runtimeIsValid(rawRt)) {
+          // Log runtime constructor for debugging
+          this.logger.info(`[RUNTIME] Runtime constructor: ${rawRt.constructor?.name || 'unknown'}`);
           
-          // Check if methods are on prototype
-          this.logger.info(`[RUNTIME-DEBUG] getAgentId on prototype: ${typeof proto.getAgentId === 'function'}`);
-          this.logger.info(`[RUNTIME-DEBUG] getLogger on prototype: ${typeof proto.getLogger === 'function'}`);
-        } else {
-          this.logger.info(`[RUNTIME-DEBUG] No prototype found`);
-        }
-        
-        // Try to access methods directly from the __elizaRuntime object
-        this.logger.info(`[RUNTIME-DEBUG] Direct method check:`);
-        this.logger.info(`[RUNTIME-DEBUG] - typeof __elizaRuntime.getAgentId: ${typeof globalThis.__elizaRuntime.getAgentId}`);
-        this.logger.info(`[RUNTIME-DEBUG] - typeof __elizaRuntime.getLogger: ${typeof globalThis.__elizaRuntime.getLogger}`);
-        
-        // Try direct method call with binding
-        try {
-          const proto = Object.getPrototypeOf(globalThis.__elizaRuntime);
-          if (proto && typeof proto.getAgentId === 'function') {
-            const boundGetAgentId = proto.getAgentId.bind(globalThis.__elizaRuntime);
-            const agentId = boundGetAgentId();
-            this.logger.info(`[RUNTIME-DEBUG] Direct bound call successful: agentId=${agentId}`);
-          }
-        } catch (error) {
-          this.logger.error(`[RUNTIME-DEBUG] Direct bound call failed: ${error.message}`);
-        }
-        
-        // Create a proxy for the runtime that properly handles prototype methods
-        const runtimeProxy = new Proxy(globalThis.__elizaRuntime, {
-          get(target, prop, receiver) {
-            let value = Reflect.get(target, prop, receiver);
-
-            // If value is undefined, try from prototype
-            if (value === undefined) {
-              const proto = Object.getPrototypeOf(target);
-              if (proto) {
-                value = Reflect.get(proto, prop, receiver);
-              }
-            }
-
-            // Bind function only if it's a function (could be from prototype or direct)
-            if (typeof value === 'function') {
-              return value.bind(target);
-            }
-
-            return value;
-          }
-        });
-        
-        // Test if the proxy works and log results
-        try {
-          this.logger.info("[PROXY] runtime.getAgentId exists:", typeof runtimeProxy.getAgentId === "function");
-          this.logger.info("[PROXY] runtime.getLogger exists:", typeof runtimeProxy.getLogger === "function");
+          // Log detailed runtime analysis
+          this.logger.info(`[RUNTIME-DEBUG] __elizaRuntime exists`);
+          this.logger.info(`[RUNTIME-DEBUG] Runtime constructor: ${rawRt.constructor?.name || 'unknown'}`);
+          this.logger.info(`[RUNTIME-DEBUG] Direct keys: ${Object.keys(rawRt).join(', ')}`);
           
-          const agentId = runtimeProxy.getAgentId?.();
-          if (agentId) {
-            this.logger.debug(`[RUNTIME] Runtime methods: getAgentId=available`);
+          // Wrap the runtime to provide our expected interface
+          const wrappedRuntime = this.createRuntimeWrapper(rawRt);
+          this.runtime = wrappedRuntime;
+          
+          // Test if it works
+          try {
+            const agentId = wrappedRuntime.getAgentId();
             this.logger.info(`[AGENT] Agent ID: ${agentId}`);
-            
-            // Also verify getLogger works
-            const logger = runtimeProxy.getLogger('test');
-            if (logger) {
-              this.logger.debug('[RUNTIME] Runtime methods: getAgentId=available, getLogger=available');
-              this.runtime = runtimeProxy;
-              this.logger.info(`[TEST] Runtime proxy test: Agent ID = ${runtimeProxy.getAgentId?.()}`);
-              return runtimeProxy;
-            }
-          } else {
-            this.logger.error("[RUNTIME] getAgentId() returned null or undefined");
+            return wrappedRuntime;
+          } catch (error) {
+            this.logger.error(`[RUNTIME] Error with wrapped runtime: ${error.message}`);
           }
-        } catch (error) {
-          this.logger.debug(`[RUNTIME] Error using proxy methods: ${error.message}`);
+        } else {
+          this.logger.debug("[RUNTIME-DEBUG] Runtime found but validation failed");
         }
       }
 
       // Wait with exponential backoff
       await new Promise(resolve => setTimeout(resolve, delay));
-      delay = Math.min(delay * 1.5, maxDelay); // Exponential backoff with cap
+      delay = Math.min(delay * 1.5, maxDelay);
     }
 
     throw new Error(`Runtime wait timed out after ${timeoutMs}ms`);
@@ -174,6 +178,14 @@ export abstract class PluginComponent {
     if (this.runtime.memoryManager) {
       this.logger.info(`- memoryManager.createMemory: ${typeof this.runtime.memoryManager.createMemory === 'function' ? 'function' : 'missing'}`);
       this.logger.info(`- memoryManager.getMemories: ${typeof this.runtime.memoryManager.getMemories === 'function' ? 'function' : 'missing'}`);
+    }
+    
+    // Try getting agent ID
+    try {
+      const agentId = this.runtime.getAgentId();
+      this.logger.info(`- getAgentId result: ${agentId}`);
+    } catch (error) {
+      this.logger.error(`- getAgentId call failed: ${error.message}`);
     }
   }
   

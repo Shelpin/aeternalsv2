@@ -59,135 +59,78 @@ export class TelegramRelay {
   }
 
   /**
-   * Register agent with the relay server with retries
-   * @returns True if registered successfully
+   * Register the agent with the relay server
+   * @returns True if registered successfully, false otherwise
    */
   private async registerAgent(): Promise<boolean> {
-    if (!this.config.agentId) {
-      this.logger.error('No agent ID provided, cannot register');
-      return false;
-    }
-    
-    const maxRetries = 5;  // Increased from 3 to 5
-    let attempt = 0;
-    
-    while (attempt < maxRetries) {
-      attempt++;
-      this.logger.info(`Registration attempt ${attempt}/${maxRetries}`);
+    try {
+      this.logger.info(`Registering agent ${this.config.agentId} with relay server`);
       
-      try {
-        const payload = {
-          agent_id: this.config.agentId
-        };
-        
-        this.logger.debug(`Registration payload: ${JSON.stringify(payload)}`);
-        this.logger.info(`Sending registration for agent: ${this.config.agentId}`);
-        
-        // If URL is localhost and contains underscores, warn about potential issues
-        if (this.config.relayServerUrl.includes('localhost') && this.config.agentId.includes('_')) {
-          this.logger.warn('Using localhost with agent ID containing underscores may cause registration issues');
-          this.logger.info('Consider using the public IP or hostname instead');
+      const response = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/register`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.config.authToken}`
+          },
+          body: JSON.stringify({
+            agent_id: this.config.agentId,
+            token: this.config.authToken
+          })
+        }
+      );
+      
+      if (!response.ok) {
+        let errorDetails = '';
+        try {
+          // Try to get more detailed error information
+          const errorText = await response.text();
+          errorDetails = errorText;
+          this.logger.error(`Registration error response: ${errorText}`);
+        } catch (e) {
+          this.logger.error(`Could not read error response: ${e.message}`);
         }
         
-        // Use an explicit URL to ensure no path issues
-        const registrationUrl = `${this.config.relayServerUrl}/register`;
-        this.logger.debug(`Using registration URL: ${registrationUrl}`);
-        
-        // Verify we have the auth token
-        if (!this.config.authToken) {
-          this.logger.error('No auth token provided, cannot register');
+        this.logger.error(`Failed to register agent with status ${response.status} ${response.statusText}: ${errorDetails}`);
+        return false;
+      }
+      
+      // Try to parse response
+      try {
+        const data = await response.json();
+        if (!data.success) {
+          this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
           return false;
         }
         
-        // Log the auth token (first 5 chars) for debugging
-        this.logger.debug(`Using auth token: ${this.config.authToken.substring(0, 5)}****`);
+        this.logger.info(`[RELAY] Agent ${this.config.agentId} registered successfully`);
         
-        // Make sure headers are set correctly
-        const headers = {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.authToken}`
-        };
-        
-        this.logger.debug(`Headers: ${JSON.stringify(headers)}`);
-        
-        const response = await this.fetchWithTimeout(
-          registrationUrl,
-          {
-            method: 'POST',
-            headers,
-            body: JSON.stringify(payload)
-          },
-          15000 // 15 second timeout (increased from 10s)
-        );
-        
-        if (!response.ok) {
-          let errorText;
-          try {
-            errorText = await response.text();
-          } catch (e) {
-            errorText = 'Could not read error response';
-          }
-          
-          this.logger.error(`Registration failed: Status ${response.status}, Response: ${errorText}`);
-          
-          // Check for specific HTTP status codes
-          if (response.status === 401) {
-            this.logger.error('Authentication failed. Check auth token and try again.');
-            
-            // If we have auth error and token is too short, suggest fixing it
-            if (this.config.authToken.length < 10) {
-              this.logger.error(`Auth token "${this.config.authToken}" seems too short. Check configuration.`);
-            }
-          } else if (response.status === 404) {
-            this.logger.error('Registration endpoint not found. Check relay server URL.');
-          } else if (response.status >= 500) {
-            this.logger.error('Server error. The relay server is experiencing issues.');
-          }
-          
-          // Wait before retrying
-          if (attempt < maxRetries) {
-            const delay = attempt * 2000; // Exponential backoff
-            this.logger.info(`Retrying registration in ${delay}ms...`);
-            await new Promise(r => setTimeout(r, delay));
-          }
-        } else {
-          try {
-            const result = await response.json();
-            if (result.success) {
-              // Add success logging as recommended by ElizaOS expert
-              this.logger.info(`[RELAY] Successfully registered agent ${this.config.agentId}`);
-              this.logger.info(`[RELAY] Connected agents: ${JSON.stringify(result.connected_agents || [])}`);
-              return true;
-            } else {
-              this.logger.error(`Registration returned success: false. Details: ${JSON.stringify(result)}`);
-            }
-          } catch (e) {
-            // Response is OK but we could not parse it
-            this.logger.warn('Registration response was OK but could not parse JSON');
-            this.logger.warn('Assuming registration was successful');
-            
-            // Add success logging with a warning
-            this.logger.info(`[RELAY] Successfully registered agent ${this.config.agentId} (assuming success based on OK response)`);
-            return true;
-          }
+        // Log additional registration details if available
+        if (data.agent_id) {
+          this.logger.info(`[RELAY] Confirmed agent ID: ${data.agent_id}`);
         }
-      } catch (error) {
-        this.logger.error(`Registration attempt ${attempt} failed with error: ${error.message}`);
-        if (error.stack) {
-          this.logger.debug(`Error stack: ${error.stack}`);
+        if (data.expires_at) {
+          this.logger.info(`[RELAY] Registration expires at: ${new Date(data.expires_at).toISOString()}`);
         }
         
-        // Wait before retrying
-        if (attempt < maxRetries) {
-          const delay = attempt * 2000; // Exponential backoff
-          this.logger.info(`Retrying registration in ${delay}ms...`);
-          await new Promise(r => setTimeout(r, delay));
-        }
+        return true;
+      } catch (parseError) {
+        this.logger.error(`Error parsing registration response: ${parseError.message}`);
+        return false;
       }
+    } catch (error) {
+      this.logger.error(`Error registering agent: ${error.message}`);
+      
+      // Check if retry is possible
+      if (this.connectionAttempts < this.maxConnectionAttempts) {
+        this.logger.info(`Registration retry ${this.connectionAttempts}/${this.maxConnectionAttempts} will be attempted shortly`);
+        return false;
+      }
+      
+      this.logger.error(`Maximum registration attempts (${this.maxConnectionAttempts}) reached, giving up`);
+      return false;
     }
-    
-    this.logger.error(`Failed to register after ${maxRetries} attempts`);
-    return false;
   }
 
   /**
@@ -198,10 +141,10 @@ export class TelegramRelay {
     // Reset connection state
     this.connected = false;
     
-    this.logger.info(`Connecting to relay server at ${this.config.relayServerUrl}`);
+    this.logger.info(`[RELAY] Connecting to relay server at ${this.config.relayServerUrl}`);
     
     if (!this.config.agentId) {
-      this.logger.error('No agent ID provided, cannot connect');
+      this.logger.error('[RELAY] No agent ID provided, cannot connect');
       return false;
     }
     
@@ -209,7 +152,7 @@ export class TelegramRelay {
     this.connectionAttempts++;
     
     // Log connection attempt with counter
-    this.logger.info(`Connection attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}`);
+    this.logger.info(`[RELAY] Connection attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}`);
     
     try {
       // Check if the server is available
@@ -217,7 +160,7 @@ export class TelegramRelay {
       try {
         // Explicitly form the health URL
         const healthUrl = `${this.config.relayServerUrl}/health`;
-        this.logger.debug(`Checking relay server health at: ${healthUrl}`);
+        this.logger.debug(`[RELAY] Checking relay server health at: ${healthUrl}`);
         
         healthCheck = await this.fetchWithTimeout(
           healthUrl,
@@ -225,31 +168,44 @@ export class TelegramRelay {
           5000  // 5 second timeout for health check
         );
       } catch (error) {
-        this.logger.error(`Health check failed: ${error.message}`);
+        this.logger.error(`[RELAY] Health check failed: ${error.message}`);
         
         if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
-          this.logger.warn('Connection issue detected. Please check if relay server is running and network is accessible');
+          this.logger.warn('[RELAY] Connection issue detected. Please check if relay server is running and network is accessible');
         }
         return false;
       }
       
       if (!healthCheck.ok) {
-        this.logger.warn(`Relay server health check failed with status ${healthCheck.status}`);
+        this.logger.warn(`[RELAY] Relay server health check failed with status ${healthCheck.status}`);
         try {
           const responseText = await healthCheck.text();
-          this.logger.error(`Health check response: ${responseText}`);
+          this.logger.error(`[RELAY] Health check response: ${responseText}`);
         } catch (e) {
-          this.logger.error('Could not read health check response');
+          this.logger.error('[RELAY] Could not read health check response');
         }
         return false;
       }
       
+      // Try to parse health check response for additional diagnostics
+      try {
+        const healthData = await healthCheck.json();
+        this.logger.info(`[RELAY] Health status: ${JSON.stringify(healthData)}`);
+        if (healthData.agents) {
+          this.logger.info(`[RELAY] Current active agents: ${healthData.agents}`);
+        }
+      } catch (e) {
+        // Non-critical error, just continue
+        this.logger.debug(`[RELAY] Could not parse health check JSON: ${e.message}`);
+      }
+      
       // Health check passed
-      this.logger.info(`Health check passed, relay server is running`);
+      this.logger.info(`[RELAY] Health check passed, relay server is running`);
       
       // Register the agent with retries
       const registered = await this.registerAgent();
       if (!registered) {
+        this.logger.error(`[RELAY] Failed to register agent ${this.config.agentId}`);
         return false;
       }
       
@@ -264,11 +220,12 @@ export class TelegramRelay {
       // Start update polling
       this.startUpdatePolling();
       
+      this.logger.info(`[RELAY] Agent ${this.config.agentId} connected and registered successfully`);
       return true;
     } catch (error) {
-      this.logger.error(`Unexpected error connecting to relay server: ${error.message}`);
+      this.logger.error(`[RELAY] Unexpected error connecting to relay server: ${error.message}`);
       if (error.stack) {
-        this.logger.debug(`Error stack: ${error.stack}`);
+        this.logger.debug(`[RELAY] Error stack: ${error.stack}`);
       }
       return false;
     }
