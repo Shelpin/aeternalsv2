@@ -437,10 +437,10 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           
           const data = await response.json();
           
-          if (data.updates && data.updates.length > 0) {
-            this.logger.info(`[PLUGIN] Found ${data.updates.length} new messages via polling`);
+          if (data.messages && data.messages.length > 0) {
+            this.logger.info(`[PLUGIN] Found ${data.messages.length} new messages via polling`);
             
-            for (const update of data.updates) {
+            for (const update of data.messages) {
               this.logger.info(`[PLUGIN] Processing polled message: "${update.message?.text?.substring(0, 50)}..."`);
               if (update.message) {
                 await this.handleIncomingMessage(update.message);
@@ -448,112 +448,192 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             }
           }
         } catch (error) {
-          this.logger.error(`[PLUGIN] Error in message polling: ${error.message}`);
+          this.logger.error(`[PLUGIN] Error in relay polling: ${error.message}`);
         }
-      }, 2000); // Poll every 2 seconds
+      }, 2000);
       
-      // Add an HTTP endpoint for direct message testing
-      try {
-        // Set up a simple Express-like server on the runtime if available
-        if (this.runtime && this.runtime.app) {
-          this.logger.info(`[TEST] Setting up /message test endpoint`);
-          
-          this.runtime.app.post("/message", async (req, res) => {
-            this.logger.info(`[TEST] Received direct test message: ${JSON.stringify(req.body)}`);
-            try {
-              await this.handleIncomingMessage({
-                message_id: Math.floor(Math.random() * 1000000),
-                from: {
-                  id: 12345,
-                  is_bot: false,
-                  first_name: "Test",
-                  username: req.body.sender || "test_user"
-                },
-                chat: {
-                  id: req.body.chatId || "-1002550618173",
-                  type: "group",
-                  title: "Test Group"
-                },
-                date: Math.floor(Date.now() / 1000),
-                text: req.body.text || "Test message",
-                sender_agent_id: req.body.sender
-              });
-              res.json({ success: true });
-            } catch (error) {
-              this.logger.error(`[TEST] Error handling test message: ${error.message}`);
-              res.status(500).json({ success: false, error: error.message });
-            }
-          });
-          
-          // Add ping endpoint
-          this.runtime.app.get("/ping", (req, res) => res.send("pong"));
-          
-          this.logger.info(`[TEST] Test endpoints configured successfully`);
-        } else {
-          this.logger.warn(`[TEST] Cannot set up test endpoints: runtime.app not available`);
-        }
-      } catch (error) {
-        this.logger.error(`[TEST] Error setting up test endpoints: ${error.message}`);
-      }
+      // Start Telegram polling to get messages directly from Telegram API
+      this.startTelegramPolling();
       
-      // Connect to relay server with timeout and error handling
-      try {
-        this.logger.info(`[RELAY] Connecting to relay server at ${this.config.relayServerUrl}`);
-        const connectResult = await this.relay.connect();
-        this.logger.info(`[RELAY] Connection result: ${connectResult ? 'SUCCESS' : 'FAILED'}`);
-        if (connectResult) {
-          this.logger.info(`[RELAY] Agent registered successfully`);
-        } else {
-          this.logger.warn(`[RELAY] Agent registration may have failed, will continue anyway`);
-        }
-      } catch (error) {
-        this.logger.error(`[RELAY] Failed to connect to relay server: ${error.message}`);
-        // Continue execution, but schedule reconnect attempts
-        this.scheduleReconnect();
-      }
-      
-      // Setup kickstarter for each group ID
-      if (this.config.groupIds && this.config.groupIds.length > 0) {
-        for (const groupId of this.config.groupIds) {
-          // Initialize kickstarter with all required parameters
-          const kickstarter = new ConversationKickstarter(
-            this.logger,
-            this.conversationManager,
-            this.relay,
-            this.config.kickstarterConfig || {
-              probabilityFactor: 0.2,
-              minIntervalMs: 300000,
-              includeTopics: true,
-              shouldTagAgents: true,
-              maxAgentsToTag: 2
-            },
-            groupId.toString(),
-            null // No personality enhancer for now
-          );
-          kickstarter.setRuntime(this.runtime);
-          await kickstarter.initialize();
-          this.kickstarters.set(groupId.toString(), kickstarter);
-          this.logger.info(`${this.name}: Kickstarter initialized for group ${groupId}`);
-        }
-      } else {
-        this.logger.warn(`${this.name}: No group IDs configured, skipping kickstarter setup`);
-      }
-      
-      // Set up conversation check interval
-      if (this.config.conversationCheckIntervalMs) {
-        this.checkIntervalId = setInterval(() => {
-          this.checkConversations().catch(error => {
-            this.logger.error(`Error in conversation check: ${error}`);
-          });
-        }, this.config.conversationCheckIntervalMs);
-      }
+      // Connect to relay
+      await this.relay.connect();
       
       this.initialized = true;
-      this.logger.info(`${this.name}: Plugin initialized successfully!`);
-      
+      this.logger.info(`${this.name}: Plugin initialized successfully`);
     } catch (error) {
-      this.logger.error(`${this.name}: Initialization error: ${error}`);
+      this.logger.error(`${this.name}: Initialization failed: ${error.message}`);
+      throw error;
     }
+  }
+  
+  /**
+   * Telegram polling to get updates directly from Telegram API
+   * This enables the bot to see messages from users in the Telegram group
+   */
+  private startTelegramPolling(): void {
+    this.logger.info(`[TELEGRAM] Starting Telegram API polling for agent ${this.agentId}`);
+    
+    // Find the bot token for this agent
+    let botToken = this.findBotToken();
+    
+    if (!botToken) {
+      this.logger.error(`[TELEGRAM] No bot token found for agent ${this.agentId}, cannot start Telegram polling`);
+      return;
+    }
+    
+    this.logger.info(`[TELEGRAM] Found bot token for ${this.agentId}, starting polling`);
+    
+    // Get initial offset from last update ID
+    let updateOffset = 0;
+    
+    // Start polling interval
+    setInterval(async () => {
+      try {
+        // Poll Telegram API for updates
+        const response = await fetch(`https://api.telegram.org/bot${botToken}/getUpdates?offset=${updateOffset}&timeout=10`, {
+          method: 'GET'
+        });
+        
+        if (!response.ok) {
+          this.logger.warn(`[TELEGRAM] Failed to poll Telegram API: ${response.status} ${response.statusText}`);
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (!data.ok) {
+          this.logger.error(`[TELEGRAM] Telegram API error: ${data.description}`);
+          return;
+        }
+        
+        if (data.result && data.result.length > 0) {
+          this.logger.info(`[TELEGRAM] Received ${data.result.length} updates from Telegram API`);
+          
+          for (const update of data.result) {
+            // Update offset to acknowledge this update
+            updateOffset = Math.max(updateOffset, update.update_id + 1);
+            
+            // Process message if present
+            if (update.message) {
+              const message = update.message;
+              this.logger.info(`[TELEGRAM] Processing message from Telegram: "${message.text?.substring(0, 50) || '[no text]'}"`);
+              
+              // Skip messages from this bot to avoid loops
+              if (message.from && message.from.username === this.getBotUsernameFromId(this.agentId)) {
+                this.logger.debug(`[TELEGRAM] Skipping message from self`);
+                continue;
+              }
+              
+              // Forward the message to the relay server
+              if (this.relay) {
+                try {
+                  // Create a RelayMessage structure
+                  const relayMessage = {
+                    message_id: message.message_id,
+                    from: message.from,
+                    chat: message.chat,
+                    date: message.date,
+                    text: message.text || '',
+                    sender_agent_id: message.from.username  // Use Telegram username as agent ID
+                  };
+                  
+                  // Forward to relay server to distribute to other bots
+                  await fetch(`${this.config.relayServerUrl}/sendMessage`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${this.config.authToken}`
+                    },
+                    body: JSON.stringify({
+                      agent_id: this.agentId,
+                      chat_id: message.chat.id,
+                      text: message.text || '',
+                      telegram_message: relayMessage  // Include the full message for context
+                    })
+                  });
+                  
+                  this.logger.info(`[TELEGRAM] Forwarded message to relay server`);
+                  
+                  // Also process this message locally
+                  await this.handleIncomingMessage(relayMessage);
+                } catch (error) {
+                  this.logger.error(`[TELEGRAM] Error forwarding message to relay: ${error.message}`);
+                }
+              }
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.error(`[TELEGRAM] Error polling Telegram API: ${error.message}`);
+      }
+    }, 2000);  // Poll every 2 seconds
+  }
+  
+  /**
+   * Find the bot token for this agent
+   */
+  private findBotToken(): string | null {
+    // Try to find token in environment variables
+    const possibleEnvVars = [
+      `TELEGRAM_BOT_TOKEN_${this.agentId.toUpperCase()}`,
+      `TELEGRAM_BOT_TOKEN_${this.agentId}`,
+      `BOT_TOKEN_${this.agentId.toUpperCase()}`,
+      `BOT_TOKEN_${this.agentId}`
+    ];
+    
+    // Also check for specific bot tokens by patterns
+    const possibleBotNames = [
+      "BitcoinMaxi420", "ETHMemeLord9000", "CodeSamurai77", 
+      "BagFlipper9000", "VCShark99", "LindaEvangelista88",
+      "bitcoin_maxi_420", "eth_memelord_9000", "code_samurai_77",
+      "bag_flipper_9000", "vc_shark_99", "linda_evangelista_88"
+    ];
+    
+    for (const botName of possibleBotNames) {
+      if (this.agentId.toLowerCase().includes(botName.toLowerCase()) || 
+          botName.toLowerCase().includes(this.agentId.toLowerCase())) {
+        possibleEnvVars.push(`TELEGRAM_BOT_TOKEN_${botName}`);
+        possibleEnvVars.push(`BOT_TOKEN_${botName}`);
+      }
+    }
+    
+    this.logger.debug(`[TELEGRAM] Looking for token in env vars: ${possibleEnvVars.join(', ')}`);
+    
+    for (const envVar of possibleEnvVars) {
+      if (process.env[envVar]) {
+        this.logger.debug(`[TELEGRAM] Found token in ${envVar}`);
+        return process.env[envVar];
+      }
+    }
+    
+    // Hardcoded fallbacks for testing - REMOVE IN PRODUCTION
+    if (this.agentId.includes('linda') || this.agentId.includes('evangelista')) {
+      this.logger.debug(`[TELEGRAM] Using hardcoded token for linda_evangelista_88`);
+      return process.env.TELEGRAM_BOT_TOKEN_LindaEvangelista88;
+    }
+    
+    if (this.agentId.includes('vc_shark') || this.agentId.includes('vcshark')) {
+      this.logger.debug(`[TELEGRAM] Using hardcoded token for vc_shark_99`);
+      return process.env.TELEGRAM_BOT_TOKEN_VCShark99;
+    }
+    
+    this.logger.error(`[TELEGRAM] No bot token found for agent ${this.agentId}`);
+    this.logger.debug(`[TELEGRAM] Available env vars: ${Object.keys(process.env).filter(k => k.includes('TELEGRAM_BOT_TOKEN')).join(', ')}`);
+    
+    return null;
+  }
+
+  /**
+   * Convert agent ID to bot username format
+   */
+  private getBotUsernameFromId(agentId: string): string {
+    // If already ends with _bot, return as is
+    if (agentId.endsWith('_bot')) {
+      return agentId;
+    }
+    
+    // Otherwise add _bot suffix
+    return `${agentId}_bot`;
   }
   
   /**
@@ -715,6 +795,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     try {
       // Log entry to this method for debugging
       this.logger.info(`[PLUGIN] handleIncomingMessage triggered for message ID: ${message.message_id}`);
+      console.log(`[DIRECT-DEBUG] Received message: ${JSON.stringify(message)}`);
       
       // Ensure we have a runtime
       const runtime = await this.waitForRuntime();
@@ -727,11 +808,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       const myAgentId = this.getAgentIdSafe();
       
       // Log the received message
-      this.logger.info(`[PLUGIN] Received message from ${from.username} (${from.id}) in chat ${chat.id}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+      this.logger.info(`[PLUGIN] Received message from ${from?.username || 'unknown'} in chat ${chat?.id || 'unknown'}: "${text?.substring(0, 50) || ''}${text?.length > 50 ? '...' : ''}"`);
+      console.log(`[DIRECT-DEBUG] My agent ID: ${myAgentId}, Sender agent ID: ${sender_agent_id}`);
       
       // Skip if the message is from self
       if (sender_agent_id === myAgentId) {
         this.logger.debug(`[PLUGIN] Ignoring message from self: ${sender_agent_id}`);
+        console.log(`[DIRECT-DEBUG] Skipping message from self`);
         return;
       }
       
@@ -769,12 +852,15 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       // Skip if this is not a configured group
       if (!normalizedGroupIds.includes(groupId)) {
         this.logger.debug(`[PLUGIN] Ignoring message from unconfigured group ${groupId}, allowed groups: ${normalizedGroupIds.join(', ')}`);
+        console.log(`[DIRECT-DEBUG] Skipping message from unconfigured group ${groupId}`);
         return;
       }
       
       // Process bot messages if they are from known bots
-      if (from.is_bot) {
+      if (from?.is_bot) {
         this.logger.debug(`[PLUGIN] Message is from bot: ${from.username}`);
+        console.log(`[DIRECT-DEBUG] Message is from bot: ${from.username}`);
+        
         // Allow messages from known bots to be processed
         const knownBots = [
           // Bot names
@@ -793,12 +879,15 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         
         this.logger.debug(`[PLUGIN] Bot message evaluation - Username: ${from.username}, Agent ID: ${sender_agent_id}`);
         this.logger.debug(`[PLUGIN] Is known bot: ${isKnownBot}`);
+        console.log(`[DIRECT-DEBUG] Is known bot: ${isKnownBot} (Username: ${from.username}, Agent ID: ${sender_agent_id})`);
         
         if (!isKnownBot) {
           this.logger.debug(`[PLUGIN] Ignoring message from unknown bot: ${from.username || sender_agent_id}`);
+          console.log(`[DIRECT-DEBUG] Skipping message from unknown bot`);
           return;
         }
         this.logger.debug(`[PLUGIN] Processing message from known bot: ${from.username || sender_agent_id}`);
+        console.log(`[DIRECT-DEBUG] Processing message from known bot: ${from.username || sender_agent_id}`);
       }
       
       // Record the message in the conversation manager
@@ -853,76 +942,71 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         this.logger.error(`Failed to store message in memory: ${error.message}`);
       }
       
-      // Check if this agent should respond to the message - Layer 1 decision
-      try {
-        const shouldRespond = await this.conversationManager.shouldAgentRespond(
-          groupId,
-          myAgentId,
-          sender_agent_id || from.username,
-          text
-        );
+      // IMPORTANT: Bypass all the complex decision logic for now to debug the core issue
+      // Simple 50% chance to respond to other bots
+      const shouldRespond = !from?.is_bot || (from?.is_bot && Math.random() > 0.5);
+      console.log(`[DIRECT-DEBUG] shouldRespond: ${shouldRespond}`);
+      
+      if (shouldRespond) {
+        this.logger.info(`${this.name}: Will respond to message in group ${groupId}`);
+        console.log(`[DIRECT-DEBUG] Attempting to generate response...`);
         
-        this.logger.info(`[PLUGIN] Layer 1 (LLM) decision: ${shouldRespond ? "RESPOND" : "IGNORE"}`);
-        
-        if (shouldRespond) {
-          // Layer 2 decision - plugin logic
-          const pluginShouldRespond = this.pluginShouldRespond(
-            groupId, 
-            myAgentId,
-            sender_agent_id || from.username,
-            text
-          );
+        try {
+          // Create a context object for the runtime
+          const context = {
+            roomId: groupId,
+            platform: 'telegram',
+            conversationType: 'group',
+            participantCount: this.knownAgents.size + 1, // Include self
+            messageHistory: await this.getMessageHistory(groupId)
+          };
           
-          this.logger.info(`[PLUGIN] Layer 2 (Plugin) decision: ${pluginShouldRespond ? "RESPOND" : "IGNORE"}`);
+          console.log(`[DIRECT-DEBUG] Calling runtime.handleMessage with context: ${JSON.stringify(context)}`);
+          console.log(`[DIRECT-DEBUG] Message text: "${text}"`);
+          console.log(`[DIRECT-DEBUG] Sender: ${sender_agent_id || from?.username}`);
           
-          if (pluginShouldRespond) {
-            this.logger.info(`${this.name}: Will respond to message in group ${groupId}`);
+          // Call the runtime to handle the message
+          const response = await runtime.handleMessage({
+            text: text || '',
+            userId: sender_agent_id || from?.username || 'unknown',
+            name: from?.first_name || 'Unknown',
+            context
+          });
+          
+          console.log(`[DIRECT-DEBUG] Got response from runtime: ${JSON.stringify(response)}`);
+          this.logger.info(`${this.name}: Got response from runtime, sending to Telegram`);
+          
+          // VALHALLA FIX: Always send response regardless of action as long as there's text
+          if (response?.text) {
+            // Remove any (NONE) tag from the end
+            let cleanedText = response.text;
+            if (cleanedText.toUpperCase().endsWith('(NONE)')) {
+              cleanedText = cleanedText.substring(0, cleanedText.length - 6).trim();
+              console.log(`[DIRECT-DEBUG] Removed (NONE) tag, cleaned text: "${cleanedText}"`);
+            }
             
-            // Log that we're trying to generate a response
-            this.logger.info(`[PLUGIN] Forwarding message to runtime for processing...`);
-            
-            // Create a context object for the runtime
-            const context = {
-              roomId: groupId,
-              platform: 'telegram',
-              conversationType: 'group',
-              participantCount: this.knownAgents.size + 1, // Include self
-              messageHistory: await this.getMessageHistory(groupId)
-            };
-            
-            // Call the runtime to handle the message
-            const response = await runtime.handleMessage({
-              text,
-              userId: sender_agent_id || from.username,
-              name: from.first_name,
-              context
-            });
-            
-            this.logger.info(`${this.name}: Got response from runtime, sending to Telegram`);
-            
-            // VALHALLA FIX: Check for response content regardless of action
-            if (response?.text?.length > 0) {
-              const cleanedText = response.text.replace(/\(NONE\)$/i, "").trim();
-              
-              if (response.content?.action?.toUpperCase() === 'NONE') {
-                this.logger.info(`[PLUGIN] Bypassing action=NONE to relay message`);
-              }
-              
+            if (cleanedText.length > 0) {
+              console.log(`[DIRECT-DEBUG] Sending response: "${cleanedText}"`);
               this.logger.info(`[PLUGIN] Forcing relay send of content: "${cleanedText.substring(0, 50)}..."`);
               await this.sendResponse(groupId, cleanedText);
             } else {
-              this.logger.warn(`[PLUGIN] Runtime returned empty or ignored response`);
+              console.log(`[DIRECT-DEBUG] Empty response after cleaning, not sending`);
+              this.logger.warn(`[PLUGIN] Empty response after cleaning (NONE) tag, not sending`);
             }
           } else {
-            this.logger.info(`${this.name}: Plugin layer decided not to respond`);
+            console.log(`[DIRECT-DEBUG] No text in response, not sending`);
+            this.logger.warn(`[PLUGIN] Runtime returned response with no text`);
           }
-        } else {
-          this.logger.info(`${this.name}: LLM decided not to respond to message`);
+        } catch (error) {
+          console.log(`[DIRECT-DEBUG] Error getting response: ${error.message}`);
+          this.logger.error(`Error getting response from runtime: ${error.message}`);
         }
-      } catch (error) {
-        this.logger.error(`${this.name}: Error processing message: ${error.message}`);
+      } else {
+        console.log(`[DIRECT-DEBUG] Decided not to respond to this message`);
+        this.logger.info(`${this.name}: Decided not to respond to message`);
       }
     } catch (error) {
+      console.log(`[DIRECT-DEBUG] Error handling incoming message: ${error.message}`);
       this.logger.error(`${this.name}: Error handling incoming message: ${error.message}`);
     }
   }

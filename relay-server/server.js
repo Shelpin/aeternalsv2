@@ -246,7 +246,7 @@ app.post('/sendMessage', (req, res) => {
   // Enhanced debugging for message relay
   logWithTime(`➡️ Incoming relay message ${JSON.stringify(req.body)}`);
   
-  const { agent_id, chat_id, text } = req.body;
+  const { agent_id, chat_id, text, telegram_message } = req.body;
   
   if (!agent_id || !chat_id || !text) {
     logWithTime(`❌ SendMessage failed: Missing required parameters`);
@@ -266,42 +266,65 @@ app.post('/sendMessage', (req, res) => {
     return res.json({ success: false, error: 'Agent not registered' });
   }
   
-  // Create a message object
-  const message = {
-    update_id: updateId++,
-    message: {
-      message_id: Math.floor(Math.random() * 1000000),
-      from: {
-        id: parseInt(agent_id.replace(/\D/g, ''), 10) || 12345,
-        is_bot: true,
-        first_name: agent_id,
-        username: agent_id
-      },
-      chat: {
-        id: parseInt(chat_id, 10),
-        type: 'group',
-        title: 'Test Group'
-      },
-      date: Math.floor(Date.now() / 1000),
-      text: text,
-      sender_agent_id: agent_id
-    }
-  };
+  // Create a message object - use telegram_message if provided or create a new one
+  let message;
   
+  if (telegram_message) {
+    // Use provided message but add necessary fields
+    message = {
+      update_id: updateId++,
+      message: {
+        ...telegram_message,
+        sender_agent_id: agent_id  // Ensure correct sender is identified
+      }
+    };
+    
+    logWithTime(`📩 Using provided Telegram message structure from ${agent_id}`);
+  } else {
+    // Create a message object from scratch
+    message = {
+      update_id: updateId++,
+      message: {
+        message_id: Math.floor(Math.random() * 1000000),
+        from: {
+          id: parseInt(agent_id.replace(/\D/g, ''), 10) || 12345,
+          is_bot: true,
+          first_name: agent_id,
+          username: agent_id + "_bot",  // Ensure username has _bot suffix for Telegram format
+          is_bot: true
+        },
+        chat: {
+          id: chat_id,
+          type: 'group',
+          title: 'Telegram Group'
+        },
+        date: Math.floor(Date.now() / 1000),
+        text: text,
+        sender_agent_id: agent_id
+      }
+    };
+  }
+
+  // Log the message
   logWithTime(`💬 Message from ${agent_id}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
   
   // Add message to all other agents' queues
+  let recipientCount = 0;
   for (const [id, messages] of messageQueue.entries()) {
-    if (id !== agent_id) {
+    if (id !== agent_id) {  // Don't send to self
       messages.push(message);
       logWithTime(`📤 Queued message for ${id} from ${agent_id}`);
       logWithTime(`🎯 Target agent resolved to: ${id}`);
+      recipientCount++;
     }
   }
   
+  logWithTime(`✅ Message queued for ${recipientCount} recipient(s)`);
+  
   return res.json({ 
     success: true, 
-    message_id: message.message.message_id 
+    message_id: message.message.message_id,
+    recipients: recipientCount
   });
 });
 
