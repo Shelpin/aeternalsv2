@@ -9,8 +9,8 @@
     "baseTypingSpeedCPM": 300,
     "randomVariation": 0.2
   ,
-  "heartbeatInterval": 10000
+  "heartbeatInterval": 10000,
 }
 ,
-  "heartbeatInterval": 10000
+  "heartbeatInterval": 10000,
 }

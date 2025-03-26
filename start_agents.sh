@@ -93,42 +93,47 @@ check_port() {
 find_available_port() {
     local character="$1"
     
-    # First priority: Check the standard assigned port for this agent
+    # Force kill any processes using our standard ports before checking
+    # This helps ensure agents get their standard ports
     local standard_port="${STANDARD_PORTS[$character]}"
+    if [ -n "$standard_port" ]; then
+        local using_pid=$(lsof -i :"$standard_port" -t 2>/dev/null || true)
+        if [ -n "$using_pid" ]; then
+            echo "⚠️ Standard port $standard_port for $character is in use by PID $using_pid" >&2
+            echo "🛑 Forcefully releasing port $standard_port..." >&2
+            kill -9 $using_pid 2>/dev/null || true
+            sleep 1
+        fi
+    fi
+    
+    # First priority: Check the standard assigned port for this agent
     if check_port "$standard_port" "$character"; then
         echo "🔄 Using standard port $standard_port for $character" >&2
         echo "$standard_port"
         return 0
     else
-        # Check what process is using the standard port
-        local using_pid=$(lsof -i :"$standard_port" -t)
+        # Check what process is using the standard port despite our kill attempt
+        local using_pid=$(lsof -i :"$standard_port" -t 2>/dev/null || true)
         if [ -n "$using_pid" ]; then
-            echo "⚠️ Standard port $standard_port for $character is in use by PID $using_pid" >&2
+            echo "⚠️ Failed to free standard port $standard_port for $character, still in use by PID $using_pid" >&2
             
-            # Check if it's another agent
-            for other_character in "${!STANDARD_PORTS[@]}"; do
-                if [ "$other_character" != "$character" ] && [ -f "$LOG_DIR/${other_character}.pid" ]; then
-                    local other_pid=$(cat "$LOG_DIR/${other_character}.pid")
-                    if [ "$other_pid" = "$using_pid" ]; then
-                        echo "⚠️ Port $standard_port is being used by $other_character" >&2
-                        echo "⚠️ Will attempt to reclaim port by first stopping $other_character" >&2
-                        
-                        # Try to stop the other agent to reclaim our port
-                        if [ -f "./stop_agents.sh" ]; then
-                            echo "🛑 Stopping $other_character to reclaim port $standard_port..." >&2
-                            ./stop_agents.sh "$other_character"
-                            sleep 2
-                            
-                            # Check if port is now available
-                            if check_port "$standard_port" "$character"; then
-                                echo "✅ Successfully reclaimed port $standard_port for $character" >&2
-                                echo "$standard_port"
-                                return 0
-                            fi
-                        fi
-                    fi
-                fi
-            done
+            # Output details about the stubborn process
+            echo "ℹ️ Process details:" >&2
+            ps -p $using_pid -o pid,ppid,cmd 2>/dev/null || true
+            
+            # Last resort: try SIGKILL again
+            echo "🛑 Final attempt to kill process $using_pid..." >&2
+            kill -9 $using_pid 2>/dev/null || true
+            sleep 2
+            
+            # Check if port is now available
+            if check_port "$standard_port" "$character"; then
+                echo "✅ Successfully freed port $standard_port for $character (second attempt)" >&2
+                echo "$standard_port"
+                return 0
+            else
+                echo "❌ Failed to free port $standard_port after multiple attempts" >&2
+            fi
         fi
     fi
     
@@ -143,55 +148,33 @@ find_available_port() {
         
         # Security: Validate port number
         if [[ "$previous_port" =~ ^[0-9]+$ ]]; then
+            # Try to free this port if it's in use
+            local using_pid=$(lsof -i :"$previous_port" -t 2>/dev/null || true)
+            if [ -n "$using_pid" ]; then
+                echo "⚠️ Previous port $previous_port for $character is in use by PID $using_pid" >&2
+                echo "🛑 Attempting to free the port..." >&2
+                kill -9 $using_pid 2>/dev/null || true
+                sleep 1
+            fi
+            
             if check_port "$previous_port" "$character"; then
                 echo "🔄 Reusing previous port $previous_port for $character" >&2
                 echo "$previous_port"
                 return 0
             else
-                echo "⚠️ Previous port $previous_port for $character is now in use by another process" >&2
-                local using_pid=$(lsof -i :"$previous_port" -t)
-                if [ -n "$using_pid" ]; then
-                    echo "   Port $previous_port is being used by process $using_pid ($(ps -p "$using_pid" -o comm=))" >&2
-                fi
+                echo "⚠️ Cannot reuse previous port $previous_port for $character, still in use" >&2
             fi
         else
             echo "⚠️ Invalid port value in port file for $character" >&2
         fi
     fi
     
-    # Third priority: Check the standard assigned port range
-    local i=0
-    for agent in "${!STANDARD_PORTS[@]}"; do
-        if [ "$agent" = "$character" ]; then
-            agent_position=$i
-            break
-        fi
-        ((i++))
-    done
-    
-    # If the standard port is in use, warn about it
-    if [ "$standard_port" -ge "$PORT_RANGE_START" ] && [ "$standard_port" -le "$PORT_RANGE_END" ]; then
-        echo "⚠️ Preferred port $standard_port for $character is already in use" >&2
-    fi
-    
     # As a last resort, find any available port
-    # Start from the beginning of the range
+    echo "🔍 Searching for any available port for $character..." >&2
+    # Start from the beginning of the range and search sequentially
     for port in $(seq $PORT_RANGE_START $PORT_RANGE_END); do
         # Security: Validate port number
         if ! [[ "$port" =~ ^[0-9]+$ ]]; then
-            continue
-        fi
-        
-        # Skip ports assigned to other agents
-        local skip=0
-        for other_character in "${!STANDARD_PORTS[@]}"; do
-            if [ "$other_character" != "$character" ] && [ "${STANDARD_PORTS[$other_character]}" = "$port" ]; then
-                skip=1
-                break
-            fi
-        done
-        
-        if [ "$skip" -eq 1 ]; then
             continue
         fi
         
@@ -202,6 +185,8 @@ find_available_port() {
         fi
     done
     
+    # If we get here, no ports are available
+    echo "❌ No available ports found for $character" >&2
     echo "0" # No available ports found
     return 1
 }

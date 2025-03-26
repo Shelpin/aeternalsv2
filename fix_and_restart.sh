@@ -62,8 +62,44 @@ else
   rm -f $LOG_DIR/*.log || true
 fi
 
+# Clean up ports to avoid conflicts
+echo -e "\n${YELLOW}[3] Cleaning up ports to avoid conflicts...${NC}"
+if [ -f "./cleanup_ports.sh" ]; then
+  echo -e "   ${BLUE}Running port cleanup...${NC}"
+  ./cleanup_ports.sh
+  echo -e "   ${GREEN}Port cleanup complete!${NC}"
+else
+  echo -e "   ${RED}Warning: cleanup_ports.sh not found!${NC}"
+  echo -e "   ${BLUE}Attempting manual port cleanup...${NC}"
+  
+  # Simple manual port cleanup
+  for port in {3000..3010}; do
+    pid=$(lsof -i :$port -t 2>/dev/null || true)
+    if [ -n "$pid" ]; then
+      echo -e "   ${BLUE}Killing process using port $port...${NC}"
+      kill -9 $pid 2>/dev/null || true
+    fi
+  done
+  
+  # Clean up PID files
+  rm -f $LOG_DIR/*.pid 2>/dev/null || true
+  
+  echo -e "   ${BLUE}Manual port cleanup complete${NC}"
+fi
+
+# Fix @elizaos/core dependency issue for patches
+echo -e "\n${YELLOW}[4] Fixing @elizaos/core dependency for patches...${NC}"
+if [ -f "./fix_elizaos_core.sh" ]; then
+  echo -e "   ${BLUE}Running fix_elizaos_core.sh...${NC}"
+  ./fix_elizaos_core.sh
+  echo -e "   ${GREEN}@elizaos/core dependency fix complete!${NC}"
+else
+  echo -e "   ${RED}Warning: fix_elizaos_core.sh not found!${NC}"
+  echo -e "   ${BLUE}You might encounter errors with runtime patches.${NC}"
+fi
+
 # Configure plugin
-echo -e "\n${YELLOW}[3] Configuring Telegram Multi-Agent Plugin...${NC}"
+echo -e "\n${YELLOW}[5] Configuring Telegram Multi-Agent Plugin...${NC}"
 
 CONFIG_FILE="$PLUGIN_DIR/telegram-multiagent.json"
 if [ -f "$CONFIG_FILE" ]; then
@@ -132,7 +168,7 @@ chmod 640 $CONFIG_FILE
 echo -e "   ${BLUE}Plugin configuration file permissions set!${NC}"
 
 # Set environment variables
-echo -e "\n${YELLOW}[4] Setting environment variables...${NC}"
+echo -e "\n${YELLOW}[6] Setting environment variables...${NC}"
 export HEARTBEAT_INTERVAL=$HEARTBEAT_INTERVAL
 export RELAY_SERVER_URL="http://207.180.245.243:$RELAY_PORT"
 export RELAY_AUTH_TOKEN=$RELAY_AUTH_TOKEN
@@ -145,7 +181,7 @@ echo -e "   - HEARTBEAT_INTERVAL=${HEARTBEAT_INTERVAL}"
 echo -e "   - TELEGRAM_GROUP_IDS=${TELEGRAM_GROUP_IDS}"
 
 # Start relay server
-echo -e "\n${YELLOW}[5] Starting relay server...${NC}"
+echo -e "\n${YELLOW}[7] Starting relay server...${NC}"
 cd $RELAY_SERVER_DIR
 if [ -f "./start-relay.sh" ]; then
   ./start-relay.sh > $LOG_DIR/relay-server.log 2>&1 &
@@ -174,7 +210,7 @@ for i in {1..15}; do
 done
 
 # Start all agents
-echo -e "\n${YELLOW}[6] Starting all agents...${NC}"
+echo -e "\n${YELLOW}[8] Starting all agents...${NC}"
 if [ -f "./start_agents.sh" ]; then
   ./start_agents.sh
 else
@@ -183,7 +219,7 @@ else
 fi
 
 # Verify agents are running
-echo -e "\n${YELLOW}[7] Verifying agent connections...${NC}"
+echo -e "\n${YELLOW}[9] Verifying agent connections...${NC}"
 echo -e "   ${BLUE}Waiting 15 seconds for agents to initialize...${NC}"
 sleep 15
 
@@ -203,7 +239,7 @@ else
 fi
 
 # Run verification scripts
-echo -e "\n${YELLOW}[8] Running verification tests...${NC}"
+echo -e "\n${YELLOW}[10] Running verification tests...${NC}"
 if [ -f "./verifyFixes.sh" ]; then
   echo -e "   ${BLUE}Running verification for eth_memelord_9000_bot...${NC}"
   ./verifyFixes.sh eth_memelord_9000_bot

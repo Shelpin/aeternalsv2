@@ -18,4 +18,4 @@ try {
 } catch (error) {
   console.error('❌ Error loading patches:', error);
   process.exit(1);
-} 
+}

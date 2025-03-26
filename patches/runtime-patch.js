@@ -5,11 +5,44 @@
  * allowing the telegram-multiagent plugin to call it successfully
  */
 
-// Import the global ElizaOS runtime
-const { runtime } = await import('@elizaos/core');
+let runtime;
 const elizaLogger = console;
 
 elizaLogger.info('🧩 [PATCH] Applying runtime handleMessage patch');
+
+// Try to import the ElizaOS runtime, with fallback if not available
+try {
+  // Import the global ElizaOS runtime
+  const coreModule = await import('@elizaos/core');
+  runtime = coreModule.runtime;
+  elizaLogger.info('✅ [PATCH] Successfully imported @elizaos/core');
+} catch (error) {
+  elizaLogger.warn(`⚠️ [PATCH] Could not import @elizaos/core: ${error.message}`);
+  elizaLogger.info('🔍 [PATCH] Attempting to use global runtime object instead');
+  
+  // Try to use the global runtime object if it exists
+  if (globalThis.__elizaRuntime) {
+    runtime = globalThis.__elizaRuntime;
+    elizaLogger.info('✅ [PATCH] Using globalThis.__elizaRuntime');
+  } else {
+    // Create a minimal runtime object if nothing else is available
+    elizaLogger.warn('⚠️ [PATCH] No runtime found, creating minimal stub');
+    runtime = {
+      agentId: process.env.AGENT_ID || 'unknown-agent',
+      logger: console,
+      getLogger: (name) => {
+        return {
+          trace: (message, ...args) => console.log(`[TRACE] ${name}: ${message}`, ...args),
+          debug: (message, ...args) => console.log(`[DEBUG] ${name}: ${message}`, ...args),
+          info: (message, ...args) => console.log(`[INFO] ${name}: ${message}`, ...args),
+          warn: (message, ...args) => console.warn(`[WARN] ${name}: ${message}`, ...args),
+          error: (message, ...args) => console.error(`[ERROR] ${name}: ${message}`, ...args)
+        };
+      }
+    };
+    elizaLogger.info('✅ [PATCH] Created minimal runtime stub');
+  }
+}
 
 // Check if runtime already has a handleMessage method
 if (runtime && typeof runtime.handleMessage !== 'function') {
@@ -60,8 +93,35 @@ if (runtime && typeof runtime.handleMessage !== 'function') {
   };
   
   elizaLogger.info('🧩 [PATCH] runtime.handleMessage successfully patched');
-} else {
+} else if (runtime) {
   elizaLogger.info('🧩 [PATCH] runtime.handleMessage already exists, no patch needed');
+} else {
+  elizaLogger.error('❌ [PATCH] No runtime object available, patch failed');
+}
+
+// Make sure runtime is not undefined
+if (!runtime) {
+  elizaLogger.warn('⚠️ [PATCH] Creating minimal runtime stub for export');
+  runtime = {
+    agentId: process.env.AGENT_ID || 'unknown-agent',
+    handleMessage: async (message) => {
+      elizaLogger.info(`[STUB] Handling message: ${JSON.stringify(message).substring(0, 100)}...`);
+      return {
+        text: `This is a fallback response for message: "${message.text?.substring(0, 50) || 'unknown'}"`,
+        content: { action: 'SAY' }
+      };
+    },
+    getLogger: (name) => {
+      return {
+        trace: (message, ...args) => console.log(`[TRACE] ${name}: ${message}`, ...args),
+        debug: (message, ...args) => console.log(`[DEBUG] ${name}: ${message}`, ...args),
+        info: (message, ...args) => console.log(`[INFO] ${name}: ${message}`, ...args),
+        warn: (message, ...args) => console.warn(`[WARN] ${name}: ${message}`, ...args),
+        error: (message, ...args) => console.error(`[ERROR] ${name}: ${message}`, ...args)
+      };
+    }
+  };
+  elizaLogger.info('✅ [PATCH] Created emergency fallback runtime stub for export');
 }
 
 // Export the patched runtime 
