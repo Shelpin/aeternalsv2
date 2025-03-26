@@ -72,6 +72,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private lastSpeaker: Map<string, string> = new Map();
   private recentSpeakers: Map<string, { agentId: string; time: number }[]> = new Map();
   private fallbackMemory: FallbackMemoryManager | null = null;
+  private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   
   /**
    * Create a new TelegramMultiAgentPlugin
@@ -97,6 +98,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     super(defaultLogger);
     
     console.log("[CONSTRUCTOR] TelegramMultiAgentPlugin: Constructor called");
+    
+    // VALHALLA FIX: Set agentId from environment variable if available
+    // This is our canonical agent ID throughout the plugin
+    if (process.env.AGENT_ID) {
+      this.agentId = process.env.AGENT_ID;
+      console.log(`[CONSTRUCTOR] Using AGENT_ID from environment: ${this.agentId}`);
+    }
     
     // Only set basic config here, don't do any initialization
     this.config = {
@@ -133,25 +141,43 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         return this;
       }
       
-      // Store agentId immediately if available
-      try {
-        if (typeof runtime.getAgentId === 'function') {
-          this.agentId = runtime.getAgentId();
-          console.log(`[REGISTER] ${this.name}: Got agent ID during registration: ${this.agentId}`);
-        }
-      } catch (error) {
-        console.warn(`[REGISTER] ${this.name}: Could not get agent ID during registration: ${error.message}`);
-      }
+      // VALHALLA FIX: Override agent ID with environment or Telegram username
+      this.agentId = process.env.AGENT_ID || 
+                     runtime.client?.telegram?.botInfo?.username || 
+                     runtime.getAgentId();
       
-      // Register onMessage handler
-      if (runtime.onMessage) {
-        runtime.onMessage(async (message) => {
-          this.logger.info(`[PLUGIN] Received message from relay: ${JSON.stringify(message)}`);
-          await this.handleIncomingMessage(message);
+      this.logger.info(`[IDENTITY] Using canonical agent ID: ${this.agentId}`);
+      
+      // VALHALLA FIX: Hook into ElizaOS core's message events with enhanced logging
+      if (runtime.client?.telegram) {
+        runtime.client.telegram.on('message', async (message) => {
+          // Enhanced message logging
+          this.logger.info(`[RECEIVE] From ${message.from.username} | Text: ${message.text}`);
+          
+          // Convert Telegram message to our RelayMessage format
+          const relayMessage = {
+            message_id: message.message_id,
+            from: message.from,
+            chat: message.chat,
+            date: message.date,
+            text: message.text || '',
+            sender_agent_id: message.from.username
+          };
+          
+          // Log message journey
+          this.logger.debug(`[FLOW] Message journey:
+            Source: Telegram
+            Stage: Core Client Reception
+            From: ${message.from.username}
+            To: ${this.agentId}
+            Text: ${message.text?.substring(0, 50)}...
+          `);
+          
+          await this.handleIncomingMessage(relayMessage);
         });
-        this.logger.info(`[PLUGIN] Registered onMessage handler`);
+        this.logger.info(`[PLUGIN] Hooked into ElizaOS Telegram client message events`);
       } else {
-        console.warn(`[REGISTER] ${this.name}: runtime.onMessage not available, relay messages may not be received`);
+        this.logger.warn(`[REGISTER] ${this.name}: ElizaOS Telegram client not available`);
       }
       
       return this;
@@ -243,28 +269,29 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    * This will be called by ElizaOS after the plugin is loaded
    */
   async initialize(): Promise<void> {
-    // Add clear verification logging
-    console.log("[INIT] Plugin initialize() called");
-    
-    // Return existing promise if initialization already started
-    if (this.initializePromise) {
-      return this.initializePromise;
+    try {
+      this.logger.info(`[PLUGIN] Initializing ${this.name}`);
+      
+      // Initialize conversation manager
+      await this.conversationManager.initialize();
+      
+      // VALHALLA FIX: No need to start polling, ElizaOS core handles it
+      this.logger.info(`[PLUGIN] ${this.name} initialized successfully`);
+      
+      // Send initial heartbeat to relay
+      await this.sendHeartbeat();
+      
+      // Start heartbeat interval
+      this.heartbeatInterval = setInterval(() => {
+        this.sendHeartbeat().catch(error => {
+          this.logger.error(`[PLUGIN] Failed to send heartbeat: ${error.message}`);
+        });
+      }, 30000); // Every 30 seconds
+      
+    } catch (error) {
+      this.logger.error(`[PLUGIN] Failed to initialize ${this.name}: ${error.message}`);
+      throw error;
     }
-    
-    // Log plugin startup state
-    console.log(`[${this.name}] Plugin initialize() called`);
-    console.log(`[${this.name}] Runtime reference exists: ${this.runtime !== null}`);
-    if (this.runtime) {
-      console.log(`[${this.name}] Runtime methods availability check:`);
-      console.log(`[${this.name}] - getAgentId: ${typeof this.runtime.getAgentId === 'function' ? 'available' : 'NOT AVAILABLE'}`);
-      console.log(`[${this.name}] - getLogger: ${typeof this.runtime.getLogger === 'function' ? 'available' : 'NOT AVAILABLE'}`);
-      console.log(`[${this.name}] - memoryManager: ${this.runtime.memoryManager ? 'exists' : 'NOT AVAILABLE'}`);
-      console.log(`[${this.name}] - handleMessage: ${typeof this.runtime.handleMessage === 'function' ? 'available' : 'NOT AVAILABLE'}`);
-    }
-    
-    // Create a new initialization promise
-    this.initializePromise = this._initialize();
-    return this.initializePromise;
   }
   
   /**
@@ -343,10 +370,36 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       }
       
       // Log initialization start
-      this.logger.info(`${this.name}: Initializing plugin...`);
+      this.logger.info(`${this.name}: Initializing (v0.25.9)...`);
       
-      // Step 1: Load configuration (independent of runtime)
+      // Load configuration
       await this.loadConfig();
+      
+      // Add debugging route (Agent HTTP Exposure - from reviewed action plan)
+      if (globalThis.__elizaRuntime?.app) {
+        const app = globalThis.__elizaRuntime.app;
+        app.get('/status', (req, res) => {
+          const status = {
+            plugin: this.name,
+            version: '0.25.9',
+            agent_id: this.getAgentIdSafe(),
+            initialized: this.initialized,
+            relay_connected: this.relay?.isConnected() || false,
+            known_agents: Array.from(this.knownAgents),
+            config: {
+              relay_url: this.config.relayServerUrl,
+              enabled: this.config.enabled,
+              group_ids: this.config.groupIds
+            }
+          };
+          res.json(status);
+          this.logger.info(`[HTTP] Status endpoint accessed: ${JSON.stringify(status)}`);
+        });
+        
+        this.logger.info(`[HTTP] Added /status endpoint for diagnostics`);
+      } else {
+        this.logger.warn(`[HTTP] Cannot add status endpoint: app not available`);
+      }
       
       // Step 2: Wait for runtime with maximum timeout
       // This will throw an error if the runtime cannot be obtained in time
@@ -396,64 +449,41 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       
       this.logger.info(`[RELAY] Will register agent ${this.agentId}`);
       
-      // Initialize relay with safe agent ID
+      // CRITICAL FIX: Prior to passing to TelegramRelay, ensure we're using the Telegram bot's
+      // username format, not the UUID, for agent ID
+      let telegramAgentId = this.agentId;
+      
+      // First try getting from environment variables
+      if (process.env.TELEGRAM_BOT_USERNAME) {
+        telegramAgentId = process.env.TELEGRAM_BOT_USERNAME;
+        this.logger.info(`[RELAY] Using TELEGRAM_BOT_USERNAME: ${telegramAgentId}`);
+      } else if (process.env.AGENT_ID) {
+        const agentIdFromEnv = process.env.AGENT_ID;
+        telegramAgentId = agentIdFromEnv.endsWith('_bot') ? agentIdFromEnv : `${agentIdFromEnv}_bot`;
+        this.logger.info(`[RELAY] Using derived bot username from AGENT_ID: ${telegramAgentId}`);
+      }
+      
+      this.logger.info(`[IDENTITY] Agent ID for relay registration: ${telegramAgentId}`);
+      
+      // VALHALLA FIX: Override this.agentId with telegramAgentId to ensure consistency
+      // This ensures all further operations use the same ID format
+      this.agentId = telegramAgentId;
+      this.logger.info(`[IDENTITY] Setting canonical agent ID to: ${this.agentId}`);
+      
+      // Initialize relay with explicit Telegram bot username
       this.relay = new TelegramRelay({
         relayServerUrl: this.config.relayServerUrl,
         authToken: this.config.authToken,
-        agentId: this.agentId 
+        agentId: telegramAgentId 
       }, this.logger);
       
-      this.logger.info(`[RELAY] Agent ${this.agentId} relay instance created`);
+      this.logger.info(`[RELAY] Agent ${telegramAgentId} relay instance created`);
       
       // Set up relay message handling
       this.relay.onMessage(this.handleIncomingMessage.bind(this));
       
-      // VALHALLA FIX: Set up message polling interval
-      this.logger.info(`[PLUGIN] Starting internal message poller for agent ${this.agentId}`);
-      
-      setInterval(async () => {
-        try {
-          if (!this.relay) {
-            this.logger.warn('[PLUGIN] Relay not initialized for polling');
-            return;
-          }
-          
-          // Try to get available agents to verify connection
-          const availableAgents = await this.relay.getAvailableAgents();
-          this.logger.debug(`[PLUGIN] Active agents from relay: ${availableAgents.join(', ')}`);
-          
-          // Poll for new messages - FIXED: Using correct getUpdates endpoint
-          const response = await fetch(`${this.config.relayServerUrl}/getUpdates?agent_id=${this.agentId}&offset=0`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${this.config.authToken}`
-            }
-          });
-          
-          if (!response.ok) {
-            this.logger.warn(`[PLUGIN] Failed to poll messages: ${response.status} ${response.statusText}`);
-            return;
-          }
-          
-          const data = await response.json();
-          
-          if (data.messages && data.messages.length > 0) {
-            this.logger.info(`[PLUGIN] Found ${data.messages.length} new messages via polling`);
-            
-            for (const update of data.messages) {
-              this.logger.info(`[PLUGIN] Processing polled message: "${update.message?.text?.substring(0, 50)}..."`);
-              if (update.message) {
-                await this.handleIncomingMessage(update.message);
-              }
-            }
-          }
-        } catch (error) {
-          this.logger.error(`[PLUGIN] Error in relay polling: ${error.message}`);
-        }
-      }, 2000);
-      
-      // Start Telegram polling to get messages directly from Telegram API
-      this.startTelegramPolling();
+      // VALHALLA FIX: Remove custom Telegram polling and rely on ElizaOS core
+      this.logger.info(`[PLUGIN] Using ElizaOS core for Telegram polling`);
       
       // Connect to relay
       await this.relay.connect();
@@ -464,176 +494,6 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.logger.error(`${this.name}: Initialization failed: ${error.message}`);
       throw error;
     }
-  }
-  
-  /**
-   * Telegram polling to get updates directly from Telegram API
-   * This enables the bot to see messages from users in the Telegram group
-   */
-  private startTelegramPolling(): void {
-    this.logger.info(`[TELEGRAM] Starting Telegram API polling for agent ${this.agentId}`);
-    
-    // Find the bot token for this agent
-    let botToken = this.findBotToken();
-    
-    if (!botToken) {
-      this.logger.error(`[TELEGRAM] No bot token found for agent ${this.agentId}, cannot start Telegram polling`);
-      return;
-    }
-    
-    this.logger.info(`[TELEGRAM] Found bot token for ${this.agentId}, starting polling`);
-    
-    // Get initial offset from last update ID
-    let updateOffset = 0;
-    
-    // Start polling interval
-    setInterval(async () => {
-      try {
-        // Poll Telegram API for updates
-        const response = await fetch(`https://api.telegram.org/bot${botToken}/getUpdates?offset=${updateOffset}&timeout=10`, {
-          method: 'GET'
-        });
-        
-        if (!response.ok) {
-          this.logger.warn(`[TELEGRAM] Failed to poll Telegram API: ${response.status} ${response.statusText}`);
-          return;
-        }
-        
-        const data = await response.json();
-        
-        if (!data.ok) {
-          this.logger.error(`[TELEGRAM] Telegram API error: ${data.description}`);
-          return;
-        }
-        
-        if (data.result && data.result.length > 0) {
-          this.logger.info(`[TELEGRAM] Received ${data.result.length} updates from Telegram API`);
-          
-          for (const update of data.result) {
-            // Update offset to acknowledge this update
-            updateOffset = Math.max(updateOffset, update.update_id + 1);
-            
-            // Process message if present
-            if (update.message) {
-              const message = update.message;
-              this.logger.info(`[TELEGRAM] Processing message from Telegram: "${message.text?.substring(0, 50) || '[no text]'}"`);
-              
-              // Skip messages from this bot to avoid loops
-              if (message.from && message.from.username === this.getBotUsernameFromId(this.agentId)) {
-                this.logger.debug(`[TELEGRAM] Skipping message from self`);
-                continue;
-              }
-              
-              // Forward the message to the relay server
-              if (this.relay) {
-                try {
-                  // Create a RelayMessage structure
-                  const relayMessage = {
-                    message_id: message.message_id,
-                    from: message.from,
-                    chat: message.chat,
-                    date: message.date,
-                    text: message.text || '',
-                    sender_agent_id: message.from.username  // Use Telegram username as agent ID
-                  };
-                  
-                  // Forward to relay server to distribute to other bots
-                  await fetch(`${this.config.relayServerUrl}/sendMessage`, {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${this.config.authToken}`
-                    },
-                    body: JSON.stringify({
-                      agent_id: this.agentId,
-                      chat_id: message.chat.id,
-                      text: message.text || '',
-                      telegram_message: relayMessage  // Include the full message for context
-                    })
-                  });
-                  
-                  this.logger.info(`[TELEGRAM] Forwarded message to relay server`);
-                  
-                  // Also process this message locally
-                  await this.handleIncomingMessage(relayMessage);
-                } catch (error) {
-                  this.logger.error(`[TELEGRAM] Error forwarding message to relay: ${error.message}`);
-                }
-              }
-            }
-          }
-        }
-      } catch (error) {
-        this.logger.error(`[TELEGRAM] Error polling Telegram API: ${error.message}`);
-      }
-    }, 2000);  // Poll every 2 seconds
-  }
-  
-  /**
-   * Find the bot token for this agent
-   */
-  private findBotToken(): string | null {
-    // Try to find token in environment variables
-    const possibleEnvVars = [
-      `TELEGRAM_BOT_TOKEN_${this.agentId.toUpperCase()}`,
-      `TELEGRAM_BOT_TOKEN_${this.agentId}`,
-      `BOT_TOKEN_${this.agentId.toUpperCase()}`,
-      `BOT_TOKEN_${this.agentId}`
-    ];
-    
-    // Also check for specific bot tokens by patterns
-    const possibleBotNames = [
-      "BitcoinMaxi420", "ETHMemeLord9000", "CodeSamurai77", 
-      "BagFlipper9000", "VCShark99", "LindaEvangelista88",
-      "bitcoin_maxi_420", "eth_memelord_9000", "code_samurai_77",
-      "bag_flipper_9000", "vc_shark_99", "linda_evangelista_88"
-    ];
-    
-    for (const botName of possibleBotNames) {
-      if (this.agentId.toLowerCase().includes(botName.toLowerCase()) || 
-          botName.toLowerCase().includes(this.agentId.toLowerCase())) {
-        possibleEnvVars.push(`TELEGRAM_BOT_TOKEN_${botName}`);
-        possibleEnvVars.push(`BOT_TOKEN_${botName}`);
-      }
-    }
-    
-    this.logger.debug(`[TELEGRAM] Looking for token in env vars: ${possibleEnvVars.join(', ')}`);
-    
-    for (const envVar of possibleEnvVars) {
-      if (process.env[envVar]) {
-        this.logger.debug(`[TELEGRAM] Found token in ${envVar}`);
-        return process.env[envVar];
-      }
-    }
-    
-    // Hardcoded fallbacks for testing - REMOVE IN PRODUCTION
-    if (this.agentId.includes('linda') || this.agentId.includes('evangelista')) {
-      this.logger.debug(`[TELEGRAM] Using hardcoded token for linda_evangelista_88`);
-      return process.env.TELEGRAM_BOT_TOKEN_LindaEvangelista88;
-    }
-    
-    if (this.agentId.includes('vc_shark') || this.agentId.includes('vcshark')) {
-      this.logger.debug(`[TELEGRAM] Using hardcoded token for vc_shark_99`);
-      return process.env.TELEGRAM_BOT_TOKEN_VCShark99;
-    }
-    
-    this.logger.error(`[TELEGRAM] No bot token found for agent ${this.agentId}`);
-    this.logger.debug(`[TELEGRAM] Available env vars: ${Object.keys(process.env).filter(k => k.includes('TELEGRAM_BOT_TOKEN')).join(', ')}`);
-    
-    return null;
-  }
-
-  /**
-   * Convert agent ID to bot username format
-   */
-  private getBotUsernameFromId(agentId: string): string {
-    // If already ends with _bot, return as is
-    if (agentId.endsWith('_bot')) {
-      return agentId;
-    }
-    
-    // Otherwise add _bot suffix
-    return `${agentId}_bot`;
   }
   
   /**
@@ -768,7 +628,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         this.logger.debug(`${this.name}: Group ${groupId} conversation active: ${isActive}`);
         
         // If we have a kickstarter for this group, update it
-        const kickstarter = this.kickstarters.get(groupId);
+        const groupIdStr = groupId.toString();
+        const kickstarter = this.kickstarters.get(groupIdStr);
         if (kickstarter) {
           // Check if kickstarter needs to be activated/deactivated
           if (isActive) {
@@ -786,117 +647,43 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   }
   
   /**
-   * Handle an incoming message from the relay server
-   * This is called when a message is received from Telegram via the relay
-   * 
-   * @param message - The incoming message
+   * Handle an incoming message from Telegram or Relay
    */
-  private async handleIncomingMessage(message: RelayMessage): Promise<void> {
+  async handleIncomingMessage(message: RelayMessage): Promise<void> {
     try {
-      // Log entry to this method for debugging
-      this.logger.info(`[PLUGIN] handleIncomingMessage triggered for message ID: ${message.message_id}`);
-      console.log(`[DIRECT-DEBUG] Received message: ${JSON.stringify(message)}`);
+      // First, log the received message with truncation to avoid huge logs
+      this.logger.debug(`[PLUGIN] Received message: ${JSON.stringify(message).substring(0, 300)}...`, '', '');
       
-      // Ensure we have a runtime
+      const { message_id, from, chat, text, sender_agent_id } = message;
+      const groupId = chat.id.toString();
+      
+      // VALHALLA FIX: Normalize agent IDs for comparison
+      const normalizedSenderId = (sender_agent_id || from.username || '').toLowerCase();
+      const normalizedAgentId = this.agentId.toLowerCase();
+      
+      // Add to known agents list with normalized ID
+      if (sender_agent_id && !this.knownAgents.has(normalizedSenderId)) {
+        this.knownAgents.add(normalizedSenderId);
+        this.logger.info(`[PLUGIN] Added new known agent: ${sender_agent_id}`);
+      }
+      
+      // Skip if message is from self (using normalized comparison)
+      if (normalizedSenderId === normalizedAgentId) {
+        this.logger.info(`[PLUGIN] Skipping message from self (${normalizedSenderId})`);
+        return;
+      }
+      
+      // Get runtime for message handling
       const runtime = await this.waitForRuntime();
       
-      // Extract relevant fields from the message
-      const { message_id, from, chat, date, text } = message;
-      const sender_agent_id = message.sender_agent_id || null;
-      
-      // Get this agent's ID
-      const myAgentId = this.getAgentIdSafe();
-      
-      // Log the received message
-      this.logger.info(`[PLUGIN] Received message from ${from?.username || 'unknown'} in chat ${chat?.id || 'unknown'}: "${text?.substring(0, 50) || ''}${text?.length > 50 ? '...' : ''}"`);
-      console.log(`[DIRECT-DEBUG] My agent ID: ${myAgentId}, Sender agent ID: ${sender_agent_id}`);
-      
-      // Skip if the message is from self
-      if (sender_agent_id === myAgentId) {
-        this.logger.debug(`[PLUGIN] Ignoring message from self: ${sender_agent_id}`);
-        console.log(`[DIRECT-DEBUG] Skipping message from self`);
-        return;
-      }
-      
-      // Format group ID consistently as a string
-      const groupId = String(chat.id);
-      this.logger.debug(`[PLUGIN] Formatted incoming chatId: ${groupId}`);
-      
-      // Log configured group IDs for debugging
-      const configuredGroupIds = (this.config.groupIds || []).map(id => String(id));
-      this.logger.debug(`[PLUGIN] Configured group IDs: ${JSON.stringify(configuredGroupIds)}`);
-      
-      // Check if we're running with environment variable group IDs
-      const envGroupIds = process.env.TELEGRAM_GROUP_IDS ? 
-        process.env.TELEGRAM_GROUP_IDS.split(',').map(id => id.trim()) : [];
-      
-      if (envGroupIds.length > 0) {
-        this.logger.debug(`[PLUGIN] Environment group IDs: ${JSON.stringify(envGroupIds)}`);
-        
-        // Add environment group IDs to our configuration
-        if (!this.config.groupIds || this.config.groupIds.length === 0) {
-          this.config.groupIds = envGroupIds;
-          this.logger.info(`[PLUGIN] Using group IDs from environment: ${envGroupIds.join(', ')}`);
-        }
-      }
-      
-      // If no group IDs are configured at all, use the current message's groupId
-      if (!this.config.groupIds || this.config.groupIds.length === 0) {
-        this.logger.warn(`[PLUGIN] No group IDs configured, using current message's group ID: ${groupId}`);
-        this.config.groupIds = [groupId];
-      }
-      
-      // Normalize all group IDs to strings
-      const normalizedGroupIds = (this.config.groupIds || []).map(id => String(id));
-      
-      // Skip if this is not a configured group
-      if (!normalizedGroupIds.includes(groupId)) {
-        this.logger.debug(`[PLUGIN] Ignoring message from unconfigured group ${groupId}, allowed groups: ${normalizedGroupIds.join(', ')}`);
-        console.log(`[DIRECT-DEBUG] Skipping message from unconfigured group ${groupId}`);
-        return;
-      }
-      
-      // Process bot messages if they are from known bots
-      if (from?.is_bot) {
-        this.logger.debug(`[PLUGIN] Message is from bot: ${from.username}`);
-        console.log(`[DIRECT-DEBUG] Message is from bot: ${from.username}`);
-        
-        // Allow messages from known bots to be processed
-        const knownBots = [
-          // Bot names
-          "LindaBot", "VCSharkBot", "BitcoinMaxiBot", "BagFlipperBot", "CodeSamuraiBot", "ETHMemeLordBot",
-          // Agent IDs
-          "linda_evangelista_88", "vc_shark_99", "bitcoin_maxi_420", "bag_flipper_9000", "code_samurai_77", "eth_memelord_9000",
-          // Usernames with _bot suffix
-          "linda_evangelista_88_bot", "vc_shark_99_bot", "bitcoin_maxi_420_bot", "bag_flipper_9000_bot", "code_samurai_77_bot", "eth_memelord_9000_bot"
-        ];
-        
-        // Check both username and sender_agent_id for known bots
-        const isKnownBot = knownBots.some(bot => 
-          (from.username && (from.username.includes(bot) || from.username === bot)) ||
-          (sender_agent_id && (sender_agent_id.includes(bot) || sender_agent_id === bot))
-        );
-        
-        this.logger.debug(`[PLUGIN] Bot message evaluation - Username: ${from.username}, Agent ID: ${sender_agent_id}`);
-        this.logger.debug(`[PLUGIN] Is known bot: ${isKnownBot}`);
-        console.log(`[DIRECT-DEBUG] Is known bot: ${isKnownBot} (Username: ${from.username}, Agent ID: ${sender_agent_id})`);
-        
-        if (!isKnownBot) {
-          this.logger.debug(`[PLUGIN] Ignoring message from unknown bot: ${from.username || sender_agent_id}`);
-          console.log(`[DIRECT-DEBUG] Skipping message from unknown bot`);
-          return;
-        }
-        this.logger.debug(`[PLUGIN] Processing message from known bot: ${from.username || sender_agent_id}`);
-        console.log(`[DIRECT-DEBUG] Processing message from known bot: ${from.username || sender_agent_id}`);
-      }
-      
-      // Record the message in the conversation manager
+      // Record this message in conversation manager
       try {
         await this.conversationManager.recordMessage(
           groupId,
           sender_agent_id || from.username,
-          text
+          text || ''
         );
+        
         this.logger.debug(`Recorded message in conversation manager`);
       } catch (error) {
         this.logger.error(`Failed to record message in conversation manager: ${error.message}`);
@@ -942,72 +729,147 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         this.logger.error(`Failed to store message in memory: ${error.message}`);
       }
       
-      // IMPORTANT: Bypass all the complex decision logic for now to debug the core issue
-      // Simple 50% chance to respond to other bots
-      const shouldRespond = !from?.is_bot || (from?.is_bot && Math.random() > 0.5);
-      console.log(`[DIRECT-DEBUG] shouldRespond: ${shouldRespond}`);
+      // VALHALLA FIX: Check relay health before sending response
+      const relayHealthy = await this.ensureRelayConnection();
+      if (!relayHealthy) {
+        this.logger.warn(`[RELAY] Server unhealthy, message handling may be affected`);
+      }
       
-      if (shouldRespond) {
-        this.logger.info(`${this.name}: Will respond to message in group ${groupId}`);
-        console.log(`[DIRECT-DEBUG] Attempting to generate response...`);
+      // IMPORTANT: Now implement proper response decision logic
+      // Extract a canonical agent ID for clean comparison (normalized to lowercase)
+      const canonicalAgentId = this.agentId.toLowerCase().replace(/_/g, '');
+      const canonicalSenderId = (sender_agent_id || from.username || '').toLowerCase().replace(/_/g, '');
+      
+      // 1. Skip if message is from self
+      if (canonicalSenderId === canonicalAgentId) {
+        this.logger.info(`[PLUGIN] Skipping message from self (${canonicalSenderId})`);
+        return;
+      }
+      
+      // 2. Check if we should respond based on plugin logic
+      // Determine if this is a direct mention
+      const normalizedText = (text || '').toLowerCase();
+      const botMentions = [
+        `@${this.agentId.toLowerCase()}`,
+        `@${this.agentId.toLowerCase()}_bot`,
+        this.agentId.toLowerCase()
+      ];
+      
+      const isDirect = botMentions.some(mention => normalizedText.includes(mention));
+      
+      // Higher chance to respond if it's a direct mention
+      let respondChance = isDirect ? 0.9 : 0.4;
+      
+      // Reduce chance if from another bot and not directly mentioned
+      if (from.is_bot && !isDirect) {
+        respondChance = 0.3;
+      }
+      
+      const shouldRespond = Math.random() < respondChance;
+      
+      this.logger.info(`[PLUGIN] Message from ${from.is_bot ? 'bot' : 'user'} ${sender_agent_id || from.username}, ` + 
+                      `${isDirect ? 'is direct mention' : 'not direct'}, response chance: ${respondChance}, will respond: ${shouldRespond}`);
+      
+      if (!shouldRespond) {
+        this.logger.info(`[PLUGIN] Decided not to respond to this message`);
+        return;
+      }
+      
+      // If we get here, we've decided to respond
+      this.logger.info(`[PLUGIN] Will respond to message in group ${groupId}`);
         
-        try {
-          // Create a context object for the runtime
-          const context = {
-            roomId: groupId,
-            platform: 'telegram',
-            conversationType: 'group',
-            participantCount: this.knownAgents.size + 1, // Include self
-            messageHistory: await this.getMessageHistory(groupId)
-          };
-          
-          console.log(`[DIRECT-DEBUG] Calling runtime.handleMessage with context: ${JSON.stringify(context)}`);
-          console.log(`[DIRECT-DEBUG] Message text: "${text}"`);
-          console.log(`[DIRECT-DEBUG] Sender: ${sender_agent_id || from?.username}`);
-          
-          // Call the runtime to handle the message
-          const response = await runtime.handleMessage({
-            text: text || '',
-            userId: sender_agent_id || from?.username || 'unknown',
-            name: from?.first_name || 'Unknown',
-            context
-          });
-          
-          console.log(`[DIRECT-DEBUG] Got response from runtime: ${JSON.stringify(response)}`);
-          this.logger.info(`${this.name}: Got response from runtime, sending to Telegram`);
-          
-          // VALHALLA FIX: Always send response regardless of action as long as there's text
-          if (response?.text) {
-            // Remove any (NONE) tag from the end
-            let cleanedText = response.text;
-            if (cleanedText.toUpperCase().endsWith('(NONE)')) {
-              cleanedText = cleanedText.substring(0, cleanedText.length - 6).trim();
-              console.log(`[DIRECT-DEBUG] Removed (NONE) tag, cleaned text: "${cleanedText}"`);
+      try {
+        // Simulate typing for more natural feel
+        if (this.config.typingSimulation?.enabled) {
+          try {
+            // Find bot token
+            const botToken = this.findBotToken();
+            if (botToken) {
+              // Send typing indicator to Telegram
+              await fetch(`https://api.telegram.org/bot${botToken}/sendChatAction`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  chat_id: groupId,
+                  action: 'typing'
+                })
+              });
+              this.logger.debug(`[TELEGRAM] Sent typing indicator to group ${groupId}`);
+              
+              // Calculate a natural delay based on message length and typing speed
+              const baseTypingSpeed = this.config.typingSimulation.baseTypingSpeedCPM || 300; // chars per minute
+              const charsPerSecond = baseTypingSpeed / 60;
+              
+              // Simulate reading + thinking time plus typing time
+              // Randomize within a range for more natural feel
+              const randomFactor = 1 + (Math.random() * 0.4 - 0.2); // 0.8 to 1.2
+              const expectedMessageLength = 100; // Assume an average response length
+              
+              // Calculate reading delay + typing delay
+              const readingTimeMs = 1000; // 1 second base reading time
+              const typingTimeMs = (expectedMessageLength / charsPerSecond) * 1000;
+              
+              // Cap the delay to reasonable limits (2-8 seconds)
+              const totalDelayMs = Math.min(8000, Math.max(2000, (readingTimeMs + typingTimeMs) * randomFactor));
+              
+              this.logger.debug(`[TELEGRAM] Simulating ${Math.round(totalDelayMs)}ms typing delay`);
+              await new Promise(resolve => setTimeout(resolve, totalDelayMs));
             }
-            
-            if (cleanedText.length > 0) {
-              console.log(`[DIRECT-DEBUG] Sending response: "${cleanedText}"`);
-              this.logger.info(`[PLUGIN] Forcing relay send of content: "${cleanedText.substring(0, 50)}..."`);
-              await this.sendResponse(groupId, cleanedText);
-            } else {
-              console.log(`[DIRECT-DEBUG] Empty response after cleaning, not sending`);
-              this.logger.warn(`[PLUGIN] Empty response after cleaning (NONE) tag, not sending`);
-            }
-          } else {
-            console.log(`[DIRECT-DEBUG] No text in response, not sending`);
-            this.logger.warn(`[PLUGIN] Runtime returned response with no text`);
+          } catch (error) {
+            this.logger.warn(`[TELEGRAM] Error simulating typing: ${error.message}`);
+            // Continue execution even if typing simulation fails
           }
-        } catch (error) {
-          console.log(`[DIRECT-DEBUG] Error getting response: ${error.message}`);
-          this.logger.error(`Error getting response from runtime: ${error.message}`);
         }
-      } else {
-        console.log(`[DIRECT-DEBUG] Decided not to respond to this message`);
-        this.logger.info(`${this.name}: Decided not to respond to message`);
+        
+        // Create a context object for the runtime
+        const context = {
+          roomId: groupId,
+          platform: 'telegram',
+          conversationType: 'group',
+          participantCount: this.knownAgents.size + 1, // Include self
+          messageHistory: await this.getMessageHistory(groupId)
+        };
+        
+        this.logger.debug(`[PLUGIN] Calling runtime.handleMessage with context: ${JSON.stringify(context)}`, '', '');
+        
+        // Call the runtime to handle the message
+        const response = await runtime.handleMessage({
+          text: text || '',
+          userId: sender_agent_id || from?.username || 'unknown',
+          name: from?.first_name || 'Unknown',
+          context
+        });
+        
+        this.logger.debug(`[PLUGIN] Got response from runtime: ${JSON.stringify(response)}`, '', '');
+        
+        // VALHALLA FIX: Always send response regardless of action as long as there's text
+        if (response?.text) {
+          // Remove any (NONE) tag from the end
+          let cleanedText = response.text;
+          if (cleanedText.toUpperCase().endsWith('(NONE)')) {
+            cleanedText = cleanedText.substring(0, cleanedText.length - 6).trim();
+            this.logger.info(`[PLUGIN] Removed (NONE) tag, cleaned text: "${cleanedText}"`);
+          }
+          
+          const action = response.content?.action?.toUpperCase() || 'UNKNOWN';
+          if (action === 'NONE') {
+            this.logger.info(`[PLUGIN] Bypassing action=NONE to relay message`);
+          }
+          
+          if (cleanedText.length > 0) {
+            this.logger.info(`[PLUGIN] Forcing relay send of content: "${cleanedText.substring(0, 50)}..."`);
+            await this.sendResponse(groupId, cleanedText);
+          } else {
+            this.logger.warn(`[PLUGIN] Empty response after cleaning (NONE) tag, not sending`);
+          }
+        } else {
+          this.logger.warn(`[PLUGIN] Runtime returned response with no text`);
+        }
+      } catch (error) {
+        this.logger.error(`Error getting response from runtime: ${error.message}`);
       }
     } catch (error) {
-      console.log(`[DIRECT-DEBUG] Error handling incoming message: ${error.message}`);
-      this.logger.error(`${this.name}: Error handling incoming message: ${error.message}`);
+      this.logger.error(`[PLUGIN] Error handling incoming message: ${error.message}`);
     }
   }
   
@@ -1428,17 +1290,105 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    * @param groupId - The group ID
    * @param text - The message text to send
    */
-  private async sendResponse(groupId: string, text: string): Promise<void> {
+  private async sendResponse(groupId: string | number, text: string): Promise<void> {
     try {
       if (!this.relay) {
-        this.logger.error('Cannot send response: Relay server not initialized');
+        this.logger.error('[PLUGIN] Cannot send response: Relay server not initialized');
         return;
       }
       
-      await this.relay.sendMessage(groupId, text);
-      this.logger.info(`Sent response to group ${groupId}: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+      // First send to Telegram directly
+      const botToken = this.findBotToken();
+      if (botToken) {
+        try {
+          // Send to Telegram
+          const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: groupId,
+              text: text,
+              parse_mode: 'Markdown'
+            })
+          });
+          
+          if (!telegramResponse.ok) {
+            const errorText = await telegramResponse.text();
+            this.logger.error(`[TELEGRAM] Error sending message to Telegram: ${errorText}`);
+          } else {
+            const responseData = await telegramResponse.json();
+            if (responseData.ok) {
+              this.logger.info(`[TELEGRAM] Message sent to Telegram, message ID: ${responseData.result?.message_id}`);
+            }
+          }
+        } catch (error) {
+          this.logger.error(`[TELEGRAM] Error sending to Telegram: ${error.message}`);
+        }
+      } else {
+        this.logger.error('[TELEGRAM] No bot token found, cannot send to Telegram');
+      }
+      
+      // Then also send via relay to inform other bots
+      // Convert groupId to string if it's a number
+      const groupIdStr = groupId.toString();
+      await this.relay.sendMessage(groupIdStr, text);
+      this.logger.info(`[RELAY] Message forwarded to relay: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
+      
+      // Track this response to avoid immediate repeat responses
+      this.lastResponseTimes.set(groupIdStr, Date.now());
+      this.lastSpeaker.set(groupIdStr, this.agentId);
+      this.trackResponse(groupIdStr, this.agentId);
     } catch (error) {
-      this.logger.error(`Error sending response: ${error.message}`);
+      this.logger.error(`[PLUGIN] Error sending response: ${error.message}`);
+    }
+  }
+
+  /**
+   * Find the bot token for this agent
+   */
+  private findBotToken(): string | null {
+    // Each agent process should have its own TELEGRAM_BOT_TOKEN set by start_agents.sh
+    // The token lookup was changed to use a custom format, but we need to respect the
+    // multi-process architecture where each agent has its own process with its own
+    // TELEGRAM_BOT_TOKEN env var
+    
+    // First try the direct environment variable that should be set for each agent process
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      this.logger.info(`[TOKEN] Using process-specific TELEGRAM_BOT_TOKEN`);
+      return process.env.TELEGRAM_BOT_TOKEN;
+    }
+    
+    // Fallback to prefixed environment variables
+    const agentId = process.env.AGENT_ID;
+    if (agentId) {
+      const envVar = `TELEGRAM_BOT_TOKEN_${agentId}`;
+      this.logger.debug(`[TOKEN] Looking for token using AGENT_ID: ${envVar}`);
+      
+      if (process.env[envVar]) {
+        this.logger.info(`[TOKEN] Found token using AGENT_ID: ${envVar}`);
+        return process.env[envVar];
+      }
+    }
+    
+    // Log available token env vars for debugging
+    const tokenVars = Object.keys(process.env).filter(k => 
+      k.includes('TELEGRAM_BOT_TOKEN') || k.includes('BOT_TOKEN')
+    );
+    
+    this.logger.error(`[TOKEN] No bot token found for agent ${this.agentId}`);
+    this.logger.debug(`[TOKEN] Available token env vars: ${tokenVars.join(', ')}`);
+    
+    return null;
+  }
+
+  // Add relay health check method
+  private async ensureRelayConnection(): Promise<boolean> {
+    try {
+      const health = await fetch(`${this.config.relayServerUrl}/health`);
+      return health.ok;
+    } catch (e) {
+      this.logger.error(`Relay server unreachable: ${e.message}`);
+      return false;
     }
   }
 }

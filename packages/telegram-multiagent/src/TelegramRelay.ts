@@ -66,20 +66,38 @@ export class TelegramRelay {
     try {
       this.logger.info(`Registering agent ${this.config.agentId} with relay server`);
       
+      // VALHALLA FIX: Add more detailed logging for the registration request
+      const requestBody = {
+        agent_id: this.config.agentId,
+        token: this.config.authToken
+      };
+      
+      this.logger.debug(`[RELAY] Registration request: ${JSON.stringify({
+        url: `${this.config.relayServerUrl}/register`,
+        agent_id: this.config.agentId,
+        auth_token_length: this.config.authToken?.length || 0
+      })}`);
+      
+      // VALHALLA FIX: Explicitly ensure proper headers are set
+      const headers = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.config.authToken}`
+      };
+      
+      this.logger.debug(`[RELAY] Registration headers: Content-Type and Authorization (${this.config.authToken?.substring(0, 6)}****) set`);
+      
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/register`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.authToken}`
-          },
-          body: JSON.stringify({
-            agent_id: this.config.agentId,
-            token: this.config.authToken
-          })
-        }
+          headers,
+          body: JSON.stringify(requestBody)
+        },
+        8000 // 8 second timeout for registration
       );
+      
+      // Log full response status 
+      this.logger.debug(`[RELAY] Registration response status: ${response.status} ${response.statusText}`);
       
       if (!response.ok) {
         let errorDetails = '';
@@ -87,48 +105,59 @@ export class TelegramRelay {
           // Try to get more detailed error information
           const errorText = await response.text();
           errorDetails = errorText;
-          this.logger.error(`Registration error response: ${errorText}`);
+          this.logger.error(`[RELAY] Registration error response: ${errorText}`);
         } catch (e) {
-          this.logger.error(`Could not read error response: ${e.message}`);
+          this.logger.error(`[RELAY] Could not read error response: ${e.message}`);
         }
         
-        this.logger.error(`Failed to register agent with status ${response.status} ${response.statusText}: ${errorDetails}`);
+        this.logger.error(`[RELAY] Failed to register agent with status ${response.status} ${response.statusText}: ${errorDetails}`);
         return false;
       }
       
       // Try to parse response
       try {
         const data = await response.json();
-        if (!data.success) {
-          this.logger.error(`Registration failed: ${data.error || 'Unknown error'}`);
+        
+        // VALHALLA FIX: Log the full response data for debugging
+        this.logger.debug(`[RELAY] Registration response: ${JSON.stringify(data)}`);
+        
+        // VALHALLA FIX: Strictly check for success property
+        if (data.success !== true) {
+          this.logger.error(`[RELAY] Registration failed: Server returned success=${data.success}, error: ${data.error || 'Unknown error'}`);
           return false;
         }
         
-        this.logger.info(`[RELAY] Agent ${this.config.agentId} registered successfully`);
+        this.logger.info(`[RELAY] Agent ${this.config.agentId} registered successfully with response success=${data.success}`);
         
         // Log additional registration details if available
         if (data.agent_id) {
           this.logger.info(`[RELAY] Confirmed agent ID: ${data.agent_id}`);
+          
+          // VALHALLA FIX: Verify the returned agent_id matches what we sent
+          if (data.agent_id !== this.config.agentId) {
+            this.logger.warn(`[RELAY] Server registered a different agent ID than requested: ${data.agent_id} vs ${this.config.agentId}`);
+          }
         }
+        
         if (data.expires_at) {
           this.logger.info(`[RELAY] Registration expires at: ${new Date(data.expires_at).toISOString()}`);
         }
         
         return true;
       } catch (parseError) {
-        this.logger.error(`Error parsing registration response: ${parseError.message}`);
+        this.logger.error(`[RELAY] Error parsing registration response: ${parseError.message}`);
         return false;
       }
     } catch (error) {
-      this.logger.error(`Error registering agent: ${error.message}`);
+      this.logger.error(`[RELAY] Error registering agent: ${error.message}`);
       
       // Check if retry is possible
       if (this.connectionAttempts < this.maxConnectionAttempts) {
-        this.logger.info(`Registration retry ${this.connectionAttempts}/${this.maxConnectionAttempts} will be attempted shortly`);
+        this.logger.info(`[RELAY] Registration retry ${this.connectionAttempts}/${this.maxConnectionAttempts} will be attempted shortly`);
         return false;
       }
       
-      this.logger.error(`Maximum registration attempts (${this.maxConnectionAttempts}) reached, giving up`);
+      this.logger.error(`[RELAY] Maximum registration attempts (${this.maxConnectionAttempts}) reached, giving up`);
       return false;
     }
   }
@@ -146,6 +175,13 @@ export class TelegramRelay {
     if (!this.config.agentId) {
       this.logger.error('[RELAY] No agent ID provided, cannot connect');
       return false;
+    }
+    
+    // VALHALLA FIX: Ensure agent ID is lowercase for consistency with relay server
+    const agentIdForRegistration = this.config.agentId.toLowerCase();
+    if (agentIdForRegistration !== this.config.agentId) {
+      this.logger.info(`[RELAY] Converting agent ID to lowercase for registration: ${agentIdForRegistration}`);
+      this.config.agentId = agentIdForRegistration;
     }
     
     // Increment connection attempts counter
@@ -192,7 +228,7 @@ export class TelegramRelay {
         const healthData = await healthCheck.json();
         this.logger.info(`[RELAY] Health status: ${JSON.stringify(healthData)}`);
         if (healthData.agents) {
-          this.logger.info(`[RELAY] Current active agents: ${healthData.agents}`);
+          this.logger.info(`[RELAY] Current active agents: ${healthData.agents.join(', ') || 'none'}`);
         }
       } catch (e) {
         // Non-critical error, just continue
@@ -219,6 +255,27 @@ export class TelegramRelay {
       
       // Start update polling
       this.startUpdatePolling();
+      
+      // VALHALLA FIX: Verify registration with a health check
+      try {
+        const verifyResponse = await this.fetchWithTimeout(
+          `${this.config.relayServerUrl}/health`,
+          { method: 'GET' },
+          5000
+        );
+        
+        if (verifyResponse.ok) {
+          const verifyData = await verifyResponse.json();
+          if (verifyData.agents && verifyData.agents.includes(this.config.agentId)) {
+            this.logger.info(`[RELAY] Registration verified: Agent ${this.config.agentId} is listed in health check`);
+          } else {
+            this.logger.warn(`[RELAY] Registration anomaly: Agent ${this.config.agentId} not found in health check despite successful registration`);
+            this.logger.debug(`[RELAY] Health check agents: ${JSON.stringify(verifyData.agents || [])}`);
+          }
+        }
+      } catch (e) {
+        this.logger.warn(`[RELAY] Could not verify registration with health check: ${e.message}`);
+      }
       
       this.logger.info(`[RELAY] Agent ${this.config.agentId} connected and registered successfully`);
       return true;
@@ -669,5 +726,13 @@ export class TelegramRelay {
       this.logger.error(`Error fetching available agents: ${error.message}`);
       return [];
     }
+  }
+
+  /**
+   * Check if the relay server is connected
+   * @returns True if connected to the relay server, false otherwise
+   */
+  isConnected(): boolean {
+    return this.connected;
   }
 } 

@@ -107,12 +107,17 @@ export interface TelegramMultiAgentConfig {
   enabled?: boolean;
   relayServerUrl?: string;
   authToken?: string;
-  groupIds?: string[];
+  groupIds?: string[] | number[];
   dbPath?: string;
   logLevel?: string;
   conversationCheckIntervalMs?: number;
   maxRetries?: number;
   kickstarterConfig?: KickstarterConfig;
+  typingSimulation?: {
+    enabled: boolean;
+    baseTypingSpeedCPM: number;  // Characters per minute
+    randomVariation: number;     // Random factor (0.0-1.0)
+  };
 }
 
 /**

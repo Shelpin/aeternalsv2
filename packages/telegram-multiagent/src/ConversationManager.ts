@@ -11,10 +11,8 @@ import { FallbackMemoryManager } from './FallbackMemoryManager.js';
 
 // Conversation states
 enum ConversationState {
-  INACTIVE,
-  STARTING,
-  ACTIVE,
-  ENDING
+  ACTIVE = 'active',
+  INACTIVE = 'inactive'
 }
 
 /**
@@ -22,8 +20,10 @@ enum ConversationState {
  * using the ElizaOS memory system for persistent state tracking
  */
 export class ConversationManager extends PluginComponent {
+  private db: any | null;
   private memoryNamespace = 'telegram-multiagent';
   private fallbackMemory: FallbackMemoryManager | null = null;
+  private memoryManager: any | null = null;
   
   /**
    * Create a new ConversationManager
@@ -34,6 +34,13 @@ export class ConversationManager extends PluginComponent {
     super(logger);
     
     this.logger.info('ConversationManager: Created');
+    
+    // Create fallback memory manager
+    this.fallbackMemory = new FallbackMemoryManager();
+    this.logger.info('ConversationManager: Fallback memory manager created');
+    
+    // VALHALLA FIX: Add more detailed debug log about memory manager status
+    this.logger.debug("[MEMORY] Using fallback memory manager since runtime memory manager is not available yet");
   }
   
   /**
@@ -43,9 +50,18 @@ export class ConversationManager extends PluginComponent {
     this.logger.info('ConversationManager: Initializing');
     
     try {
-      // Create fallback memory manager
-      this.fallbackMemory = new FallbackMemoryManager();
-      this.logger.info('ConversationManager: Fallback memory manager created');
+      // VALHALLA FIX: Add specific logging for memory manager status
+      if (this.runtime) {
+        if (this.runtime.memoryManager) {
+          this.logger.info("[MEMORY] Found memory manager on runtime");
+        } else if (this.runtime.memoryManagers) {
+          this.logger.info("[MEMORY] Found memory managers collection on runtime");
+        } else {
+          this.logger.warn("[MEMORY] No memory manager found on runtime, using fallback");
+        }
+      } else {
+        this.logger.warn("[MEMORY] No runtime available, using fallback memory manager");
+      }
       
       await this.ensureMemoryNamespaceExists();
       this.logger.info('ConversationManager: Memory namespace initialized');

@@ -1,5 +1,8 @@
 import { IAgentRuntime, ElizaLogger } from './types.js';
 
+// Plugin version for logging purposes
+const PLUGIN_VERSION = "0.25.9";
+
 /**
  * Base class for plugin components that require runtime access
  */
@@ -24,24 +27,87 @@ export abstract class PluginComponent {
    * @param runtime - The agent runtime
    */
   setRuntime(runtime: IAgentRuntime): void {
-    this.runtime = runtime;
-    this.logger.debug(`Runtime reference set for ${this.constructor.name}`);
+    // Create runtime proxy using the adapter pattern
+    const runtimeProxy = new Proxy(runtime, this.createRuntimeProxyHandlers());
+    this.runtime = runtimeProxy;
+    
+    this.logger.info(`[PLUGIN] Runtime set for ${this.constructor.name} (Plugin v${PLUGIN_VERSION})`);
+    this.logger.debug(`[PLUGIN] Agent ID: ${this.getAgentIdSafe()}`);
     
     // Resolve any waiting promises
     if (this.waitingPromises.length > 0) {
       this.logger.debug(`Resolving ${this.waitingPromises.length} waiting promises`);
       for (const {resolve} of this.waitingPromises) {
-        resolve(runtime);
+        resolve(runtimeProxy);
       }
       this.waitingPromises = [];
     }
   }
   
   /**
-   * Create a runtime wrapper that adapts the actual runtime structure 
+   * Create runtime proxy handlers to adapt the actual runtime structure
    * to match the expected IAgentRuntime interface
    */
+  protected createRuntimeProxyHandlers(): ProxyHandler<any> {
+    return {
+      get: (target, prop, receiver) => {
+        // Handle getAgentId method
+        if (prop === 'getAgentId') {
+          return () => {
+            // Try to use direct property access first
+            if (typeof target.agentId === 'string' && target.agentId) {
+              return target.agentId;
+            }
+            
+            // Fall back to method if it exists
+            if (typeof target.getAgentId === 'function') {
+              return target.getAgentId();
+            }
+            
+            // Last resort
+            return "unknown-agent";
+          };
+        }
+        
+        // Handle getLogger method
+        if (prop === 'getLogger') {
+          return (name: string) => {
+            // If there's a logging system available, use it
+            const loggerService = target.logger || target.loggerService;
+            if (loggerService?.getLogger) {
+              return loggerService.getLogger(name);
+            }
+            
+            // Fallback to console logging
+            return {
+              trace: (message: string, ...args: any[]) => console.log(`[TRACE][${name}]: ${message}`, ...args),
+              debug: (message: string, ...args: any[]) => console.log(`[DEBUG][${name}]: ${message}`, ...args),
+              info: (message: string, ...args: any[]) => console.log(`[INFO][${name}]: ${message}`, ...args),
+              warn: (message: string, ...args: any[]) => console.warn(`[WARN][${name}]: ${message}`, ...args),
+              error: (message: string, ...args: any[]) => console.error(`[ERROR][${name}]: ${message}`, ...args)
+            };
+          };
+        }
+        
+        // Passthrough for properties and methods that exist
+        if (prop in target) {
+          const value = target[prop];
+          return typeof value === 'function' ? value.bind(target) : value;
+        }
+        
+        return undefined;
+      }
+    };
+  }
+  
+  /**
+   * Create a runtime wrapper that adapts the actual runtime structure 
+   * to match the expected IAgentRuntime interface
+   * @deprecated Use createRuntimeProxyHandlers instead
+   */
   protected createRuntimeWrapper(runtime: any): IAgentRuntime {
+    this.logger.debug(`[PLUGIN] Creating runtime wrapper (legacy method)`);
+    
     // Create a wrapper that adapts the actual runtime structure to our expected interface
     return {
       // Direct property access for ID
@@ -105,11 +171,12 @@ export abstract class PluginComponent {
     const maxDelay = 5000;
     let delay = 100;
 
-    this.logger.debug(`Waiting for runtime to be available (timeout: ${timeoutMs}ms)`);
+    this.logger.debug(`[PLUGIN] Waiting for runtime to be available (v${PLUGIN_VERSION}, timeout: ${timeoutMs}ms)`);
 
     while (Date.now() - start < timeoutMs) {
       // Check this.runtime first if it's already a wrapped instance
       if (this.runtime && this.runtimeIsValid(this.runtime)) {
+        this.logger.info(`[PLUGIN] Runtime ready, agent ID: ${this.getAgentIdSafe()}`);
         return this.runtime;
       }
 
@@ -129,22 +196,17 @@ export abstract class PluginComponent {
           // Log runtime constructor for debugging
           this.logger.info(`[RUNTIME] Runtime constructor: ${rawRt.constructor?.name || 'unknown'}`);
           
-          // Log detailed runtime analysis
-          this.logger.info(`[RUNTIME-DEBUG] __elizaRuntime exists`);
-          this.logger.info(`[RUNTIME-DEBUG] Runtime constructor: ${rawRt.constructor?.name || 'unknown'}`);
-          this.logger.info(`[RUNTIME-DEBUG] Direct keys: ${Object.keys(rawRt).join(', ')}`);
-          
-          // Wrap the runtime to provide our expected interface
-          const wrappedRuntime = this.createRuntimeWrapper(rawRt);
-          this.runtime = wrappedRuntime;
+          // Create runtime proxy using the adapter pattern
+          const runtimeProxy = new Proxy(rawRt, this.createRuntimeProxyHandlers());
+          this.runtime = runtimeProxy;
           
           // Test if it works
           try {
-            const agentId = wrappedRuntime.getAgentId();
-            this.logger.info(`[AGENT] Agent ID: ${agentId}`);
-            return wrappedRuntime;
+            const agentId = this.getAgentIdSafe();
+            this.logger.info(`[AGENT] Agent ID: ${agentId} (from runtime v${PLUGIN_VERSION})`);
+            return runtimeProxy;
           } catch (error) {
-            this.logger.error(`[RUNTIME] Error with wrapped runtime: ${error.message}`);
+            this.logger.error(`[RUNTIME] Error with runtime proxy: ${error.message}`);
           }
         } else {
           this.logger.debug("[RUNTIME-DEBUG] Runtime found but validation failed");
@@ -169,7 +231,7 @@ export abstract class PluginComponent {
       return;
     }
     
-    this.logger.info('Testing runtime readiness:');
+    this.logger.info(`[PLUGIN-TEST] Testing runtime readiness (v${PLUGIN_VERSION}):`);
     this.logger.info(`- runtime object: ${this.runtime ? 'exists' : 'missing'}`);
     this.logger.info(`- getAgentId: ${typeof this.runtime.getAgentId === 'function' ? 'function' : 'missing'}`);
     this.logger.info(`- getLogger: ${typeof this.runtime.getLogger === 'function' ? 'function' : 'missing'}`);
@@ -194,6 +256,7 @@ export abstract class PluginComponent {
    * This should be called during plugin initialization
    */
   async initialize(): Promise<void> {
+    this.logger.info(`[PLUGIN] Initializing ${this.constructor.name} (v${PLUGIN_VERSION})`);
     // To be implemented by subclasses
   }
   
@@ -202,6 +265,7 @@ export abstract class PluginComponent {
    * This should be called during plugin shutdown
    */
   async shutdown(): Promise<void> {
+    this.logger.info(`[PLUGIN] Shutting down ${this.constructor.name}`);
     // To be implemented by subclasses
   }
   
