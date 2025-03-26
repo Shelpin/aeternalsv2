@@ -356,9 +356,9 @@ start_agent() {
     chmod 640 "$LOG_DIR/${character}.log"
     
     # Start the agent with output going to both terminal and log file
-    echo "📡 Starting agent process..."
+    echo "📡 Starting agent process with Valhalla runtime patches..."
     # Use setsid to create a new session for the agent process to prevent it from receiving parent script's signals
-    setsid pnpm --filter "@elizaos/agent" start \
+    setsid node patches/start-agent-with-patches.js \
         --isRoot \
         --characters="characters/${character}.json" \
         --clients=@elizaos-plugins/client-telegram \

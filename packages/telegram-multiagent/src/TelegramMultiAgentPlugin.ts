@@ -73,6 +73,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private recentSpeakers: Map<string, { agentId: string; time: number }[]> = new Map();
   private fallbackMemory: FallbackMemoryManager | null = null;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private runtimeProxy: IAgentRuntime | null = null;
   
   /**
    * Create a new TelegramMultiAgentPlugin
@@ -131,22 +132,26 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   register(runtime: IAgentRuntime): Plugin | boolean {
     try {
-      console.log(`[REGISTER] ${this.name}: Register method called`);
+      this.logger.info(`[REGISTER] ${this.name}: Register method called`);
       
       // Store runtime reference even if null
       super.setRuntime(runtime);
       
       if (!runtime) {
-        console.warn(`[REGISTER] ${this.name}: Received null runtime, will attempt to obtain later`);
+        this.logger.warn(`[REGISTER] ${this.name}: Received null runtime, will attempt to obtain later`);
         return this;
       }
       
-      // VALHALLA FIX: Override agent ID with environment or Telegram username
-      this.agentId = process.env.AGENT_ID || 
-                     runtime.client?.telegram?.botInfo?.username || 
-                     runtime.getAgentId();
+      // VALHALLA FIX: Normalize agent ID consistently
+      const envAgentId = process.env.AGENT_ID;
+      const runtimeAgentId = runtime.client?.telegram?.botInfo?.username;
+      const fallbackAgentId = runtime.getAgentId();
       
-      this.logger.info(`[IDENTITY] Using canonical agent ID: ${this.agentId}`);
+      this.agentId = this.normalizeAgentId(
+        envAgentId || runtimeAgentId || fallbackAgentId
+      );
+      
+      this.logger.info(`[IDENTITY] Using normalized agent ID: ${this.agentId}`);
       
       // VALHALLA FIX: Hook into ElizaOS core's message events with enhanced logging
       if (runtime.client?.telegram) {
@@ -182,7 +187,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       
       return this;
     } catch (error) {
-      console.error(`[ERROR] ${this.name}: Unexpected error during plugin registration: ${error}`);
+      this.logger.error(`[ERROR] ${this.name}: Unexpected error during plugin registration: ${error}`);
       return false;
     }
   }
@@ -266,30 +271,75 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   
   /**
    * Initialize the plugin
-   * This will be called by ElizaOS after the plugin is loaded
    */
   async initialize(): Promise<void> {
     try {
-      this.logger.info(`[PLUGIN] Initializing ${this.name}`);
+      // Wait for runtime to be ready first
+      const runtime = await this.waitForRuntime(10000); // 10 second timeout
+      if (!runtime) {
+        throw new Error('Runtime not available after timeout');
+      }
       
-      // Initialize conversation manager
-      await this.conversationManager.initialize();
+      this.logger.info(`[PLUGIN] Runtime ready, initializing plugin`);
       
-      // VALHALLA FIX: No need to start polling, ElizaOS core handles it
-      this.logger.info(`[PLUGIN] ${this.name} initialized successfully`);
+      // VALHALLA FIX: Check if runtime.handleMessage is defined
+      if (!runtime || typeof runtime.handleMessage !== 'function') {
+        this.logger.warn('[PLUGIN] Runtime handleMessage not defined. Plugin may not respond to messages.');
+      } else {
+        this.logger.info('[PLUGIN] Runtime handleMessage properly defined.');
+      }
       
-      // Send initial heartbeat to relay
-      await this.sendHeartbeat();
+      // Get Telegram bot username for relay registration
+      let telegramAgentId = '';
       
-      // Start heartbeat interval
-      this.heartbeatInterval = setInterval(() => {
-        this.sendHeartbeat().catch(error => {
-          this.logger.error(`[PLUGIN] Failed to send heartbeat: ${error.message}`);
-        });
-      }, 30000); // Every 30 seconds
+      // First try getting from environment variables
+      if (process.env.TELEGRAM_BOT_USERNAME) {
+        telegramAgentId = process.env.TELEGRAM_BOT_USERNAME;
+        this.logger.info(`[RELAY] Using TELEGRAM_BOT_USERNAME: ${telegramAgentId}`);
+      } else if (process.env.AGENT_ID) {
+        const agentIdFromEnv = process.env.AGENT_ID;
+        telegramAgentId = agentIdFromEnv.endsWith('_bot') ? agentIdFromEnv : `${agentIdFromEnv}_bot`;
+        this.logger.info(`[RELAY] Using derived bot username from AGENT_ID: ${telegramAgentId}`);
+      }
       
+      this.logger.info(`[IDENTITY] Agent ID for relay registration: ${telegramAgentId}`);
+      
+      // VALHALLA FIX: Override this.agentId with telegramAgentId to ensure consistency
+      this.agentId = telegramAgentId;
+      this.logger.info(`[IDENTITY] Setting canonical agent ID to: ${this.agentId}`);
+      
+      // Initialize relay with explicit Telegram bot username
+      this.relay = new TelegramRelay({
+        relayServerUrl: this.config.relayServerUrl,
+        authToken: this.config.authToken,
+        agentId: telegramAgentId 
+      }, this.logger);
+      
+      this.logger.info(`[RELAY] Agent ${telegramAgentId} relay instance created`);
+      
+      // Set up relay message handling
+      this.relay.onMessage(this.handleIncomingMessage.bind(this));
+      
+      // VALHALLA FIX: Remove custom Telegram polling and rely on ElizaOS core
+      this.logger.info(`[PLUGIN] Using ElizaOS core for Telegram polling`);
+      
+      // Connect to relay
+      const connected = await this.relay.connect();
+      if (!connected) {
+        throw new Error('Failed to connect to relay server');
+      }
+      
+      // VALHALLA FIX: Check if runtime.handleMessage is defined
+      if (!runtime || typeof runtime.handleMessage !== 'function') {
+        this.logger.warn('[PLUGIN] Runtime handleMessage not defined. Plugin may not respond to messages.');
+      } else {
+        this.logger.info('[PLUGIN] Runtime handleMessage properly defined.');
+      }
+      
+      this.initialized = true;
+      this.logger.info(`${this.name}: Plugin initialized successfully`);
     } catch (error) {
-      this.logger.error(`[PLUGIN] Failed to initialize ${this.name}: ${error.message}`);
+      this.logger.error(`${this.name}: Initialization failed: ${error.message}`);
       throw error;
     }
   }
@@ -334,10 +384,25 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   }
   
   /**
+   * Safe method to normalize agent ID
+   * Implements consistent agent ID normalization across the plugin
+   */
+  private normalizeAgentId(agentId: string): string {
+    // VALHALLA FIX: Handle _bot suffix more robustly and convert to lowercase
+    return agentId?.replace('_bot', '').toLowerCase() || '';
+  }
+  
+  /**
    * Safe method to get agent ID with fallback
    * Implements the expert's recommendation for defensive runtime checks
    */
-  getAgentIdSafe(): string {
+  protected getAgentIdSafe(): string {
+    // First try environment variable
+    if (process.env.AGENT_ID) {
+      return this.normalizeAgentId(process.env.AGENT_ID);
+    }
+    
+    // Then try runtime
     if (!this.runtime?.getAgentId) {
       this.logger.warn("Runtime is still invalid — fallback triggered");
       return this.agentId || "unknown";
@@ -351,8 +416,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         return this.agentId || "unknown";
       }
       
-      this.logger.debug(`Successfully retrieved agent ID: ${agentId}`);
-      return agentId;
+      return this.normalizeAgentId(agentId);
     } catch (error) {
       this.logger.error(`Error getting agent ID: ${error.message}`);
       return this.agentId || "unknown";
@@ -647,7 +711,27 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   }
   
   /**
-   * Handle an incoming message from Telegram or Relay
+   * Helper method to safely call runtime.handleMessage with fallback handling
+   * This addresses the issue with undefined handleMessage function
+   */
+  private async callRuntimeHandleMessage(message: any): Promise<any> {
+    try {
+      const runtime = this.runtimeProxy || this.runtime;
+      if (runtime?.handleMessage && typeof runtime.handleMessage === 'function') {
+        this.logger.info(`[PLUGIN] runtime.handleMessage was called`);
+        return await runtime.handleMessage(message);
+      } else {
+        this.logger.warn('[PLUGIN] runtime.handleMessage not available');
+        return null;
+      }
+    } catch (err) {
+      this.logger.error(`Error calling runtime.handleMessage: ${err.message}`);
+      return null;
+    }
+  }
+  
+  /**
+   * Handle an incoming message from Telegram or the relay
    */
   async handleIncomingMessage(message: RelayMessage): Promise<void> {
     try {
@@ -667,8 +751,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         this.logger.info(`[PLUGIN] Added new known agent: ${sender_agent_id}`);
       }
       
-      // Skip if message is from self (using normalized comparison)
-      if (normalizedSenderId === normalizedAgentId) {
+      // VALHALLA FIX: Enhanced agent ID comparison using includes() for more robust matching
+      if (normalizedSenderId.includes(normalizedAgentId) || normalizedAgentId.includes(normalizedSenderId)) {
         this.logger.info(`[PLUGIN] Skipping message from self (${normalizedSenderId})`);
         return;
       }
@@ -832,13 +916,19 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         
         this.logger.debug(`[PLUGIN] Calling runtime.handleMessage with context: ${JSON.stringify(context)}`, '', '');
         
-        // Call the runtime to handle the message
-        const response = await runtime.handleMessage({
+        // Call the runtime to handle the message using our safe helper
+        let response = await this.callRuntimeHandleMessage({
           text: text || '',
           userId: sender_agent_id || from?.username || 'unknown',
           name: from?.first_name || 'Unknown',
           context
         });
+        
+        // If no response or response has no text, generate a fallback
+        if (!response || !response.text) {
+          this.logger.info(`[PLUGIN] No valid response from runtime, using fallback`);
+          response = { text: await this.generateFallbackResponse() };
+        }
         
         this.logger.debug(`[PLUGIN] Got response from runtime: ${JSON.stringify(response)}`, '', '');
         
@@ -1381,14 +1471,202 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     return null;
   }
 
-  // Add relay health check method
+  /**
+   * Ensure relay connection is healthy, re-register if needed
+   */
   private async ensureRelayConnection(): Promise<boolean> {
-    try {
-      const health = await fetch(`${this.config.relayServerUrl}/health`);
-      return health.ok;
-    } catch (e) {
-      this.logger.error(`Relay server unreachable: ${e.message}`);
+    if (!this.relay) {
+      this.logger.warn('[PLUGIN] Relay not initialized, cannot check connection');
       return false;
+    }
+
+    try {
+      // First check if already connected
+      if (this.relay.isConnected()) {
+        // Check relay server health directly 
+        const health = await fetch(`${this.config.relayServerUrl}/health`);
+        
+        if (health.ok) {
+          const healthData = await health.json();
+          
+          // Check if our agent is in the online agents list
+          if (healthData.agents_list && 
+              healthData.agents_list.includes(this.agentId)) {
+            this.logger.debug('[PLUGIN] Relay connection is healthy');
+            return true;
+          }
+          
+          this.logger.info('[PLUGIN] Agent not found in online agents list, will re-register');
+        } else {
+          this.logger.warn(`[PLUGIN] Relay server health check failed: ${health.status}`);
+        }
+      } else {
+        this.logger.warn('[PLUGIN] Relay not connected, attempting to reconnect');
+      }
+      
+      // Try to re-register with relay
+      this.logger.info('[PLUGIN] Re-registering with relay server');
+      
+      const connected = await this.relay.connect();
+      if (connected) {
+        this.logger.info('[PLUGIN] Successfully re-registered with relay');
+        
+        // Send immediate heartbeat
+        try {
+          await this.sendHeartbeat();
+          this.logger.info('[PLUGIN] Heartbeat sent after re-registration');
+        } catch (error) {
+          this.logger.warn(`[PLUGIN] Failed to send heartbeat after re-registration: ${error.message}`);
+        }
+        
+        return true;
+      } else {
+        this.logger.error('[PLUGIN] Failed to re-register with relay');
+        return false;
+      }
+    } catch (e) {
+      this.logger.error(`[PLUGIN] Error ensuring relay connection: ${e.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Send heartbeat to relay server
+   */
+  private async sendHeartbeat(): Promise<void> {
+    if (!this.relay) {
+      this.logger.warn('[PLUGIN] Cannot send heartbeat: relay not initialized');
+      return;
+    }
+
+    try {
+      const response = await fetch(`${this.config.relayServerUrl}/heartbeat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.config.authToken}`
+        },
+        body: JSON.stringify({
+          agent_id: this.agentId,
+          port: process.env.PORT || 'unknown'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`Heartbeat failed with status ${response.status}`);
+      }
+
+      this.logger.debug('[PLUGIN] Heartbeat sent successfully');
+    } catch (error) {
+      this.logger.error(`[PLUGIN] Heartbeat error: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Run a simple manual test message to verify if agents respond
+   */
+  async testMessage(): Promise<void> {
+    try {
+      // Create a test message
+      const groupId = this.config.groupIds[0] || "-1002550618173"; // Use first configured group or default
+      
+      // Ensure chat.id is a number as required by RelayMessage type
+      const chatId = typeof groupId === 'string' ? parseInt(groupId, 10) : groupId;
+      
+      const testMessage = {
+        message_id: 999999,
+        from: {
+          id: 12345,
+          is_bot: false,
+          first_name: "Test",
+          username: "ETHMemeLord9000"
+        },
+        chat: {
+          id: chatId, // Now a number as required by RelayMessage type
+          type: "group",
+          title: "Test Group"
+        },
+        date: Math.floor(Date.now() / 1000),
+        text: `@${this.agentId} what do you think about crypto?`,
+        sender_agent_id: "ETHMemeLord9000"
+      };
+      
+      this.logger.info(`[TEST] Sending test message to ${this.agentId}: "${testMessage.text}"`);
+      
+      // Process the test message
+      await this.handleIncomingMessage(testMessage);
+      
+      this.logger.info(`[TEST] Test message sent and processed`);
+    } catch (error) {
+      this.logger.error(`[TEST] Error sending test message: ${error.message}`);
+    }
+  }
+
+  /**
+   * Verify that all fixes have been applied correctly
+   * Run this to validate fixes from knock_knock_debug.md
+   */
+  async verifyFixes(): Promise<void> {
+    try {
+      this.logger.info('======= VALHALLA FIX VERIFICATION =======');
+      
+      // 1. Check if runtime is available
+      const runtime = await this.waitForRuntime(5000);
+      this.logger.info(`[VERIFY] Runtime available: ${!!runtime}`);
+      
+      // 2. Check if runtime.handleMessage is defined
+      const handleMessageExists = runtime && typeof runtime.handleMessage === 'function';
+      this.logger.info(`[VERIFY] runtime.handleMessage exists: ${handleMessageExists}`);
+      
+      // 3. Verify callback registration
+      this.logger.info(`[VERIFY] callRuntimeHandleMessage helper: ${typeof this.callRuntimeHandleMessage === 'function' ? 'Implemented' : 'Missing'}`);
+      
+      // 4. Check agent ID normalization
+      const agentId = this.agentId;
+      const normalizedAgentId = this.normalizeAgentId(agentId);
+      this.logger.info(`[VERIFY] Agent ID: ${agentId}, Normalized: ${normalizedAgentId}`);
+      
+      // 5. Check if relay is connected
+      const relayConnected = this.relay?.isConnected();
+      this.logger.info(`[VERIFY] Relay connected: ${relayConnected}`);
+      
+      // 6. Test runtime.handleMessage directly with minimal input
+      try {
+        if (handleMessageExists) {
+          const testResult = await runtime.handleMessage({ 
+            text: 'This is a test message',
+            userId: 'test_user' 
+          });
+          this.logger.info(`[VERIFY] Direct runtime.handleMessage call successful: ${!!testResult}`);
+          this.logger.info(`[VERIFY] Response contains text: ${!!testResult?.text}`);
+        } else {
+          this.logger.warn(`[VERIFY] Cannot test runtime.handleMessage directly - not defined`);
+        }
+      } catch (error) {
+        this.logger.error(`[VERIFY] Direct runtime.handleMessage test failed: ${error.message}`);
+      }
+      
+      // 7. Test callRuntimeHandleMessage helper
+      try {
+        const helperResult = await this.callRuntimeHandleMessage({
+          text: 'This is a helper test',
+          userId: 'test_user'
+        });
+        this.logger.info(`[VERIFY] callRuntimeHandleMessage helper call successful: ${!!helperResult}`);
+        this.logger.info(`[VERIFY] Helper returned response: ${JSON.stringify(helperResult || {})}`);
+      } catch (error) {
+        this.logger.error(`[VERIFY] callRuntimeHandleMessage helper test failed: ${error.message}`);
+      }
+      
+      // 8. Test generateFallbackResponse
+      const fallbackResponse = await this.generateFallbackResponse();
+      this.logger.info(`[VERIFY] Fallback response: "${fallbackResponse.substring(0, 50)}..."`);
+      
+      this.logger.info('======= VERIFICATION COMPLETE =======');
+      this.logger.info(`Next step: Run a test message with plugin.testMessage()`);
+    } catch (error) {
+      this.logger.error(`[VERIFY] Error during verification: ${error.message}`);
     }
   }
 }

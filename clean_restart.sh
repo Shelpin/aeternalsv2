@@ -118,7 +118,8 @@ else
     "enabled": true,
     "baseTypingSpeedCPM": 300,
     "randomVariation": 0.2
-  }
+  },
+  "heartbeatInterval": 10000
 }
 EOF
 fi
@@ -128,11 +129,19 @@ echo "  - Permissions set on $CONFIG_FILE"
 
 # Display the final configuration for verification
 echo "  - Final configuration:"
-grep -e "relayServerUrl" -e "authToken" -e "enabled" "$CONFIG_FILE" | sed 's/"authToken": "[^"]*"/"authToken": "******"/g'
+grep -e "relayServerUrl" -e "authToken" -e "enabled" -e "heartbeatInterval" "$CONFIG_FILE" | sed 's/"authToken": "[^"]*"/"authToken": "******"/g'
+
+# Configure environment variables
+export HEARTBEAT_INTERVAL=10000  # 10 seconds
+export RELAY_SERVER_URL="http://${SERVER_IP}:4000"
+export RELAY_AUTH_TOKEN="elizaos-secure-relay-key"
+echo "  - Environment variables set"
 
 # Start the relay server
 echo "🚀 Starting relay server..."
 cd /root/eliza && ./relay-server/start-relay.sh > logs/relay-server.log 2>&1 &
+relay_pid=$!
+echo "  - Relay server started (PID: $relay_pid)"
 
 # Wait up to 20 seconds for relay server to start
 echo "🔄 Waiting for relay server to start..."
@@ -149,9 +158,10 @@ for i in {1..20}; do
   fi
 done
 
-# Start all agents
+# Start all agents with the configured environment
 echo "🚀 Starting all agents..."
 ./start_agents.sh
 
 echo "🏁 Complete system restart finished!"
-echo "📊 Monitor agents with: ./monitor_agents.sh -w" 
+echo "📊 Monitor agents with: ./monitor_agents.sh -w"
+echo "🧪 Test the system with: ./test_valhalla.sh" 

@@ -31,13 +31,12 @@ export class TelegramRelay {
   private connected: boolean = false;
   private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   private pingInterval: ReturnType<typeof setInterval> | null = null;
-  private updatePollingInterval: ReturnType<typeof setInterval> | null = null;
   private lastPingTime = 0;
-  private lastUpdateId = 0;
   private messageHandlers: Array<(message: RelayMessage) => void> = [];
   private agentUpdateHandlers: Array<(agents: string[]) => void> = [];
   private connectionAttempts: number = 0;
   private maxConnectionAttempts: number = 5;
+  private updatePollingInterval: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Create a new TelegramRelay
@@ -184,106 +183,27 @@ export class TelegramRelay {
       this.config.agentId = agentIdForRegistration;
     }
     
-    // Increment connection attempts counter
-    this.connectionAttempts++;
-    
-    // Log connection attempt with counter
-    this.logger.info(`[RELAY] Connection attempt ${this.connectionAttempts}/${this.maxConnectionAttempts}`);
-    
     try {
-      // Check if the server is available
-      let healthCheck;
-      try {
-        // Explicitly form the health URL
-        const healthUrl = `${this.config.relayServerUrl}/health`;
-        this.logger.debug(`[RELAY] Checking relay server health at: ${healthUrl}`);
-        
-        healthCheck = await this.fetchWithTimeout(
-          healthUrl,
-          { method: 'GET' },
-          5000  // 5 second timeout for health check
-        );
-      } catch (error) {
-        this.logger.error(`[RELAY] Health check failed: ${error.message}`);
-        
-        if (error.message.includes('timeout') || error.message.includes('ECONNREFUSED') || error.message.includes('ETIMEDOUT')) {
-          this.logger.warn('[RELAY] Connection issue detected. Please check if relay server is running and network is accessible');
-        }
-        return false;
-      }
-      
-      if (!healthCheck.ok) {
-        this.logger.warn(`[RELAY] Relay server health check failed with status ${healthCheck.status}`);
-        try {
-          const responseText = await healthCheck.text();
-          this.logger.error(`[RELAY] Health check response: ${responseText}`);
-        } catch (e) {
-          this.logger.error('[RELAY] Could not read health check response');
-        }
-        return false;
-      }
-      
-      // Try to parse health check response for additional diagnostics
-      try {
-        const healthData = await healthCheck.json();
-        this.logger.info(`[RELAY] Health status: ${JSON.stringify(healthData)}`);
-        if (healthData.agents) {
-          this.logger.info(`[RELAY] Current active agents: ${healthData.agents.join(', ') || 'none'}`);
-        }
-      } catch (e) {
-        // Non-critical error, just continue
-        this.logger.debug(`[RELAY] Could not parse health check JSON: ${e.message}`);
-      }
-      
-      // Health check passed
-      this.logger.info(`[RELAY] Health check passed, relay server is running`);
-      
-      // Register the agent with retries
-      const registered = await this.registerAgent();
-      if (!registered) {
-        this.logger.error(`[RELAY] Failed to register agent ${this.config.agentId}`);
+      // Register with the relay
+      if (!(await this.registerAgent())) {
+        this.logger.error('[RELAY] Failed to register with relay server');
         return false;
       }
       
       this.connected = true;
-      
-      // Reset connection attempts on success
       this.connectionAttempts = 0;
       
-      // Start ping interval
+      // Start heartbeat
       this.setupPingInterval();
       
-      // Start update polling
-      this.startUpdatePolling();
+      // VALHALLA FIX: Add polling for relay messages
+      this.startRelayPolling();
       
-      // VALHALLA FIX: Verify registration with a health check
-      try {
-        const verifyResponse = await this.fetchWithTimeout(
-          `${this.config.relayServerUrl}/health`,
-          { method: 'GET' },
-          5000
-        );
-        
-        if (verifyResponse.ok) {
-          const verifyData = await verifyResponse.json();
-          if (verifyData.agents && verifyData.agents.includes(this.config.agentId)) {
-            this.logger.info(`[RELAY] Registration verified: Agent ${this.config.agentId} is listed in health check`);
-          } else {
-            this.logger.warn(`[RELAY] Registration anomaly: Agent ${this.config.agentId} not found in health check despite successful registration`);
-            this.logger.debug(`[RELAY] Health check agents: ${JSON.stringify(verifyData.agents || [])}`);
-          }
-        }
-      } catch (e) {
-        this.logger.warn(`[RELAY] Could not verify registration with health check: ${e.message}`);
-      }
+      this.logger.info('[RELAY] Connected successfully - polling for relay messages');
       
-      this.logger.info(`[RELAY] Agent ${this.config.agentId} connected and registered successfully`);
       return true;
     } catch (error) {
-      this.logger.error(`[RELAY] Unexpected error connecting to relay server: ${error.message}`);
-      if (error.stack) {
-        this.logger.debug(`[RELAY] Error stack: ${error.stack}`);
-      }
+      this.logger.error(`[RELAY] Connection error: ${error.message}`);
       return false;
     }
   }
@@ -292,34 +212,14 @@ export class TelegramRelay {
    * Disconnect from the relay server
    */
   async disconnect(): Promise<void> {
-    if (!this.connected) {
-      return;
-    }
+    this.logger.info('[RELAY] Disconnecting from relay server');
     
-    try {
-      // Clear all intervals
-      this.clearTimers();
-      
-      // Unregister from the relay server
-      await this.fetchWithTimeout(
-        `${this.config.relayServerUrl}/unregister`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.authToken}`
-          },
-          body: JSON.stringify({
-            agent_id: this.config.agentId
-          })
-        }
-      );
-      
-      this.connected = false;
-      this.logger.info('Disconnected from relay server');
-    } catch (error) {
-      this.logger.error(`Error during disconnect: ${error.message}`);
-    }
+    this.connected = false;
+    this.clearTimers();
+    
+    // Clear all handlers
+    this.messageHandlers = [];
+    this.agentUpdateHandlers = [];
   }
 
   /**
@@ -477,96 +377,6 @@ export class TelegramRelay {
   }
 
   /**
-   * Start polling for updates
-   */
-  private startUpdatePolling(): void {
-    if (this.updatePollingInterval) {
-      clearInterval(this.updatePollingInterval);
-    }
-    
-    this.updatePollingInterval = setInterval(async () => {
-      if (!this.connected) {
-        return;
-      }
-      
-      try {
-        await this.pollForUpdates();
-      } catch (error) {
-        this.logger.error(`Error polling for updates: ${error.message}`);
-      }
-    }, 1000);
-  }
-
-  /**
-   * Poll the relay server for updates
-   */
-  private async pollForUpdates(): Promise<void> {
-    this.logger.debug(`Polling for updates from: ${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=${this.lastUpdateId}`);
-    
-    try {
-      const response = await this.fetchWithTimeout(
-        `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=${this.lastUpdateId}`,
-        { 
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${this.config.authToken}`
-          }
-        }
-      );
-      
-      if (!response.ok) {
-        this.logger.warn(`Failed to poll for updates: ${response.status}`);
-        return;
-      }
-      
-      const data = await response.json();
-      if (!data.success) {
-        this.logger.warn(`Failed to poll for updates: ${data.error || 'Unknown error'}`);
-        return;
-      }
-      
-      // Process messages
-      if (data.messages && data.messages.length > 0) {
-        for (const update of data.messages) {
-          this.lastUpdateId = Math.max(this.lastUpdateId, update.update_id + 1);
-          
-          // Handle agent updates
-          if (update.agent_updates) {
-            for (const agentUpdate of update.agent_updates) {
-              this.logger.info(`Agent update: ${agentUpdate.agent_id} is now ${agentUpdate.status}`);
-            }
-            
-            // Get list of available agents
-            const availableAgents = await this.getAvailableAgents();
-            
-            // Notify handlers
-            for (const handler of this.agentUpdateHandlers) {
-              handler(availableAgents);
-            }
-          }
-          
-          // Handle message updates
-          if (update.message) {
-            this.logger.debug(`Received message: ${update.message.text}`);
-            
-            // Skip messages from self
-            if (update.message.sender_agent_id === this.config.agentId) {
-              continue;
-            }
-            
-            // Notify handlers
-            for (const handler of this.messageHandlers) {
-              handler(update.message);
-            }
-          }
-        }
-      }
-    } catch (error) {
-      this.logger.error(`Error polling for updates: ${error.message}`);
-    }
-  }
-
-  /**
    * Set up the ping interval for keeping the connection alive
    */
   private setupPingInterval(): void {
@@ -574,9 +384,22 @@ export class TelegramRelay {
       clearInterval(this.pingInterval);
     }
     
-    this.pingInterval = setInterval(async () => {
-      await this.sendHeartbeat();
-    }, 30000);
+    // VALHALLA FIX: Add initial delay before starting heartbeats
+    setTimeout(() => {
+      // Send initial heartbeat
+      this.sendHeartbeat().catch(error => {
+        this.logger.warn(`[RELAY] Initial heartbeat failed: ${error.message}`);
+      });
+      
+      // Set up regular heartbeat interval
+      this.pingInterval = setInterval(() => {
+        this.sendHeartbeat().catch(error => {
+          this.logger.warn(`[RELAY] Heartbeat failed: ${error.message}`);
+        });
+      }, 30000); // Every 30 seconds
+      
+      this.logger.info('[RELAY] Heartbeat interval established');
+    }, 5000); // 5 second initial delay
   }
 
   /**
@@ -734,5 +557,91 @@ export class TelegramRelay {
    */
   isConnected(): boolean {
     return this.connected;
+  }
+
+  /**
+   * Start polling for updates from the relay server
+   */
+  private startRelayPolling(): void {
+    if (this.updatePollingInterval) {
+      clearInterval(this.updatePollingInterval);
+    }
+    
+    // Offset for tracking processed messages
+    let lastUpdateId = 0;
+    
+    // VALHALLA FIX: Disable relay polling as ElizaOS core should own polling
+    // this.updatePollingInterval = setInterval(async () => {
+    this.logger.info('[RELAY] Relay polling disabled - ElizaOS core will handle message delivery');
+    
+    /*
+    // Original polling code commented out
+    this.updatePollingInterval = setInterval(async () => {
+      if (!this.connected) {
+        return;
+      }
+      
+      try {
+        this.logger.debug(`[RELAY] Polling for updates with agent_id=${this.config.agentId}, offset=${lastUpdateId}`);
+        
+        const response = await this.fetchWithTimeout(
+          `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=${lastUpdateId}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${this.config.authToken}`
+            }
+          },
+          10000 // 10-second timeout
+        );
+        
+        if (!response.ok) {
+          this.logger.warn(`[RELAY] Failed to poll relay updates: ${response.status}`);
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (!data.success) {
+          this.logger.warn(`[RELAY] Relay update polling failed: ${data.error || 'Unknown error'}`);
+          return;
+        }
+        
+        if (data.messages && data.messages.length > 0) {
+          this.logger.info(`[RELAY] Received ${data.messages.length} messages from relay`);
+          
+          for (const message of data.messages) {
+            // Update lastUpdateId to avoid duplicate processing
+            if (message.update_id) {
+              lastUpdateId = Math.max(lastUpdateId, message.update_id + 1);
+            }
+            
+            // Process message
+            if (message.message) {
+              this.logger.debug(`[RELAY] Processing message: ${message.message.text?.substring(0, 50) || 'No text'}`);
+              
+              // Notify all handlers
+              for (const handler of this.messageHandlers) {
+                handler(message.message);
+              }
+            }
+            
+            // Process agent updates
+            if (message.agent_updates) {
+              this.logger.info(`[RELAY] Received agent updates: ${message.agent_updates.length} updates`);
+              
+              // Get updated agent list and notify handlers
+              const agents = await this.getAvailableAgents();
+              for (const handler of this.agentUpdateHandlers) {
+                handler(agents);
+              }
+            }
+          }
+        }
+      } catch (error) {
+        this.logger.error(`[RELAY] Error polling relay updates: ${error.message}`);
+      }
+    }, 2000); // Poll every 2 seconds
+    */
   }
 } 

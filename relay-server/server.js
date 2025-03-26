@@ -103,6 +103,22 @@ app.post('/register', (req, res) => {
     return res.json({ success: false, error: 'Missing agent_id' });
   }
   
+  // Check if agent is already registered
+  const existingAgent = connectedAgents.get(agent_id);
+  if (existingAgent) {
+    // Update the lastSeen timestamp
+    existingAgent.lastSeen = Date.now();
+    logWithTime(`✅ Agent already registered, updated timestamp: ${agent_id}`);
+    
+    // Return currently connected agents
+    const connectedAgentIds = Array.from(connectedAgents.keys());
+    return res.json({ 
+      success: true, 
+      connected_agents: connectedAgentIds,
+      message: 'Agent registration refreshed' 
+    });
+  }
+  
   // Register the agent
   connectedAgents.set(agent_id, { 
     token: 'via-auth-header', // Token is now validated via middleware
@@ -186,8 +202,36 @@ app.post('/heartbeat', (req, res) => {
   // Check if agent exists
   const agent = connectedAgents.get(agent_id);
   if (!agent) {
-    logWithTime(`❌ Heartbeat failed: Agent not registered: ${agent_id}`);
-    return res.json({ success: false, error: 'Agent not registered' });
+    logWithTime(`⚠️ Heartbeat for unregistered agent: ${agent_id}. Auto-registering...`);
+    
+    // Auto-register the agent
+    connectedAgents.set(agent_id, { 
+      token: 'via-auto-register',
+      lastSeen: Date.now(),
+      updateOffset: 0
+    });
+    
+    // Initialize message queue for this agent
+    if (!messageQueue.has(agent_id)) {
+      messageQueue.set(agent_id, []);
+    }
+    
+    logWithTime(`✅ Agent auto-registered during heartbeat: ${agent_id}`);
+    
+    // Notify other agents about the new agent
+    for (const [id, messages] of messageQueue.entries()) {
+      if (id !== agent_id) {
+        messages.push({
+          update_id: updateId++,
+          agent_updates: [{ agent_id, status: 'connected' }]
+        });
+      }
+    }
+    
+    return res.json({ 
+      success: true,
+      auto_registered: true
+    });
   }
   
   // Update last seen time
@@ -357,14 +401,26 @@ app.post('/sendChatAction', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  const agentsList = Array.from(connectedAgents.keys()).join(', ');
+  // Get a list of all registered agents with their last seen timestamp
+  const agentDetails = Array.from(connectedAgents.entries()).map(([id, data]) => ({
+    id,
+    last_seen: new Date(data.lastSeen).toISOString(),
+    age_seconds: Math.floor((Date.now() - data.lastSeen) / 1000)
+  }));
+  
+  // Get a list of just the agent IDs
+  const agentsList = agentDetails.map(agent => agent.id);
+  
   logWithTime(`ℹ️ Health check - Agents online: ${connectedAgents.size}`);
   
   return res.json({ 
     status: 'ok', 
     agents: connectedAgents.size,
     agents_list: agentsList,
-    uptime: process.uptime()
+    agents_details: agentDetails,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    version: '1.1.0-valhalla'
   });
 });
 
