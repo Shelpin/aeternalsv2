@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / extractAttributes
+[@elizaos/core v0.25.9](../index.md) / extractAttributes
 
 # Function: extractAttributes()
 
@@ -24,4 +24,4 @@ An object containing the extracted attributes.
 
 ## Defined in
 
-[packages/core/src/parsing.ts:194](https://github.com/elizaOS/eliza/blob/main/packages/core/src/parsing.ts#L194)
+[packages/core/src/parsing.ts:194](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/parsing.ts#L194)

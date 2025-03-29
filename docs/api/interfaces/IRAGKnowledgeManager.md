@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / IRAGKnowledgeManager
+[@elizaos/core v0.25.9](../index.md) / IRAGKnowledgeManager
 
 # Interface: IRAGKnowledgeManager
 
@@ -10,7 +10,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1219](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1219)
+[packages/core/src/types.ts:1225](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1225)
 
 ***
 
@@ -20,7 +20,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1220](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1220)
+[packages/core/src/types.ts:1226](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1226)
 
 ## Methods
 
@@ -48,7 +48,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1222](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1222)
+[packages/core/src/types.ts:1228](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1228)
 
 ***
 
@@ -66,7 +66,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1229](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1229)
+[packages/core/src/types.ts:1235](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1235)
 
 ***
 
@@ -84,7 +84,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1230](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1230)
+[packages/core/src/types.ts:1236](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1236)
 
 ***
 
@@ -112,7 +112,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1231](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1231)
+[packages/core/src/types.ts:1237](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1237)
 
 ***
 
@@ -130,7 +130,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1238](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1238)
+[packages/core/src/types.ts:1244](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1244)
 
 ***
 
@@ -156,7 +156,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1239](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1239)
+[packages/core/src/types.ts:1245](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1245)
 
 ***
 
@@ -170,7 +170,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1245](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1245)
+[packages/core/src/types.ts:1251](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1251)
 
 ***
 
@@ -190,4 +190,4 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1246](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1246)
+[packages/core/src/types.ts:1252](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1252)

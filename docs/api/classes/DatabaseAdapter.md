@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / DatabaseAdapter
+[@elizaos/core v0.25.9](../index.md) / DatabaseAdapter
 
 # Class: `abstract` DatabaseAdapter\<DB\>
 
@@ -45,7 +45,7 @@ Number of successful attempts needed to close circuit (defaults to 3)
 
 #### Defined in
 
-[packages/core/src/database.ts:47](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L47)
+[packages/core/src/database.ts:47](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L47)
 
 ## Properties
 
@@ -61,7 +61,7 @@ The database instance.
 
 #### Defined in
 
-[packages/core/src/database.ts:24](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L24)
+[packages/core/src/database.ts:24](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L24)
 
 ***
 
@@ -79,7 +79,7 @@ The circuit breaker has three states:
 
 #### Defined in
 
-[packages/core/src/database.ts:37](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L37)
+[packages/core/src/database.ts:37](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L37)
 
 ## Methods
 
@@ -101,7 +101,7 @@ A Promise that resolves when initialization is complete.
 
 #### Defined in
 
-[packages/core/src/database.ts:59](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L59)
+[packages/core/src/database.ts:59](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L59)
 
 ***
 
@@ -123,7 +123,7 @@ A Promise that resolves when closing is complete.
 
 #### Defined in
 
-[packages/core/src/database.ts:65](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L65)
+[packages/core/src/database.ts:65](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L65)
 
 ***
 
@@ -151,7 +151,7 @@ A Promise that resolves to the Account object or null if not found.
 
 #### Defined in
 
-[packages/core/src/database.ts:72](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L72)
+[packages/core/src/database.ts:72](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L72)
 
 ***
 
@@ -179,7 +179,7 @@ A Promise that resolves when the account creation is complete.
 
 #### Defined in
 
-[packages/core/src/database.ts:79](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L79)
+[packages/core/src/database.ts:79](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L79)
 
 ***
 
@@ -217,7 +217,7 @@ A Promise that resolves to an array of Memory objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:86](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L86)
+[packages/core/src/database.ts:86](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L86)
 
 ***
 
@@ -247,7 +247,7 @@ A Promise that resolves to an array of Memory objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:94](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L94)
+[packages/core/src/database.ts:94](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L94)
 
 ***
 
@@ -269,7 +269,7 @@ A Promise that resolves to an array of Memory objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:101](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L101)
+[packages/core/src/database.ts:101](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L101)
 
 ***
 
@@ -301,7 +301,7 @@ Promise resolving to array of Memory objects
 
 #### Defined in
 
-[packages/core/src/database.ts:109](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L109)
+[packages/core/src/database.ts:109](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L109)
 
 ***
 
@@ -341,7 +341,7 @@ A Promise that resolves to an array of objects containing embeddings and levensh
 
 #### Defined in
 
-[packages/core/src/database.ts:119](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L119)
+[packages/core/src/database.ts:119](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L119)
 
 ***
 
@@ -377,7 +377,7 @@ A Promise that resolves when the log entry has been saved.
 
 #### Defined in
 
-[packages/core/src/database.ts:145](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L145)
+[packages/core/src/database.ts:145](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L145)
 
 ***
 
@@ -407,7 +407,7 @@ A Promise that resolves to an array of Actor objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:157](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L157)
+[packages/core/src/database.ts:157](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L157)
 
 ***
 
@@ -449,7 +449,7 @@ A Promise that resolves to an array of Memory objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:164](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L164)
+[packages/core/src/database.ts:164](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L164)
 
 ***
 
@@ -481,7 +481,7 @@ A Promise that resolves when the goal status has been updated.
 
 #### Defined in
 
-[packages/core/src/database.ts:179](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L179)
+[packages/core/src/database.ts:179](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L179)
 
 ***
 
@@ -525,7 +525,7 @@ A Promise that resolves to an array of Memory objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:190](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L190)
+[packages/core/src/database.ts:190](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L190)
 
 ***
 
@@ -561,7 +561,7 @@ A Promise that resolves when the memory has been created.
 
 #### Defined in
 
-[packages/core/src/database.ts:209](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L209)
+[packages/core/src/database.ts:209](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L209)
 
 ***
 
@@ -593,7 +593,7 @@ A Promise that resolves when the memory has been removed.
 
 #### Defined in
 
-[packages/core/src/database.ts:221](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L221)
+[packages/core/src/database.ts:221](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L221)
 
 ***
 
@@ -625,7 +625,7 @@ A Promise that resolves when all memories have been removed.
 
 #### Defined in
 
-[packages/core/src/database.ts:229](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L229)
+[packages/core/src/database.ts:229](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L229)
 
 ***
 
@@ -661,7 +661,7 @@ A Promise that resolves to the number of memories.
 
 #### Defined in
 
-[packages/core/src/database.ts:238](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L238)
+[packages/core/src/database.ts:238](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L238)
 
 ***
 
@@ -699,7 +699,7 @@ A Promise that resolves to an array of Goal objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:249](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L249)
+[packages/core/src/database.ts:249](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L249)
 
 ***
 
@@ -727,7 +727,7 @@ A Promise that resolves when the goal has been updated.
 
 #### Defined in
 
-[packages/core/src/database.ts:262](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L262)
+[packages/core/src/database.ts:262](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L262)
 
 ***
 
@@ -755,7 +755,7 @@ A Promise that resolves when the goal has been created.
 
 #### Defined in
 
-[packages/core/src/database.ts:269](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L269)
+[packages/core/src/database.ts:269](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L269)
 
 ***
 
@@ -783,7 +783,7 @@ A Promise that resolves when the goal has been removed.
 
 #### Defined in
 
-[packages/core/src/database.ts:276](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L276)
+[packages/core/src/database.ts:276](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L276)
 
 ***
 
@@ -811,7 +811,7 @@ A Promise that resolves when all goals have been removed.
 
 #### Defined in
 
-[packages/core/src/database.ts:283](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L283)
+[packages/core/src/database.ts:283](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L283)
 
 ***
 
@@ -839,7 +839,7 @@ A Promise that resolves to the room ID or null if not found.
 
 #### Defined in
 
-[packages/core/src/database.ts:290](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L290)
+[packages/core/src/database.ts:290](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L290)
 
 ***
 
@@ -867,7 +867,7 @@ A Promise that resolves to the UUID of the created room.
 
 #### Defined in
 
-[packages/core/src/database.ts:297](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L297)
+[packages/core/src/database.ts:297](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L297)
 
 ***
 
@@ -895,7 +895,7 @@ A Promise that resolves when the room has been removed.
 
 #### Defined in
 
-[packages/core/src/database.ts:304](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L304)
+[packages/core/src/database.ts:304](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L304)
 
 ***
 
@@ -923,7 +923,7 @@ A Promise that resolves to an array of room IDs.
 
 #### Defined in
 
-[packages/core/src/database.ts:311](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L311)
+[packages/core/src/database.ts:311](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L311)
 
 ***
 
@@ -951,7 +951,7 @@ A Promise that resolves to an array of room IDs.
 
 #### Defined in
 
-[packages/core/src/database.ts:318](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L318)
+[packages/core/src/database.ts:318](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L318)
 
 ***
 
@@ -983,7 +983,7 @@ A Promise that resolves to a boolean indicating success or failure.
 
 #### Defined in
 
-[packages/core/src/database.ts:326](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L326)
+[packages/core/src/database.ts:326](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L326)
 
 ***
 
@@ -1015,7 +1015,7 @@ A Promise that resolves to a boolean indicating success or failure.
 
 #### Defined in
 
-[packages/core/src/database.ts:334](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L334)
+[packages/core/src/database.ts:334](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L334)
 
 ***
 
@@ -1045,7 +1045,7 @@ A Promise that resolves to an array of Participant objects.
 
 ##### Defined in
 
-[packages/core/src/database.ts:341](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L341)
+[packages/core/src/database.ts:341](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L341)
 
 #### getParticipantsForAccount(userId)
 
@@ -1071,7 +1071,7 @@ A Promise that resolves to an array of Participant objects.
 
 ##### Defined in
 
-[packages/core/src/database.ts:348](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L348)
+[packages/core/src/database.ts:348](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L348)
 
 ***
 
@@ -1099,7 +1099,7 @@ A Promise that resolves to an array of UUIDs representing the participants.
 
 #### Defined in
 
-[packages/core/src/database.ts:355](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L355)
+[packages/core/src/database.ts:355](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L355)
 
 ***
 
@@ -1123,7 +1123,7 @@ A Promise that resolves to an array of UUIDs representing the participants.
 
 #### Defined in
 
-[packages/core/src/database.ts:357](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L357)
+[packages/core/src/database.ts:357](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L357)
 
 ***
 
@@ -1149,7 +1149,7 @@ A Promise that resolves to an array of UUIDs representing the participants.
 
 #### Defined in
 
-[packages/core/src/database.ts:361](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L361)
+[packages/core/src/database.ts:361](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L361)
 
 ***
 
@@ -1181,7 +1181,7 @@ A Promise that resolves to a boolean indicating success or failure of the creati
 
 #### Defined in
 
-[packages/core/src/database.ts:372](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L372)
+[packages/core/src/database.ts:372](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L372)
 
 ***
 
@@ -1213,7 +1213,7 @@ A Promise that resolves to the Relationship object or null if not found.
 
 #### Defined in
 
-[packages/core/src/database.ts:382](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L382)
+[packages/core/src/database.ts:382](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L382)
 
 ***
 
@@ -1243,7 +1243,7 @@ A Promise that resolves to an array of Relationship objects.
 
 #### Defined in
 
-[packages/core/src/database.ts:392](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L392)
+[packages/core/src/database.ts:392](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L392)
 
 ***
 
@@ -1281,7 +1281,7 @@ Promise resolving to array of knowledge items
 
 #### Defined in
 
-[packages/core/src/database.ts:401](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L401)
+[packages/core/src/database.ts:401](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L401)
 
 ***
 
@@ -1313,7 +1313,7 @@ Promise resolving to array of knowledge items
 
 #### Defined in
 
-[packages/core/src/database.ts:409](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L409)
+[packages/core/src/database.ts:409](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L409)
 
 ***
 
@@ -1341,7 +1341,7 @@ Promise resolving when creation is complete
 
 #### Defined in
 
-[packages/core/src/database.ts:422](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L422)
+[packages/core/src/database.ts:422](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L422)
 
 ***
 
@@ -1369,7 +1369,7 @@ Promise resolving when removal is complete
 
 #### Defined in
 
-[packages/core/src/database.ts:429](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L429)
+[packages/core/src/database.ts:429](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L429)
 
 ***
 
@@ -1399,7 +1399,7 @@ Promise resolving when removal is complete
 
 #### Defined in
 
-[packages/core/src/database.ts:436](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L436)
+[packages/core/src/database.ts:436](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L436)
 
 ***
 
@@ -1435,4 +1435,4 @@ Will throw an error if the circuit breaker is open or if the operation fails
 
 #### Defined in
 
-[packages/core/src/database.ts:446](https://github.com/elizaOS/eliza/blob/main/packages/core/src/database.ts#L446)
+[packages/core/src/database.ts:446](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/database.ts#L446)

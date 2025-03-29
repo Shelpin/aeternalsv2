@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / loadEnvConfig
+[@elizaos/core v0.25.9](../index.md) / loadEnvConfig
 
 # Function: loadEnvConfig()
 
@@ -19,4 +19,4 @@ If no .env file is found in Node.js environment
 
 ## Defined in
 
-[packages/core/src/settings.ts:83](https://github.com/elizaOS/eliza/blob/main/packages/core/src/settings.ts#L83)
+[packages/core/src/settings.ts:83](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/settings.ts#L83)

@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / Adapter
+[@elizaos/core v0.25.9](../index.md) / Adapter
 
 # Type Alias: Adapter
 
@@ -24,4 +24,4 @@ Initialize the adapter
 
 ## Defined in
 
-[packages/core/src/types.ts:642](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L642)
+[packages/core/src/types.ts:642](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L642)

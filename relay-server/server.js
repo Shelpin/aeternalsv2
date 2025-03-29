@@ -458,7 +458,7 @@ setInterval(() => {
 }, 60 * 1000); // Check every minute
 
 // Start the server
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
   logWithTime(`🚀 Telegram Relay Server running on port ${PORT}`);
   logWithTime(`📝 Available endpoints:`);

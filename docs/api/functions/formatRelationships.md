@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / formatRelationships
+[@elizaos/core v0.25.9](../index.md) / formatRelationships
 
 # Function: formatRelationships()
 
@@ -18,4 +18,4 @@
 
 ## Defined in
 
-[packages/core/src/relationships.ts:43](https://github.com/elizaOS/eliza/blob/main/packages/core/src/relationships.ts#L43)
+[packages/core/src/relationships.ts:43](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/relationships.ts#L43)

@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / IDatabaseAdapter
+[@elizaos/core v0.25.9](../index.md) / IDatabaseAdapter
 
 # Interface: IDatabaseAdapter
 
@@ -14,7 +14,7 @@ Database instance
 
 #### Defined in
 
-[packages/core/src/types.ts:988](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L988)
+[packages/core/src/types.ts:994](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L994)
 
 ## Methods
 
@@ -30,7 +30,7 @@ Optional initialization
 
 #### Defined in
 
-[packages/core/src/types.ts:991](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L991)
+[packages/core/src/types.ts:997](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L997)
 
 ***
 
@@ -46,7 +46,7 @@ Close database connection
 
 #### Defined in
 
-[packages/core/src/types.ts:994](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L994)
+[packages/core/src/types.ts:1000](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1000)
 
 ***
 
@@ -66,7 +66,7 @@ Get account by ID
 
 #### Defined in
 
-[packages/core/src/types.ts:997](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L997)
+[packages/core/src/types.ts:1003](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1003)
 
 ***
 
@@ -86,7 +86,7 @@ Create new account
 
 #### Defined in
 
-[packages/core/src/types.ts:1000](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1000)
+[packages/core/src/types.ts:1006](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1006)
 
 ***
 
@@ -120,7 +120,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1003](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1003)
+[packages/core/src/types.ts:1009](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1009)
 
 ***
 
@@ -138,7 +138,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1013](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1013)
+[packages/core/src/types.ts:1019](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1019)
 
 ***
 
@@ -158,7 +158,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1015](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1015)
+[packages/core/src/types.ts:1021](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1021)
 
 ***
 
@@ -184,7 +184,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1017](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1017)
+[packages/core/src/types.ts:1023](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1023)
 
 ***
 
@@ -214,7 +214,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1024](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1024)
+[packages/core/src/types.ts:1030](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1030)
 
 ***
 
@@ -240,7 +240,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1033](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1033)
+[packages/core/src/types.ts:1039](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1039)
 
 ***
 
@@ -260,7 +260,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1040](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1040)
+[packages/core/src/types.ts:1046](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1046)
 
 ***
 
@@ -292,7 +292,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1042](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1042)
+[packages/core/src/types.ts:1048](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1048)
 
 ***
 
@@ -314,7 +314,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1052](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1052)
+[packages/core/src/types.ts:1058](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1058)
 
 ***
 
@@ -346,7 +346,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1057](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1057)
+[packages/core/src/types.ts:1063](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1063)
 
 ***
 
@@ -368,7 +368,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1069](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1069)
+[packages/core/src/types.ts:1075](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1075)
 
 ***
 
@@ -388,7 +388,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1075](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1075)
+[packages/core/src/types.ts:1081](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1081)
 
 ***
 
@@ -408,7 +408,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1077](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1077)
+[packages/core/src/types.ts:1083](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1083)
 
 ***
 
@@ -430,7 +430,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1079](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1079)
+[packages/core/src/types.ts:1085](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1085)
 
 ***
 
@@ -458,7 +458,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1085](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1085)
+[packages/core/src/types.ts:1091](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1091)
 
 ***
 
@@ -476,7 +476,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1093](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1093)
+[packages/core/src/types.ts:1099](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1099)
 
 ***
 
@@ -494,7 +494,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1095](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1095)
+[packages/core/src/types.ts:1101](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1101)
 
 ***
 
@@ -512,7 +512,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1097](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1097)
+[packages/core/src/types.ts:1103](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1103)
 
 ***
 
@@ -530,7 +530,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1099](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1099)
+[packages/core/src/types.ts:1105](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1105)
 
 ***
 
@@ -548,7 +548,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1101](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1101)
+[packages/core/src/types.ts:1107](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1107)
 
 ***
 
@@ -566,7 +566,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1103](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1103)
+[packages/core/src/types.ts:1109](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1109)
 
 ***
 
@@ -584,7 +584,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1105](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1105)
+[packages/core/src/types.ts:1111](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1111)
 
 ***
 
@@ -602,7 +602,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1107](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1107)
+[packages/core/src/types.ts:1113](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1113)
 
 ***
 
@@ -620,7 +620,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1109](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1109)
+[packages/core/src/types.ts:1115](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1115)
 
 ***
 
@@ -640,7 +640,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1111](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1111)
+[packages/core/src/types.ts:1117](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1117)
 
 ***
 
@@ -660,7 +660,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1113](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1113)
+[packages/core/src/types.ts:1119](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1119)
 
 ***
 
@@ -678,7 +678,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1115](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1115)
+[packages/core/src/types.ts:1121](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1121)
 
 ***
 
@@ -696,7 +696,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1117](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1117)
+[packages/core/src/types.ts:1123](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1123)
 
 ***
 
@@ -716,7 +716,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1119](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1119)
+[packages/core/src/types.ts:1125](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1125)
 
 ***
 
@@ -738,7 +738,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1124](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1124)
+[packages/core/src/types.ts:1130](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1130)
 
 ***
 
@@ -760,7 +760,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1130](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1130)
+[packages/core/src/types.ts:1136](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1136)
 
 ***
 
@@ -782,7 +782,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1132](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1132)
+[packages/core/src/types.ts:1138](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1138)
 
 ***
 
@@ -802,7 +802,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1137](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1137)
+[packages/core/src/types.ts:1143](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1143)
 
 ***
 
@@ -830,7 +830,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1139](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1139)
+[packages/core/src/types.ts:1145](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1145)
 
 ***
 
@@ -858,7 +858,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1147](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1147)
+[packages/core/src/types.ts:1153](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1153)
 
 ***
 
@@ -876,7 +876,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1155](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1155)
+[packages/core/src/types.ts:1161](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1161)
 
 ***
 
@@ -894,7 +894,7 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1156](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1156)
+[packages/core/src/types.ts:1162](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1162)
 
 ***
 
@@ -914,4 +914,4 @@ Get memories matching criteria
 
 #### Defined in
 
-[packages/core/src/types.ts:1157](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1157)
+[packages/core/src/types.ts:1163](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1163)

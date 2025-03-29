@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / composeContext
+[@elizaos/core v0.25.9](../index.md) / composeContext
 
 # Function: composeContext()
 
@@ -57,4 +57,4 @@ const contextSimple = composeContext({ state, template });
 
 ## Defined in
 
-[packages/core/src/context.ts:37](https://github.com/elizaOS/eliza/blob/main/packages/core/src/context.ts#L37)
+[packages/core/src/context.ts:37](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/context.ts#L37)

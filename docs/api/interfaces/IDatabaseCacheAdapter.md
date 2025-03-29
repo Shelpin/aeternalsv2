@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / IDatabaseCacheAdapter
+[@elizaos/core v0.25.9](../index.md) / IDatabaseCacheAdapter
 
 # Interface: IDatabaseCacheAdapter
 
@@ -22,7 +22,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1161](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1161)
+[packages/core/src/types.ts:1167](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1167)
 
 ***
 
@@ -46,7 +46,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1166](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1166)
+[packages/core/src/types.ts:1172](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1172)
 
 ***
 
@@ -68,4 +68,4 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1172](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1172)
+[packages/core/src/types.ts:1178](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1178)

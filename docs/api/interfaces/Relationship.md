@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / Relationship
+[@elizaos/core v0.25.9](../index.md) / Relationship
 
 # Interface: Relationship
 
@@ -14,7 +14,7 @@ Unique identifier
 
 #### Defined in
 
-[packages/core/src/types.ts:522](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L522)
+[packages/core/src/types.ts:522](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L522)
 
 ***
 
@@ -26,7 +26,7 @@ First user ID
 
 #### Defined in
 
-[packages/core/src/types.ts:525](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L525)
+[packages/core/src/types.ts:525](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L525)
 
 ***
 
@@ -38,7 +38,7 @@ Second user ID
 
 #### Defined in
 
-[packages/core/src/types.ts:528](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L528)
+[packages/core/src/types.ts:528](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L528)
 
 ***
 
@@ -50,7 +50,7 @@ Primary user ID
 
 #### Defined in
 
-[packages/core/src/types.ts:531](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L531)
+[packages/core/src/types.ts:531](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L531)
 
 ***
 
@@ -62,7 +62,7 @@ Associated room ID
 
 #### Defined in
 
-[packages/core/src/types.ts:534](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L534)
+[packages/core/src/types.ts:534](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L534)
 
 ***
 
@@ -74,7 +74,7 @@ Relationship status
 
 #### Defined in
 
-[packages/core/src/types.ts:537](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L537)
+[packages/core/src/types.ts:537](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L537)
 
 ***
 
@@ -86,4 +86,4 @@ Optional creation timestamp
 
 #### Defined in
 
-[packages/core/src/types.ts:540](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L540)
+[packages/core/src/types.ts:540](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L540)

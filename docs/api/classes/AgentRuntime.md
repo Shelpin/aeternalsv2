@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / AgentRuntime
+[@elizaos/core v0.25.9](../index.md) / AgentRuntime
 
 # Class: AgentRuntime
 
@@ -80,7 +80,7 @@ Custom fetch function to use for making requests.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:245](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L245)
+[packages/core/src/runtime.ts:245](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L245)
 
 ## Properties
 
@@ -96,7 +96,7 @@ The ID of the agent
 
 #### Defined in
 
-[packages/core/src/runtime.ts:83](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L83)
+[packages/core/src/runtime.ts:83](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L83)
 
 ***
 
@@ -112,7 +112,7 @@ The base URL of the server where the agent's requests are processed.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:87](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L87)
+[packages/core/src/runtime.ts:87](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L87)
 
 ***
 
@@ -128,7 +128,7 @@ The database adapter used for interacting with the database.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:92](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L92)
+[packages/core/src/runtime.ts:92](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L92)
 
 ***
 
@@ -144,7 +144,7 @@ Authentication token used for securing requests.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:97](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L97)
+[packages/core/src/runtime.ts:97](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L97)
 
 ***
 
@@ -160,7 +160,7 @@ Custom actions that the agent can perform.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:102](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L102)
+[packages/core/src/runtime.ts:102](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L102)
 
 ***
 
@@ -176,7 +176,7 @@ Evaluators used to assess and guide the agent's responses.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:107](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L107)
+[packages/core/src/runtime.ts:107](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L107)
 
 ***
 
@@ -192,7 +192,7 @@ Context providers used to provide context for message generation.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:112](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L112)
+[packages/core/src/runtime.ts:112](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L112)
 
 ***
 
@@ -204,7 +204,7 @@ Database adapters used to interact with the database.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:117](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L117)
+[packages/core/src/runtime.ts:117](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L117)
 
 ***
 
@@ -218,7 +218,7 @@ Database adapters used to interact with the database.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:119](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L119)
+[packages/core/src/runtime.ts:119](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L119)
 
 ***
 
@@ -234,7 +234,7 @@ The model to use for generateText.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:124](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L124)
+[packages/core/src/runtime.ts:124](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L124)
 
 ***
 
@@ -250,7 +250,7 @@ The model to use for generateImage.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:129](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L129)
+[packages/core/src/runtime.ts:129](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L129)
 
 ***
 
@@ -266,7 +266,7 @@ The model to use for describing images.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:134](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L134)
+[packages/core/src/runtime.ts:134](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L134)
 
 ***
 
@@ -305,7 +305,7 @@ Some environments may not have access to the global fetch function and need a cu
 
 #### Defined in
 
-[packages/core/src/runtime.ts:140](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L140)
+[packages/core/src/runtime.ts:140](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L140)
 
 ***
 
@@ -321,7 +321,7 @@ The character to use for the agent
 
 #### Defined in
 
-[packages/core/src/runtime.ts:145](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L145)
+[packages/core/src/runtime.ts:145](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L145)
 
 ***
 
@@ -337,7 +337,7 @@ Store messages that are sent and received by the agent.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:150](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L150)
+[packages/core/src/runtime.ts:150](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L150)
 
 ***
 
@@ -353,7 +353,7 @@ Store and recall descriptions of users based on conversations.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:155](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L155)
+[packages/core/src/runtime.ts:155](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L155)
 
 ***
 
@@ -369,7 +369,7 @@ Manage the creation and recall of static information (documents, historical game
 
 #### Defined in
 
-[packages/core/src/runtime.ts:160](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L160)
+[packages/core/src/runtime.ts:160](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L160)
 
 ***
 
@@ -385,7 +385,7 @@ Hold large documents that can be referenced
 
 #### Defined in
 
-[packages/core/src/runtime.ts:165](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L165)
+[packages/core/src/runtime.ts:165](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L165)
 
 ***
 
@@ -401,7 +401,7 @@ Searchable document fragments
 
 #### Defined in
 
-[packages/core/src/runtime.ts:170](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L170)
+[packages/core/src/runtime.ts:170](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L170)
 
 ***
 
@@ -415,7 +415,7 @@ Searchable document fragments
 
 #### Defined in
 
-[packages/core/src/runtime.ts:172](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L172)
+[packages/core/src/runtime.ts:172](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L172)
 
 ***
 
@@ -429,7 +429,7 @@ Searchable document fragments
 
 #### Defined in
 
-[packages/core/src/runtime.ts:176](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L176)
+[packages/core/src/runtime.ts:176](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L176)
 
 ***
 
@@ -439,7 +439,7 @@ Searchable document fragments
 
 #### Defined in
 
-[packages/core/src/runtime.ts:177](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L177)
+[packages/core/src/runtime.ts:177](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L177)
 
 ***
 
@@ -453,7 +453,7 @@ Searchable document fragments
 
 #### Defined in
 
-[packages/core/src/runtime.ts:178](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L178)
+[packages/core/src/runtime.ts:178](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L178)
 
 ***
 
@@ -467,7 +467,7 @@ Searchable document fragments
 
 #### Defined in
 
-[packages/core/src/runtime.ts:179](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L179)
+[packages/core/src/runtime.ts:179](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L179)
 
 ## Methods
 
@@ -491,7 +491,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter;
 
 #### Defined in
 
-[packages/core/src/runtime.ts:183](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L183)
+[packages/core/src/runtime.ts:183](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L183)
 
 ***
 
@@ -513,7 +513,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter;
 
 #### Defined in
 
-[packages/core/src/runtime.ts:198](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L198)
+[packages/core/src/runtime.ts:198](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L198)
 
 ***
 
@@ -539,7 +539,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter;
 
 #### Defined in
 
-[packages/core/src/runtime.ts:202](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L202)
+[packages/core/src/runtime.ts:202](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L202)
 
 ***
 
@@ -561,7 +561,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter;
 
 #### Defined in
 
-[packages/core/src/runtime.ts:211](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L211)
+[packages/core/src/runtime.ts:211](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L211)
 
 ***
 
@@ -581,7 +581,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/runtime.ts:459](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L459)
+[packages/core/src/runtime.ts:459](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L459)
 
 ***
 
@@ -595,7 +595,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/runtime.ts:580](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L580)
+[packages/core/src/runtime.ts:610](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L610)
 
 ***
 
@@ -617,7 +617,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/runtime.ts:945](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L945)
+[packages/core/src/runtime.ts:975](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L975)
 
 ***
 
@@ -639,7 +639,7 @@ The number of recent messages to be kept in memory.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:967](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L967)
+[packages/core/src/runtime.ts:997](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L997)
 
 ***
 
@@ -665,7 +665,7 @@ The action to register.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:975](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L975)
+[packages/core/src/runtime.ts:1005](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1005)
 
 ***
 
@@ -687,7 +687,7 @@ The evaluator to register.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:984](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L984)
+[packages/core/src/runtime.ts:1014](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1014)
 
 ***
 
@@ -709,7 +709,7 @@ The context provider to register.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:992](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L992)
+[packages/core/src/runtime.ts:1022](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1022)
 
 ***
 
@@ -731,7 +731,7 @@ The adapter to register.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1000](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1000)
+[packages/core/src/runtime.ts:1030](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1030)
 
 ***
 
@@ -763,7 +763,7 @@ The message to process.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1009](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1009)
+[packages/core/src/runtime.ts:1039](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1039)
 
 ***
 
@@ -803,7 +803,7 @@ The results of the evaluation.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1093](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1093)
+[packages/core/src/runtime.ts:1123](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1123)
 
 ***
 
@@ -835,7 +835,7 @@ An error if the participant cannot be added.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1163](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1163)
+[packages/core/src/runtime.ts:1193](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1193)
 
 ***
 
@@ -871,7 +871,7 @@ The user name to ensure the existence of.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1179](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1179)
+[packages/core/src/runtime.ts:1209](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1209)
 
 ***
 
@@ -895,7 +895,7 @@ The user name to ensure the existence of.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1205](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1205)
+[packages/core/src/runtime.ts:1235](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1235)
 
 ***
 
@@ -925,7 +925,7 @@ The user name to ensure the existence of.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1222](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1222)
+[packages/core/src/runtime.ts:1252](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1252)
 
 ***
 
@@ -956,7 +956,7 @@ An error if the room cannot be created.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1258](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1258)
+[packages/core/src/runtime.ts:1288](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1288)
 
 ***
 
@@ -986,7 +986,7 @@ The state of the agent.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1271](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1271)
+[packages/core/src/runtime.ts:1301](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1301)
 
 ***
 
@@ -1008,4 +1008,4 @@ The state of the agent.
 
 #### Defined in
 
-[packages/core/src/runtime.ts:1728](https://github.com/elizaOS/eliza/blob/main/packages/core/src/runtime.ts#L1728)
+[packages/core/src/runtime.ts:1758](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/runtime.ts#L1758)

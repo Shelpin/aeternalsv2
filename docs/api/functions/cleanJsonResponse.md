@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / cleanJsonResponse
+[@elizaos/core v0.25.9](../index.md) / cleanJsonResponse
 
 # Function: cleanJsonResponse()
 
@@ -21,4 +21,4 @@ The cleaned string, ready for parsing or further processing.
 
 ## Defined in
 
-[packages/core/src/parsing.ts:269](https://github.com/elizaOS/eliza/blob/main/packages/core/src/parsing.ts#L269)
+[packages/core/src/parsing.ts:269](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/parsing.ts#L269)

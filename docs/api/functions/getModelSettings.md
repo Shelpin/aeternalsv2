@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / getModelSettings
+[@elizaos/core v0.25.9](../index.md) / getModelSettings
 
 # Function: getModelSettings()
 
@@ -16,4 +16,4 @@
 
 ## Defined in
 
-[packages/core/src/models.ts:1226](https://github.com/elizaOS/eliza/blob/main/packages/core/src/models.ts#L1226)
+[packages/core/src/models.ts:1226](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/models.ts#L1226)

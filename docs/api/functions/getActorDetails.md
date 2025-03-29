@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / getActorDetails
+[@elizaos/core v0.25.9](../index.md) / getActorDetails
 
 # Function: getActorDetails()
 
@@ -20,4 +20,4 @@ Get details for a list of actors.
 
 ## Defined in
 
-[packages/core/src/messages.ts:12](https://github.com/elizaOS/eliza/blob/main/packages/core/src/messages.ts#L12)
+[packages/core/src/messages.ts:12](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/messages.ts#L12)

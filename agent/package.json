@@ -18,7 +18,7 @@
         "exec": "node --enable-source-maps --loader ts-node/esm src/index.ts"
     },
     "dependencies": {
-        "@elizaos-plugins/client-telegram": "github:elizaos-plugins/client-telegram",
+        "@elizaos-plugins/client-telegram": "^0.1.0",
         "@elizaos-plugins/plugin-coingecko": "github:elizaos-plugins/plugin-coingecko",
         "@elizaos-plugins/plugin-giphy": "github:elizaos-plugins/plugin-giphy",
         "@elizaos/client-direct": "workspace:*",

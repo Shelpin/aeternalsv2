@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / EmbeddingConfig
+[@elizaos/core v0.25.9](../index.md) / EmbeddingConfig
 
 # Type Alias: EmbeddingConfig
 
@@ -20,4 +20,4 @@
 
 ## Defined in
 
-[packages/core/src/embedding.ts:28](https://github.com/elizaOS/eliza/blob/main/packages/core/src/embedding.ts#L28)
+[packages/core/src/embedding.ts:28](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/embedding.ts#L28)

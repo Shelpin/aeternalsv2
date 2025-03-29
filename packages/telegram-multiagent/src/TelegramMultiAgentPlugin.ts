@@ -15,6 +15,10 @@ import { PluginComponent } from './PluginComponent.js';
 import path from 'path';
 import fs from 'fs';
 import { FallbackMemoryManager } from './FallbackMemoryManager.js';
+import { SqliteAdapterProxy } from './SqliteAdapterProxy.js';
+import { generateUUID } from './utils.js';
+import { createRequire } from 'node:module';
+import { config as initConfig } from 'dotenv';
 
 // Extend the Character interface to include additional properties
 declare module './types.js' {
@@ -32,11 +36,13 @@ const DEFAULT_CONFIG: TelegramMultiAgentConfig = {
   enabled: true,
   relayServerUrl: 'http://207.180.245.243:4000',
   authToken: 'elizaos-secure-relay-key',
+  botToken: '',  // Telegram Bot API token (empty by default)
   groupIds: [],
   dbPath: './data/telegram-multiagent.db',
   logLevel: 'info',
   conversationCheckIntervalMs: 60000, // 1 minute
   maxRetries: 3,
+  disablePolling: false,
   kickstarterConfig: {
     probabilityFactor: 0.2,
     minIntervalMs: 300000, // 5 minutes
@@ -45,6 +51,24 @@ const DEFAULT_CONFIG: TelegramMultiAgentConfig = {
     maxAgentsToTag: 2
   }
 };
+
+// Added default agent ID constant
+const DEFAULT_AGENT_ID = 'unknown_agent';
+
+/**
+ * Creates a minimal representation of a message object for logging
+ * @param {any} msg - The message object to minimize
+ * @return {object} - A minimal representation with just essential properties
+ */
+function logMinimalMsg(msg: any): any {
+  if (!msg) return 'null';
+  return {
+    id: msg?.message_id,
+    from: msg?.from?.username,
+    text: msg?.text?.slice(0, 100),
+    chatId: msg?.chat?.id
+  };
+}
 
 /**
  * Telegram Multi-Agent Plugin
@@ -74,6 +98,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private fallbackMemory: FallbackMemoryManager | null = null;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private runtimeProxy: IAgentRuntime | null = null;
+  private sqliteProxies: Record<string, SqliteAdapterProxy> = {};
+  private fallbackMemoryManagers: Record<string, FallbackMemoryManager> = {};
+  private dbAdapter: any = null;
+  private agentRegistry: any = null;
+  private memoryManager: any = null;
+  private telegramClient: any = null;
+  private _eventHandlers: Record<string, Function[]> = {};
   
   /**
    * Create a new TelegramMultiAgentPlugin
@@ -137,58 +168,62 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       // Store runtime reference even if null
       super.setRuntime(runtime);
       
-      if (!runtime) {
-        this.logger.warn(`[REGISTER] ${this.name}: Received null runtime, will attempt to obtain later`);
-        return this;
+      // Use this.initializePromise to ensure initialization happens only once
+      if (!this.initializePromise) {
+        this.initializePromise = this.startInitialization(runtime);
+      }
+      
+      return this;
+    } catch (error) {
+      this.logger.error(`[REGISTER] ${this.name}: Registration failed: ${error.message}`);
+      return false;
+    }
+  }
+  
+  /**
+   * Start the initialization process in the background
+   * This allows the register method to return immediately
+   */
+  private async startInitialization(runtime: IAgentRuntime): Promise<void> {
+    try {
+      // Wait for runtime to be fully initialized - increased timeout to 30 seconds
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Small initial delay
+      
+      // Wait for runtime to be fully available
+      const wrappedRuntime = await this.waitForRuntime(30000);
+      
+      // Check for critical methods
+      if (!wrappedRuntime || typeof wrappedRuntime.handleMessage !== 'function') {
+        this.logger.warn(`[PLUGIN] Runtime handleMessage still not defined after wait.`);
+      } else {
+        this.logger.info(`[PLUGIN] Runtime handleMessage is now available.`);
       }
       
       // VALHALLA FIX: Normalize agent ID consistently
       const envAgentId = process.env.AGENT_ID;
-      const runtimeAgentId = runtime.client?.telegram?.botInfo?.username;
-      const fallbackAgentId = runtime.getAgentId();
+      const runtimeAgentId = runtime?.client?.telegram?.botInfo?.username;
+      const fallbackAgentId = wrappedRuntime.getAgentId();
       
       this.agentId = this.normalizeAgentId(
         envAgentId || runtimeAgentId || fallbackAgentId
       );
       
-      this.logger.info(`[IDENTITY] Using normalized agent ID: ${this.agentId}`);
-      
-      // VALHALLA FIX: Hook into ElizaOS core's message events with enhanced logging
-      if (runtime.client?.telegram) {
-        runtime.client.telegram.on('message', async (message) => {
-          // Enhanced message logging
-          this.logger.info(`[RECEIVE] From ${message.from.username} | Text: ${message.text}`);
-          
-          // Convert Telegram message to our RelayMessage format
-          const relayMessage = {
-            message_id: message.message_id,
-            from: message.from,
-            chat: message.chat,
-            date: message.date,
-            text: message.text || '',
-            sender_agent_id: message.from.username
-          };
-          
-          // Log message journey
-          this.logger.debug(`[FLOW] Message journey:
-            Source: Telegram
-            Stage: Core Client Reception
-            From: ${message.from.username}
-            To: ${this.agentId}
-            Text: ${message.text?.substring(0, 50)}...
-          `);
-          
-          await this.handleIncomingMessage(relayMessage);
-        });
-        this.logger.info(`[PLUGIN] Hooked into ElizaOS Telegram client message events`);
-      } else {
-        this.logger.warn(`[REGISTER] ${this.name}: ElizaOS Telegram client not available`);
+      // Add new code to check for character id/name as fallback
+      if (!this.agentId || this.agentId === "unknown") {
+        // Try to get agent ID from character
+        if (this.character) {
+          this.agentId = this.character.id || this.character.name || "unknown";
+          this.logger.info(`[IDENTITY] Using character id/name as Agent ID: ${this.agentId}`);
+        }
       }
       
-      return this;
+      // Log the final agent ID that will be used for relay registration
+      this.logger.info(`[IDENTITY] Agent ID for relay registration: ${this.agentId}`);
+      
+      // Continue initialization
+      await this.initialize();
     } catch (error) {
-      this.logger.error(`[ERROR] ${this.name}: Unexpected error during plugin registration: ${error}`);
-      return false;
+      this.logger.error(`[PLUGIN] Initialization error: ${error.message}`);
     }
   }
   
@@ -207,8 +242,9 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.logger.debug(`${this.name}: Environment variables:
         RELAY_SERVER_URL=${process.env.RELAY_SERVER_URL || 'not set'}
         RELAY_AUTH_TOKEN=${process.env.RELAY_AUTH_TOKEN ? '(set)' : 'not set'}
+        TELEGRAM_BOT_TOKEN=${process.env.TELEGRAM_BOT_TOKEN ? '(set)' : 'not set'}
         AGENT_ID=${process.env.AGENT_ID || 'not set'}
-      `);
+      `, '', '');
       
       // First check for environment variables - highest priority
       if (process.env.RELAY_SERVER_URL) {
@@ -223,6 +259,35 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         this.logger.info(`${this.name}: Using auth token from RELAY_API_KEY environment variable`);
         this.config.authToken = process.env.RELAY_API_KEY;
       }
+      
+      // VALHALLA FIX: Look for Telegram bot token in environment variables
+      // First try generic TELEGRAM_BOT_TOKEN
+      if (process.env.TELEGRAM_BOT_TOKEN) {
+        this.logger.info(`${this.name}: Using Telegram bot token from TELEGRAM_BOT_TOKEN environment variable`);
+        this.config.botToken = process.env.TELEGRAM_BOT_TOKEN;
+      } 
+      // Then try agent-specific token format
+      else if (process.env.AGENT_ID) {
+        const agentId = process.env.AGENT_ID;
+        const formattedAgentId = agentId.toUpperCase().replace(/-/g, '_');
+        const tokenEnvVar = `TELEGRAM_BOT_TOKEN_${formattedAgentId}`;
+        
+        if (process.env[tokenEnvVar]) {
+          this.logger.info(`${this.name}: Using Telegram bot token from ${tokenEnvVar} environment variable`);
+          this.config.botToken = process.env[tokenEnvVar];
+        } else {
+          this.logger.warn(`${this.name}: No agent-specific bot token found in environment`);
+        }
+      }
+      
+      // If no botToken set but authToken is available, use it as fallback
+      if (!this.config.botToken && this.config.authToken && 
+          this.config.authToken.length > 30) { // Bot tokens are typically long
+        this.logger.info(`${this.name}: Using authToken as fallback for botToken`);
+        this.config.botToken = this.config.authToken;
+      }
+      
+      const authToken = this.config.authToken; // Save from env
       
       // Check if config file exists - second priority
       if (fs.existsSync(configPath)) {
@@ -274,6 +339,196 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   async initialize(): Promise<void> {
     try {
+      this.logger.info('[PLUGIN] Initializing TelegramMultiAgentPlugin');
+      
+      // Make sure the runtime is available before proceeding
+      if (!this.runtime) {
+        // Try to get runtime one more time with a longer timeout
+        try {
+          this.runtime = await this.waitForRuntime(20000);
+        } catch (runtimeError) {
+          throw new Error(`Runtime not available: ${runtimeError.message}`);
+        }
+      }
+      
+      if (!this.runtime) {
+        throw new Error('Runtime not available');
+      }
+      
+      // Get the agent ID and normalize it for token lookup
+      const rawAgentId = this.runtime.agentId || process.env.AGENT_ID || DEFAULT_AGENT_ID;
+      
+      // Log the raw agent ID for debugging
+      this.logger.info(`[PLUGIN] Raw agent ID: ${rawAgentId}`);
+      
+      // Multiple approaches to construct environment variable names for token lookup
+      const possibleEnvVars = [
+        // Standard normalized format
+        `TELEGRAM_BOT_TOKEN_${rawAgentId.replace(/[^a-zA-Z0-9]/g, '_')}`,
+        
+        // Character name-based lookup (common in Valhalla)
+        `TELEGRAM_BOT_TOKEN_${this.getCharacterName()}`,
+        
+        // Upper case transformation
+        `TELEGRAM_BOT_TOKEN_${rawAgentId.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`,
+        
+        // Camel case to snake case transformation
+        `TELEGRAM_BOT_TOKEN_${this.normalizeAgentId(rawAgentId)}`,
+        
+        // Simple fallbacks
+        'TELEGRAM_BOT_TOKEN',
+        `TELEGRAM_BOT_TOKEN_${rawAgentId}`
+      ];
+      
+      // Log the environment variables we're checking
+      this.logger.info(`[PLUGIN] Checking for token in environment variables: ${possibleEnvVars.join(', ')}`);
+      
+      // Try to find a matching environment variable with a token
+      let token = null;
+      let matchedVar = null;
+      
+      for (const envVar of possibleEnvVars) {
+        if (process.env[envVar]) {
+          token = process.env[envVar];
+          matchedVar = envVar;
+          this.logger.info(`[PLUGIN] Found token in environment variable: ${envVar}`);
+          break;
+        }
+      }
+      
+      // Also check config for token
+      if (!token && this.config.botToken) {
+        token = this.config.botToken;
+        this.logger.info(`[PLUGIN] Using token from plugin config`);
+      }
+      
+      // If still no token, throw error
+      if (!token) {
+        const envStr = possibleEnvVars.map(v => `${v}=...`).join(' or ');
+        this.logger.error(`[PLUGIN] No bot token found. Please set ${envStr} environment variable or configure botToken in plugin config.`);
+        throw new Error(`No bot token found for agent`);
+      }
+      
+      // Set the token in the config for future use
+      this.config.botToken = token;
+      
+      // Use just the beginning and end for logging (to avoid exposing full token)
+      const tokenMasked = token ? `${token.substring(0, 5)}...${token.substring(token.length - 3)}` : 'undefined';
+      this.logger.info(`[PLUGIN] Using bot token from ${matchedVar || 'config'}: ${tokenMasked}`);
+      this.logger.info(`[PLUGIN] Resolved Telegram token: ${tokenMasked}`);
+      
+      // STEP 2 - Initialize the TelegramClient
+      try {
+        // Paths to try when loading the TelegramClient module
+        const possiblePaths = [
+          // Absolute paths
+          '/root/eliza/node_modules/@elizaos-plugins/client-telegram',
+          '/root/eliza/node_modules/.pnpm/node_modules/@elizaos-plugins/client-telegram',
+          // Relative paths from current directory
+          path.resolve(process.cwd(), 'packages/clients'),
+          path.resolve(process.cwd(), 'node_modules/@elizaos-plugins/client-telegram'),
+          path.resolve(process.cwd(), '../packages/clients'),
+          // Fallback paths
+          '../packages/clients',
+          'packages/clients',
+          'packages/clients/client-telegram'
+        ];
+        
+        let TelegramClient = null;
+        let loadedFrom = '';
+        
+        // Try each path until we find the module
+        for (const modulePath of possiblePaths) {
+          try {
+            if (fs.existsSync(modulePath)) {
+              this.logger.info(`[PLUGIN] Attempting to load TelegramClient from ${modulePath}`);
+              
+              // If it's a directory, look for index file
+              if (fs.statSync(modulePath).isDirectory()) {
+                const files = fs.readdirSync(modulePath);
+                this.logger.info(`[PLUGIN] Directory contents of ${modulePath}: ${files.join(', ')}`);
+                
+                // Try to load from different entry points
+                if (files.includes('index.js') || files.includes('index.ts')) {
+                  // Try a standard import
+                  const module = require(modulePath);
+                  if (module && module.TelegramClient) {
+                    TelegramClient = module.TelegramClient;
+                    loadedFrom = modulePath;
+                    break;
+                  }
+                }
+              } else {
+                // It's a file, try to load it directly
+                const module = require(modulePath);
+                if (module && module.TelegramClient) {
+                  TelegramClient = module.TelegramClient;
+                  loadedFrom = modulePath;
+                  break;
+                }
+              }
+            }
+          } catch (err) {
+            this.logger.debug(`[PLUGIN] Failed to load from ${modulePath}: ${err.message}`);
+            // Continue to the next path
+          }
+        }
+        
+        if (TelegramClient) {
+          this.logger.info(`[PLUGIN] Successfully loaded TelegramClient from ${loadedFrom}`);
+          
+          // Initialize the client with our config
+          this.telegramClient = new TelegramClient({
+            botToken: this.config.botToken,
+            relayServerUrl: this.config.relayServerUrl,
+            agentId: this.agentId,
+            logger: this.logger
+          });
+          
+          // Add simulateMessage method to telegramClient
+          this.telegramClient.simulateMessage = (message) => {
+            this.logger.info(`[PLUGIN][VALHALLA] Simulating message: ${message.text}`);
+            // Handle the message through our standard flow
+            this.handleIncomingMessage(message);
+          };
+
+          // Ensure runtime.clients exists and attach the client
+          if (this.runtime) {
+            this.runtime.clients ??= {};
+            this.runtime.clients.telegram = this.telegramClient;
+            this.logger.info(`[PLUGIN] Telegram client initialized and attached to runtime.clients.telegram`);
+            
+            // STEP 5 - Test with Simulated Message
+            setTimeout(() => {
+              this.logger.info(`[PLUGIN][VALHALLA] Running simulated message test...`);
+              this.telegramClient.simulateMessage({
+                chat: { id: 'test_chat' },
+                text: 'What do you think about Ethereum?',
+                from: { id: 123456, username: 'test_user' }
+              });
+            }, 5000); // Wait 5 seconds after initialization
+          } else {
+            this.logger.warn(`[PLUGIN] Runtime not available yet, client created but not attached`);
+          }
+        } else {
+          throw new Error('TelegramClient not found in any of the expected locations');
+        }
+      } catch (error) {
+        this.logger.error(`[PLUGIN] Failed to initialize Telegram client: ${error.message}`);
+        this.logger.error(`[PLUGIN] Will try to create minimal client`);
+        
+        // Create minimal client
+        this.createMinimalTelegramClient();
+      }
+      
+      // STEP 7 - Add guard to prevent minimal client fallbacks - MOVED AFTER INITIALIZATION ATTEMPT
+      if (!this.telegramClient || !this.telegramClient.sendMessage) {
+        throw new Error(`Telegram client not initialized correctly for ${this.agentId}`);
+      }
+      
+      // VALHALLA DEBUG: Log available clients in the runtime
+      console.log('[VALHALLA] Runtime clients:', Object.keys(globalThis.__elizaRuntime?.clients || {}));
+      
       // Wait for runtime to be ready first
       const runtime = await this.waitForRuntime(10000); // 10 second timeout
       if (!runtime) {
@@ -282,278 +537,113 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       
       this.logger.info(`[PLUGIN] Runtime ready, initializing plugin`);
       
-      // VALHALLA FIX: Check if runtime.handleMessage is defined
-      if (!runtime || typeof runtime.handleMessage !== 'function') {
-        this.logger.warn('[PLUGIN] Runtime handleMessage not defined. Plugin may not respond to messages.');
+      // VALHALLA INSPECTOR: Log available runtime methods
+      this.logger.info('[VALHALLA] Runtime method registration check:', '', '');
+      this.logger.info(`Available runtime methods: ${Object.keys(this.runtime).join(', ')}`, '', '');
+      
+      // Additional checks for specific methods
+      if (this.runtime.agents) {
+        this.logger.info(`[VALHALLA] Available runtime.agents methods: ${Object.keys(this.runtime.agents).join(', ')}`, '', '');
       } else {
-        this.logger.info('[PLUGIN] Runtime handleMessage properly defined.');
+        this.logger.warn('[VALHALLA] runtime.agents object not available', '', '');
       }
       
-      // Get Telegram bot username for relay registration
-      let telegramAgentId = '';
-      
-      // First try getting from environment variables
-      if (process.env.TELEGRAM_BOT_USERNAME) {
-        telegramAgentId = process.env.TELEGRAM_BOT_USERNAME;
-        this.logger.info(`[RELAY] Using TELEGRAM_BOT_USERNAME: ${telegramAgentId}`);
-      } else if (process.env.AGENT_ID) {
-        const agentIdFromEnv = process.env.AGENT_ID;
-        telegramAgentId = agentIdFromEnv.endsWith('_bot') ? agentIdFromEnv : `${agentIdFromEnv}_bot`;
-        this.logger.info(`[RELAY] Using derived bot username from AGENT_ID: ${telegramAgentId}`);
-      }
-      
-      this.logger.info(`[IDENTITY] Agent ID for relay registration: ${telegramAgentId}`);
-      
-      // VALHALLA FIX: Override this.agentId with telegramAgentId to ensure consistency
-      this.agentId = telegramAgentId;
-      this.logger.info(`[IDENTITY] Setting canonical agent ID to: ${this.agentId}`);
-      
-      // Initialize relay with explicit Telegram bot username
-      this.relay = new TelegramRelay({
-        relayServerUrl: this.config.relayServerUrl,
-        authToken: this.config.authToken,
-        agentId: telegramAgentId 
-      }, this.logger);
-      
-      this.logger.info(`[RELAY] Agent ${telegramAgentId} relay instance created`);
-      
-      // Set up relay message handling
-      this.relay.onMessage(this.handleIncomingMessage.bind(this));
-      
-      // VALHALLA FIX: Remove custom Telegram polling and rely on ElizaOS core
-      this.logger.info(`[PLUGIN] Using ElizaOS core for Telegram polling`);
-      
-      // Connect to relay
-      const connected = await this.relay.connect();
-      if (!connected) {
-        throw new Error('Failed to connect to relay server');
-      }
-      
-      // VALHALLA FIX: Check if runtime.handleMessage is defined
-      if (!runtime || typeof runtime.handleMessage !== 'function') {
-        this.logger.warn('[PLUGIN] Runtime handleMessage not defined. Plugin may not respond to messages.');
+      // Log character config 
+      if (this.runtime.character) {
+        this.logger.info(`[VALHALLA] Character name: ${this.runtime.character.name}`, '', '');
+        this.logger.info(`[VALHALLA] Character plugins: ${JSON.stringify(this.runtime.character.plugins || [])}`, '', '');
       } else {
-        this.logger.info('[PLUGIN] Runtime handleMessage properly defined.');
+        this.logger.warn('[VALHALLA] runtime.character not available', '', '');
       }
-      
-      this.initialized = true;
-      this.logger.info(`${this.name}: Plugin initialized successfully`);
-    } catch (error) {
-      this.logger.error(`${this.name}: Initialization failed: ${error.message}`);
-      throw error;
-    }
-  }
-  
-  /**
-   * Test method to quickly confirm plugin health
-   */
-  test(): void {
-    try {
-      if (!this.runtime) {
-        console.log("[TEST] Runtime reference is missing");
-        return;
-      }
-      
-      // Log the runtime constructor name
-      console.log("Runtime class:", this.runtime.constructor?.name || "unknown");
-      
-      // Test runtime methods
-      this.logger.info("[PROXY] runtime.getAgentId exists:", typeof this.runtime.getAgentId === "function");
-      this.logger.info("[PROXY] runtime.getLogger exists:", typeof this.runtime.getLogger === "function");
-      this.logger.info("[PROXY] runtime.memoryManager exists:", !!this.runtime.memoryManager);
-      
-      // Test agent ID retrieval
-      try {
-        const agentId = this.runtime.getAgentId();
-        this.logger.info(`[TEST] Runtime proxy test: Agent ID = ${agentId}`);
-      } catch (error) {
-        this.logger.error(`[TEST] Agent ID test failed: ${error.message}`);
-      }
-      
-      // Check if runtime methods are bound correctly
-      try {
-        const getAgentId = this.runtime.getAgentId;
-        const unboundAgentId = getAgentId?.();
-        this.logger.info(`[TEST] Unbound method test: ${unboundAgentId || 'Failed'}`);
-      } catch (error) {
-        this.logger.error(`[TEST] Unbound method test failed: ${error.message}`);
-      }
-    } catch (error) {
-      console.error(`[TEST] Error during test: ${error}`);
-    }
-  }
-  
-  /**
-   * Safe method to normalize agent ID
-   * Implements consistent agent ID normalization across the plugin
-   */
-  private normalizeAgentId(agentId: string): string {
-    // VALHALLA FIX: Handle _bot suffix more robustly and convert to lowercase
-    return agentId?.replace('_bot', '').toLowerCase() || '';
-  }
-  
-  /**
-   * Safe method to get agent ID with fallback
-   * Implements the expert's recommendation for defensive runtime checks
-   */
-  protected getAgentIdSafe(): string {
-    // First try environment variable
-    if (process.env.AGENT_ID) {
-      return this.normalizeAgentId(process.env.AGENT_ID);
-    }
-    
-    // Then try runtime
-    if (!this.runtime?.getAgentId) {
-      this.logger.warn("Runtime is still invalid — fallback triggered");
-      return this.agentId || "unknown";
-    }
-    
-    try {
-      const agentId = this.runtime.getAgentId();
-      
-      if (!agentId) {
-        this.logger.warn("Runtime.getAgentId() returned empty value");
-        return this.agentId || "unknown";
-      }
-      
-      return this.normalizeAgentId(agentId);
-    } catch (error) {
-      this.logger.error(`Error getting agent ID: ${error.message}`);
-      return this.agentId || "unknown";
-    }
-  }
-  
-  /**
-   * Internal initialization implementation
-   */
-  private async _initialize(): Promise<void> {
-    try {
-      if (this.initialized) {
-        this.logger.info(`${this.name}: Already initialized, skipping`);
-        return;
-      }
-      
-      // Log initialization start
-      this.logger.info(`${this.name}: Initializing (v0.25.9)...`);
-      
-      // Load configuration
-      await this.loadConfig();
-      
-      // Add debugging route (Agent HTTP Exposure - from reviewed action plan)
-      if (globalThis.__elizaRuntime?.app) {
-        const app = globalThis.__elizaRuntime.app;
-        app.get('/status', (req, res) => {
-          const status = {
-            plugin: this.name,
-            version: '0.25.9',
-            agent_id: this.getAgentIdSafe(),
-            initialized: this.initialized,
-            relay_connected: this.relay?.isConnected() || false,
-            known_agents: Array.from(this.knownAgents),
-            config: {
-              relay_url: this.config.relayServerUrl,
-              enabled: this.config.enabled,
-              group_ids: this.config.groupIds
+
+      // VALHALLA ACTION CHECK: Log available actions
+      if (this.runtime.actions) {
+        this.logger.info(`[VALHALLA] Available runtime.actions: ${JSON.stringify(Object.keys(this.runtime.actions))}`, '', '');
+        
+        // Check for specific action handlers
+        const actionNames = Object.keys(this.runtime.actions);
+        this.logger.info(`[VALHALLA] Inspecting ${actionNames.length} actions for handlers...`, '', '');
+        
+        // Inspect the structure of actions
+        for (let i = 0; i < Math.min(actionNames.length, 5); i++) {
+          const actionKey = actionNames[i];
+          const action = this.runtime.actions[actionKey];
+          this.logger.info(`[VALHALLA] Action ${actionKey} details:`, '', '');
+          
+          if (action) {
+            if (action.name) this.logger.info(`[VALHALLA] Action ${actionKey} name: ${action.name}`, '', '');
+            if (action.description) this.logger.info(`[VALHALLA] Action ${actionKey} description: ${action.description}`, '', '');
+            if (typeof action.handler === 'function') {
+              this.logger.info(`[VALHALLA] Action ${actionKey} has a function handler`, '', '');
+              // Log the function's parameters if possible
+              const funcStr = action.handler.toString().substring(0, 100);
+              this.logger.info(`[VALHALLA] Action ${actionKey} handler signature: ${funcStr}...`, '', '');
             }
-          };
-          res.json(status);
-          this.logger.info(`[HTTP] Status endpoint accessed: ${JSON.stringify(status)}`);
-        });
-        
-        this.logger.info(`[HTTP] Added /status endpoint for diagnostics`);
-      } else {
-        this.logger.warn(`[HTTP] Cannot add status endpoint: app not available`);
-      }
-      
-      // Step 2: Wait for runtime with maximum timeout
-      // This will throw an error if the runtime cannot be obtained in time
-      try {
-        // Wait for runtime with timeout
-        this.logger.debug(`${this.name}: Waiting for runtime to be available and ready (timeout: 30000ms)`);
-        await this.waitForRuntime(30000);
-        
-        // Verify runtime is properly wrapped with adapter
-        this.logger.info(`[RUNTIME] Adapter wrapping status: runtime.getAgentId=${typeof this.runtime?.getAgentId === 'function' ? 'function' : 'missing'}`);
-        
-        // Defensive runtime check (just in case the adapter didn't work)
-        if (!this.runtime?.getLogger) {
-          this.logger.warn("[RUNTIME] Runtime adapter failed - getLogger not available");
-          throw new Error("Runtime methods not available despite adapter");
+          }
         }
         
-        // Update logger with the one from the runtime
-        this.logger = this.runtime.getLogger(this.name);
+        // Try to find a message handling action
+        const messageHandlers = actionNames.filter(key => {
+          const action = this.runtime.actions[key];
+          return action && 
+                (action.name === 'handleMessage' || 
+                action.name === 'processMessage' || 
+                action.name === 'processCharacterMessage' || 
+                action.name === 'sendMessage' ||
+                (action.name && action.name.toLowerCase().includes('message')));
+        });
         
-        // Update agentId from runtime using safe method
-        this.agentId = this.getAgentIdSafe();
-        this.logger.info(`[AGENT] Using agent ID from adapter: ${this.agentId}`);
-        
-      } catch (error) {
-        this.logger.error(`[RUNTIME] ${error.message}`);
-        throw new Error(`${this.name}: Runtime initialization failed: ${error.message}`);
+        if (messageHandlers.length > 0) {
+          this.logger.info(`[VALHALLA] Found ${messageHandlers.length} potential message handler actions`, '', '');
+          messageHandlers.forEach(key => {
+            const action = this.runtime.actions[key];
+            this.logger.info(`[VALHALLA] Message handler action found: ${action.name}`, '', '');
+          });
+        } else {
+          this.logger.warn('[VALHALLA] No message handler actions found', '', '');
+        }
+      } else {
+        this.logger.warn('[VALHALLA] runtime.actions object not available', '', '');
       }
       
-      // Signal that the plugin is ready for external verification
-      globalThis.__telegramMultiAgentPluginReady = true;
-      
-      // Test runtime functionality to ensure methods are ready
-      this.testRuntime();
-      
-      // ONLY NOW initialize components with runtime
-      this.conversationManager = new ConversationManager(this.logger);
-      this.conversationManager.setRuntime(this.runtime);
-      await this.conversationManager.initialize();
-      
-      // Get agent ID using safe method
-      this.agentId = this.getAgentIdSafe(); 
-      if (!this.agentId || this.agentId === "unknown-agent") {
-        this.logger.error("[RELAY] Cannot register with relay — agentId not available");
-        throw new Error("Agent ID not available for relay registration");
+      // VALHALLA FIX: Check if runtime.handleMessage is defined
+      if (!runtime || typeof runtime.handleMessage !== 'function') {
+        this.logger.warn('[PLUGIN] Runtime handleMessage not defined. Plugin may not respond to messages.');
+      } else {
+        this.logger.info('[PLUGIN] Runtime handleMessage properly defined.', '', '');
+      }
+
+      // EXPERT FIX: Implement proper handleMessage directly on runtime
+      if (!this.runtime.handleMessage) {
+        this.logger.warn('[VALHALLA] runtime.handleMessage not found, implementing proper handler');
+        this.runtime.handleMessage = async (message: any) => {
+          const { text = "", userId = "", context = {} } = message || {};
+          const formattedMessage = {
+            text,
+            userId,
+            context
+          };
+          const response = await runtime.agent.respond(formattedMessage);
+          return response;
+        };
+        this.logger.info('[VALHALLA] Expert-recommended handleMessage implementation added successfully');
       }
       
-      this.logger.info(`[RELAY] Will register agent ${this.agentId}`);
-      
-      // CRITICAL FIX: Prior to passing to TelegramRelay, ensure we're using the Telegram bot's
-      // username format, not the UUID, for agent ID
-      let telegramAgentId = this.agentId;
-      
-      // First try getting from environment variables
-      if (process.env.TELEGRAM_BOT_USERNAME) {
-        telegramAgentId = process.env.TELEGRAM_BOT_USERNAME;
-        this.logger.info(`[RELAY] Using TELEGRAM_BOT_USERNAME: ${telegramAgentId}`);
-      } else if (process.env.AGENT_ID) {
-        const agentIdFromEnv = process.env.AGENT_ID;
-        telegramAgentId = agentIdFromEnv.endsWith('_bot') ? agentIdFromEnv : `${agentIdFromEnv}_bot`;
-        this.logger.info(`[RELAY] Using derived bot username from AGENT_ID: ${telegramAgentId}`);
+      // VALHALLA FIX: Fix client structure if needed
+      if (!runtime.clients) {
+        this.logger.warn('[PLUGIN] Runtime clients object not defined, creating it');
+        runtime.clients = {};
       }
       
-      this.logger.info(`[IDENTITY] Agent ID for relay registration: ${telegramAgentId}`);
-      
-      // VALHALLA FIX: Override this.agentId with telegramAgentId to ensure consistency
-      // This ensures all further operations use the same ID format
-      this.agentId = telegramAgentId;
-      this.logger.info(`[IDENTITY] Setting canonical agent ID to: ${this.agentId}`);
-      
-      // Initialize relay with explicit Telegram bot username
-      this.relay = new TelegramRelay({
-        relayServerUrl: this.config.relayServerUrl,
-        authToken: this.config.authToken,
-        agentId: telegramAgentId 
-      }, this.logger);
-      
-      this.logger.info(`[RELAY] Agent ${telegramAgentId} relay instance created`);
-      
-      // Set up relay message handling
-      this.relay.onMessage(this.handleIncomingMessage.bind(this));
-      
-      // VALHALLA FIX: Remove custom Telegram polling and rely on ElizaOS core
-      this.logger.info(`[PLUGIN] Using ElizaOS core for Telegram polling`);
-      
-      // Connect to relay
-      await this.relay.connect();
-      
-      this.initialized = true;
-      this.logger.info(`${this.name}: Plugin initialized successfully`);
+      // VALHALLA FIX: Dynamically attach the Telegram client if it's not available
+      if (!this.telegramClient && this.runtime) {
+        // Log available clients
+        const clientsArray = Object.keys(this.runtime.clients || {});
+        this.logger.info('[VALHALLA] Runtime clients:', clientsArray);
+      }
+
+      // Log completion of initialization
+      this.logger.info('[PLUGIN] Plugin fully initialized');
     } catch (error) {
       this.logger.error(`${this.name}: Initialization failed: ${error.message}`);
       throw error;
@@ -711,22 +801,92 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   }
   
   /**
-   * Helper method to safely call runtime.handleMessage with fallback handling
-   * This addresses the issue with undefined handleMessage function
+   * Wrapper function to safely call runtime.handleMessage with fallback
    */
   private async callRuntimeHandleMessage(message: any): Promise<any> {
     try {
       const runtime = this.runtimeProxy || this.runtime;
+      
+      // VALHALLA FIX: Add more detailed logging about runtime state
+      this.logger.info(`[PLUGIN][VALHALLA][FLOW] Runtime check before handleMessage:
+        Has runtime: ${Boolean(runtime)}
+        Has handleMessage: ${Boolean(runtime?.handleMessage)}
+        handleMessage type: ${typeof runtime?.handleMessage}
+      `, '', '');
+      
       if (runtime?.handleMessage && typeof runtime.handleMessage === 'function') {
-        this.logger.info(`[PLUGIN] runtime.handleMessage was called`);
-        return await runtime.handleMessage(message);
+        // Extract key details for logging
+        const from = message.from;
+        const senderId = from?.username || from?.id || 'unknown';
+        const text = message.text || '[no text]';
+        
+        // Create context object for logging
+        const context = {
+          messageId: message.message_id,
+          chatId: message.chat?.id,
+          fromUser: senderId,
+          isBot: from?.is_bot || false,
+          text: text.substring(0, 50) + (text.length > 50 ? '...' : '')
+        };
+        
+        // Log exact payload being sent to runtime - ADDED AS PER ACTION PLAN
+        this.logger.info(`[DEBUG] Calling runtime.handleMessage with text="${text}", userId="${senderId}", context=${JSON.stringify(context)}`);
+        
+        // Call runtime's handleMessage method
+        const startTime = Date.now();
+        const response = await runtime.handleMessage(message);
+        const duration = Date.now() - startTime;
+        
+        // VALHALLA FIX: Log detailed response information
+        if (response) {
+          this.logger.info(`[PLUGIN][VALHALLA][FLOW] Runtime.handleMessage returned in ${duration}ms:
+            Has text: ${Boolean(response.text)}
+            Text length: ${response.text?.length || 0}
+            Action: ${response.content?.action || 'none'}
+            Content: ${JSON.stringify(response.content || {}).substring(0, 100)}...
+          `, '', '');
+          
+          if (response.text) {
+            this.logger.info(`[PLUGIN][VALHALLA][FLOW] Response text (first 150 chars): ${response.text?.substring(0, 150)}...`, '', '');
+          }
+        } else {
+          this.logger.warn(`[PLUGIN][VALHALLA][FLOW] Runtime.handleMessage returned null or undefined after ${duration}ms`, '', '');
+        }
+        
+        return response;
       } else {
-        this.logger.warn('[PLUGIN] runtime.handleMessage not available');
-        return null;
+        // VALHALLA FIX: Provide detailed diagnostics when handleMessage is missing
+        this.logger.error(`[PLUGIN][VALHALLA][FLOW] runtime.handleMessage not available!
+          Runtime type: ${runtime ? runtime.constructor?.name || typeof runtime : 'undefined'}
+          Available methods: ${runtime ? Object.keys(runtime).join(', ') : 'none'}
+          Global __elizaRuntime available: ${Boolean(globalThis.__elizaRuntime)}
+        `, '', '');
+        
+        // Use a simple echo response as fallback if handleMessage is missing
+        this.logger.warn('[PLUGIN][VALHALLA][FLOW] Using fallback response handler', '', '');
+        return {
+          text: `I received your message: "${message.text?.substring(0, 50) || 'empty message'}..."`,
+          content: {
+            action: "SAY", // Explicitly set SAY to ensure message is sent
+            text: `I received your message: "${message.text?.substring(0, 50) || 'empty message'}..."`
+          },
+          userId: message.from?.id
+        };
       }
     } catch (err) {
-      this.logger.error(`Error calling runtime.handleMessage: ${err.message}`);
-      return null;
+      this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error calling runtime.handleMessage: ${err.message}`, '', '');
+      this.logger.error(`[PLUGIN][VALHALLA][FLOW] Stack trace: ${err.stack}`, '', '');
+      
+      // VALHALLA FIX: Return an error response with SAY action to ensure it's displayed
+      return {
+        text: `Sorry, I encountered an error processing your message. Please try again.`,
+        content: {
+          action: "SAY", // Explicitly use SAY to bypass filtering
+          text: `Sorry, I encountered an error processing your message. Please try again.`
+        },
+        userId: message.from?.id,
+        error: true
+      };
     }
   }
   
@@ -735,798 +895,205 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   async handleIncomingMessage(message: RelayMessage): Promise<void> {
     try {
-      // First, log the received message with truncation to avoid huge logs
-      this.logger.debug(`[PLUGIN] Received message: ${JSON.stringify(message).substring(0, 300)}...`, '', '');
-      
-      const { message_id, from, chat, text, sender_agent_id } = message;
-      const groupId = chat.id.toString();
-      
-      // VALHALLA FIX: Normalize agent IDs for comparison
-      const normalizedSenderId = (sender_agent_id || from.username || '').toLowerCase();
-      const normalizedAgentId = this.agentId.toLowerCase();
-      
-      // Add to known agents list with normalized ID
-      if (sender_agent_id && !this.knownAgents.has(normalizedSenderId)) {
-        this.knownAgents.add(normalizedSenderId);
-        this.logger.info(`[PLUGIN] Added new known agent: ${sender_agent_id}`);
-      }
-      
-      // VALHALLA FIX: Enhanced agent ID comparison using includes() for more robust matching
-      if (normalizedSenderId.includes(normalizedAgentId) || normalizedAgentId.includes(normalizedSenderId)) {
-        this.logger.info(`[PLUGIN] Skipping message from self (${normalizedSenderId})`);
+      if (!message) {
+        this.logger.warn(`[PLUGIN] handleIncomingMessage called with empty message`, '', '');
         return;
       }
       
-      // Get runtime for message handling
-      const runtime = await this.waitForRuntime();
+      // VALHALLA FIX: Add clear logging for debugging message flow
+      this.logger.info(`[PLUGIN][VALHALLA][FLOW] handleIncomingMessage triggered for message ID: ${message.message_id}, from ${message.from?.username || 'unknown'}`, '', '');
       
-      // Record this message in conversation manager
-      try {
-        await this.conversationManager.recordMessage(
-          groupId,
-          sender_agent_id || from.username,
-          text || ''
-        );
-        
-        this.logger.debug(`Recorded message in conversation manager`);
-      } catch (error) {
-        this.logger.error(`Failed to record message in conversation manager: ${error.message}`);
+      // Enhanced logging for message debugging
+      this.logger.info(`[DEBUG] Incoming message: ${logMinimalMsg(message)}`);
+      
+      // Better sender extraction
+      const from = message.from;
+      const senderId = from?.username || from?.id || 'unknown';
+      const senderName = from?.first_name || from?.username || 'Anonymous';
+      
+      // Validate necessary fields
+      if (!message.text) {
+        this.logger.warn(`[PLUGIN][VALHALLA][FLOW] Message has no text content`, '', '');
       }
       
-      // Store the message in the memory manager for context if available
-      try {
-        // ✅ MEMORY MANAGER FALLBACK: Check if memory manager exists and use fallback if not
-        let memoryManager;
-        if (runtime.memoryManager) {
-          memoryManager = runtime.memoryManager;
-        } else {
-          this.logger.warn(`[MEMORY] Runtime memory manager not available, using fallback`);
-          // Create fallback memory manager if it doesn't exist
-          if (!this.fallbackMemory) {
-            this.logger.info(`[MEMORY] Creating fallback memory manager`);
-            this.fallbackMemory = new FallbackMemoryManager();
-          }
-          memoryManager = this.fallbackMemory;
-        }
-        
-        const memoryData: MemoryData = {
-          roomId: groupId,
-          userId: sender_agent_id || from.username,
-          content: {
-            text,
-            metadata: {
-              conversationType: 'group',
-              messageId: message_id,
-              senderName: from.first_name,
-              senderUsername: from.username,
-              isBot: from.is_bot,
-              groupId,
-              agentId: sender_agent_id
-            }
-          },
-          type: 'telegram-message'
-        };
-        
-        await memoryManager.createMemory(memoryData);
-        this.logger.debug(`[MEMORY] Stored message from ${sender_agent_id || from.username} in group ${groupId}`);
-      } catch (error) {
-        this.logger.error(`Failed to store message in memory: ${error.message}`);
+      if (!message.chat?.id) {
+        this.logger.warn(`[PLUGIN][VALHALLA][FLOW] Message has no chat.id`, '', '');
       }
       
-      // VALHALLA FIX: Check relay health before sending response
-      const relayHealthy = await this.ensureRelayConnection();
-      if (!relayHealthy) {
-        this.logger.warn(`[RELAY] Server unhealthy, message handling may be affected`);
-      }
-      
-      // IMPORTANT: Now implement proper response decision logic
-      // Extract a canonical agent ID for clean comparison (normalized to lowercase)
-      const canonicalAgentId = this.agentId.toLowerCase().replace(/_/g, '');
-      const canonicalSenderId = (sender_agent_id || from.username || '').toLowerCase().replace(/_/g, '');
-      
-      // 1. Skip if message is from self
-      if (canonicalSenderId === canonicalAgentId) {
-        this.logger.info(`[PLUGIN] Skipping message from self (${canonicalSenderId})`);
+      // Skip own messages - crucial to avoid loops
+      if (message.sender_agent_id === this.agentId) {
+        this.logger.info(`[PLUGIN][VALHALLA][FLOW] Ignoring message from self (${this.agentId})`, '', '');
         return;
       }
       
-      // 2. Check if we should respond based on plugin logic
-      // Determine if this is a direct mention
-      const normalizedText = (text || '').toLowerCase();
-      const botMentions = [
-        `@${this.agentId.toLowerCase()}`,
-        `@${this.agentId.toLowerCase()}_bot`,
-        this.agentId.toLowerCase()
-      ];
-      
-      const isDirect = botMentions.some(mention => normalizedText.includes(mention));
-      
-      // Higher chance to respond if it's a direct mention
-      let respondChance = isDirect ? 0.9 : 0.4;
-      
-      // Reduce chance if from another bot and not directly mentioned
-      if (from.is_bot && !isDirect) {
-        respondChance = 0.3;
-      }
-      
-      const shouldRespond = Math.random() < respondChance;
-      
-      this.logger.info(`[PLUGIN] Message from ${from.is_bot ? 'bot' : 'user'} ${sender_agent_id || from.username}, ` + 
-                      `${isDirect ? 'is direct mention' : 'not direct'}, response chance: ${respondChance}, will respond: ${shouldRespond}`);
-      
-      if (!shouldRespond) {
-        this.logger.info(`[PLUGIN] Decided not to respond to this message`);
-        return;
-      }
-      
-      // If we get here, we've decided to respond
-      this.logger.info(`[PLUGIN] Will respond to message in group ${groupId}`);
-        
-      try {
-        // Simulate typing for more natural feel
-        if (this.config.typingSimulation?.enabled) {
-          try {
-            // Find bot token
-            const botToken = this.findBotToken();
-            if (botToken) {
-              // Send typing indicator to Telegram
-              await fetch(`https://api.telegram.org/bot${botToken}/sendChatAction`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  chat_id: groupId,
-                  action: 'typing'
-                })
-              });
-              this.logger.debug(`[TELEGRAM] Sent typing indicator to group ${groupId}`);
-              
-              // Calculate a natural delay based on message length and typing speed
-              const baseTypingSpeed = this.config.typingSimulation.baseTypingSpeedCPM || 300; // chars per minute
-              const charsPerSecond = baseTypingSpeed / 60;
-              
-              // Simulate reading + thinking time plus typing time
-              // Randomize within a range for more natural feel
-              const randomFactor = 1 + (Math.random() * 0.4 - 0.2); // 0.8 to 1.2
-              const expectedMessageLength = 100; // Assume an average response length
-              
-              // Calculate reading delay + typing delay
-              const readingTimeMs = 1000; // 1 second base reading time
-              const typingTimeMs = (expectedMessageLength / charsPerSecond) * 1000;
-              
-              // Cap the delay to reasonable limits (2-8 seconds)
-              const totalDelayMs = Math.min(8000, Math.max(2000, (readingTimeMs + typingTimeMs) * randomFactor));
-              
-              this.logger.debug(`[TELEGRAM] Simulating ${Math.round(totalDelayMs)}ms typing delay`);
-              await new Promise(resolve => setTimeout(resolve, totalDelayMs));
-            }
-          } catch (error) {
-            this.logger.warn(`[TELEGRAM] Error simulating typing: ${error.message}`);
-            // Continue execution even if typing simulation fails
-          }
-        }
-        
-        // Create a context object for the runtime
-        const context = {
-          roomId: groupId,
-          platform: 'telegram',
-          conversationType: 'group',
-          participantCount: this.knownAgents.size + 1, // Include self
-          messageHistory: await this.getMessageHistory(groupId)
-        };
-        
-        this.logger.debug(`[PLUGIN] Calling runtime.handleMessage with context: ${JSON.stringify(context)}`, '', '');
-        
-        // Call the runtime to handle the message using our safe helper
-        let response = await this.callRuntimeHandleMessage({
-          text: text || '',
-          userId: sender_agent_id || from?.username || 'unknown',
-          name: from?.first_name || 'Unknown',
-          context
-        });
-        
-        // If no response or response has no text, generate a fallback
-        if (!response || !response.text) {
-          this.logger.info(`[PLUGIN] No valid response from runtime, using fallback`);
-          response = { text: await this.generateFallbackResponse() };
-        }
-        
-        this.logger.debug(`[PLUGIN] Got response from runtime: ${JSON.stringify(response)}`, '', '');
-        
-        // VALHALLA FIX: Always send response regardless of action as long as there's text
-        if (response?.text) {
-          // Remove any (NONE) tag from the end
-          let cleanedText = response.text;
-          if (cleanedText.toUpperCase().endsWith('(NONE)')) {
-            cleanedText = cleanedText.substring(0, cleanedText.length - 6).trim();
-            this.logger.info(`[PLUGIN] Removed (NONE) tag, cleaned text: "${cleanedText}"`);
-          }
-          
-          const action = response.content?.action?.toUpperCase() || 'UNKNOWN';
-          if (action === 'NONE') {
-            this.logger.info(`[PLUGIN] Bypassing action=NONE to relay message`);
-          }
-          
-          if (cleanedText.length > 0) {
-            this.logger.info(`[PLUGIN] Forcing relay send of content: "${cleanedText.substring(0, 50)}..."`);
-            await this.sendResponse(groupId, cleanedText);
-          } else {
-            this.logger.warn(`[PLUGIN] Empty response after cleaning (NONE) tag, not sending`);
-          }
-        } else {
-          this.logger.warn(`[PLUGIN] Runtime returned response with no text`);
-        }
-      } catch (error) {
-        this.logger.error(`Error getting response from runtime: ${error.message}`);
-      }
-    } catch (error) {
-      this.logger.error(`[PLUGIN] Error handling incoming message: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Plugin-level decision logic for responses (Layer 2)
-   * This applies additional filters after the LLM has decided to respond
-   */
-  private pluginShouldRespond(
-    groupId: string, 
-    agentId: string,
-    fromAgentId: string, 
-    messageText: string
-  ): boolean {
-    try {
-      this.logger.debug(`[PLUGIN] Layer 2 decision for ${agentId} responding to ${fromAgentId}`);
-      
-      // 1. Anti-flood protection
-      const now = Date.now();
-      const lastResponseTime = this.lastResponseTimes.get(groupId) || 0;
-      const timeSinceLastResponse = now - lastResponseTime;
-      
-      if (timeSinceLastResponse < 5000) {
-        this.logger.debug(`[PLUGIN] Anti-flood: Last response was ${timeSinceLastResponse}ms ago, too recent`);
-        return false;
-      }
-      
-      // 2. Check for direct mentions which override other rules
-      const normalizedAgentId = agentId.toLowerCase().replace(/_/g, '');
-      const normalizedMessage = messageText.toLowerCase();
-      
-      const possibleMentions = [
-        `@${normalizedAgentId}`,
-        `@${this.getAgentNameFromId(agentId).toLowerCase()}`,
-        this.getAgentNameFromId(agentId).toLowerCase()
-      ];
-      
-      const isDirect = possibleMentions.some(mention => normalizedMessage.includes(mention));
-      
-      if (isDirect) {
-        this.logger.info(`[PLUGIN] Direct mention detected, will respond`);
-        this.trackResponse(groupId, agentId);
-        return true;
-      }
-      
-      // 3. Conversation rhythm check - try to maintain natural flow
-      if (this.lastSpeaker.get(groupId) === agentId) {
-        this.logger.debug(`[PLUGIN] Conversation rhythm: Agent was the last speaker, letting others respond`);
-        return false;
-      }
-      
-      // 4. Check character-specific response patterns
-      const character = this.getCharacter();
-      if (character) {
-        // Personality-based response rate
-        const chattyScore = this.getChattyScore(character);
-        const randomFactor = Math.random();
-        
-        // Higher chatty score = more likely to jump into conversations
-        if (randomFactor > chattyScore) {
-          this.logger.debug(`[PLUGIN] Character is not chatty enough to respond (${chattyScore} vs ${randomFactor})`);
-          return false;
-        }
-        
-        // Topic interest match
-        if (character.topics && messageText) {
-          const topicMatched = this.messageMatchesTopics(messageText, character.topics);
-          if (topicMatched) {
-            this.logger.info(`[PLUGIN] Topic match detected, more likely to respond`);
-            // Topic match increases chance but doesn't guarantee
-          }
-        }
-      }
-      
-      // 5. Prevent bot circular conversations
-      if (this.isBot(fromAgentId) && this.wasRecentSpeaker(groupId, agentId)) {
-        const coinFlip = Math.random() > 0.7; // 30% chance to break the rule
-        if (!coinFlip) {
-          this.logger.debug(`[PLUGIN] Avoiding bot circular conversation`);
-          return false;
-        }
-      }
-      
-      // Track this response
-      this.trackResponse(groupId, agentId);
-      return true;
-    } catch (error) {
-      this.logger.error(`[PLUGIN] Error in pluginShouldRespond: ${error.message}`);
-      return false; // Default to not responding on error
-    }
-  }
-  
-  /**
-   * Get a chatty score for a character (0-1)
-   * Higher value = more talkative
-   */
-  private getChattyScore(character: Character): number {
-    // Default medium chatty score
-    let score = 0.5;
-    
-    // Check for relevant traits
-    if (character.traits) {
-      if (character.traits.includes('talkative') || character.traits.includes('extroverted')) {
-        score += 0.2;
-      }
-      if (character.traits.includes('quiet') || character.traits.includes('introverted')) {
-        score -= 0.2;
-      }
-    }
-    
-    // Check for personality config
-    if (character.personality && typeof character.personality === 'object') {
-      // If the character has a conversationInitiationWeight property
-      if ('conversationInitiationWeight' in character.personality) {
-        const weight = character.personality.conversationInitiationWeight;
-        if (typeof weight === 'number' && weight >= 0 && weight <= 1) {
-          // Direct value overrides calculated score
-          return weight;
-        }
-      }
-    }
-    
-    // Clamp between 0.1 and 0.9 to prevent never/always speaking
-    return Math.max(0.1, Math.min(0.9, score));
-  }
-  
-  /**
-   * Check if a message contains topics of interest to the character
-   */
-  private messageMatchesTopics(message: string, topics: string[]): boolean {
-    const normalizedMessage = message.toLowerCase();
-    
-    return topics.some(topic => 
-      normalizedMessage.includes(topic.toLowerCase())
-    );
-  }
-  
-  /**
-   * Check if an agent ID belongs to a bot
-   */
-  private isBot(agentId: string): boolean {
-    if (!agentId) return false;
-    
-    // Common bot patterns
-    const botPatterns = [
-      '_bot',
-      'vc_shark',
-      'linda_evangelista',
-      'bitcoin_maxi',
-      'bag_flipper',
-      'code_samurai',
-      'eth_memelord'
-    ];
-    
-    return botPatterns.some(pattern => 
-      agentId.toLowerCase().includes(pattern)
-    );
-  }
-  
-  /**
-   * Get a human-readable name from an agent ID
-   */
-  private getAgentNameFromId(agentId: string): string {
-    // Try to get from character if available
-    const character = this.getCharacter();
-    if (character?.name) return character.name;
-    
-    // Otherwise pretty format the ID
-    return agentId
-      .split('_')
-      .map(part => part.charAt(0).toUpperCase() + part.slice(1))
-      .join(' ')
-      .replace(/\d+$/, ''); // Remove trailing numbers
-  }
-  
-  /**
-   * Track a response for conversation flow purposes
-   */
-  private trackResponse(groupId: string, agentId: string): void {
-    const now = Date.now();
-    this.lastResponseTimes.set(groupId, now);
-    this.lastSpeaker.set(groupId, agentId);
-    
-    // Keep a history of recent speakers
-    let recentSpeakers = this.recentSpeakers.get(groupId) || [];
-    recentSpeakers.unshift({ agentId, time: now });
-    
-    // Keep only the last 5 speakers
-    if (recentSpeakers.length > 5) {
-      recentSpeakers = recentSpeakers.slice(0, 5);
-    }
-    
-    this.recentSpeakers.set(groupId, recentSpeakers);
-  }
-  
-  /**
-   * Check if an agent was one of the recent speakers
-   */
-  private wasRecentSpeaker(groupId: string, agentId: string): boolean {
-    const recentSpeakers = this.recentSpeakers.get(groupId) || [];
-    
-    // Check if the agent spoke in the last 3 turns
-    const recentlySpoke = recentSpeakers
-      .slice(0, 3)
-      .some(speaker => speaker.agentId === agentId);
-      
-    return recentlySpoke;
-  }
-  
-  /**
-   * Generate a fallback response when the runtime fails to generate one
-   */
-  private async generateFallbackResponse(): Promise<string> {
-    try {
-      // Try to get character-specific fallback
-      const runtime = await this.waitForRuntime();
-      const { character } = runtime;
-      
-      if (character) {
-        const traits = character.traits || [];
-        const style = character.style || {};
-        
-        // Generate a more personalized fallback based on character
-        if (traits.includes('helpful')) {
-          return "I'd like to respond in more detail, but I'm currently in limited mode. I'll get back to you soon!";
-        }
-        
-        if (traits.includes('technical')) {
-          return "Due to a temporary processing constraint, I'm unable to generate a complete response at this time.";
-        }
-        
-        if (traits.includes('friendly')) {
-          return "Hey there! I got your message but I'm a bit tied up at the moment. I'll jump back in soon!";
-        }
-      }
-    } catch (error) {
-      this.logger.debug(`${this.name}: Error generating character-specific fallback: ${error}`);
-    }
-    
-    // Default fallback
-    return "I received your message but I'm currently in limited mode. Please try again later.";
-  }
-  
-  /**
-   * Get recent message history for a group
-   */
-  private async getMessageHistory(groupId: string): Promise<string> {
-    try {
-      // Get runtime
-      const runtime = await this.waitForRuntime();
-      
-      // Query for recent messages
-      const messages = await runtime.memoryManager.getMemories({
-        roomId: groupId,
-        type: 'telegram-message',
-        count: 10
-      });
-      
-      if (!messages || messages.length === 0) {
-        return "No message history available.";
-      }
-      
-      // Sort messages by time (oldest first)
-      const sortedMessages = [...messages].sort((a, b) => {
-        const aDate = a.createdAt instanceof Date ? a.createdAt : new Date(a.createdAt);
-        const bDate = b.createdAt instanceof Date ? b.createdAt : new Date(b.createdAt);
-        return aDate.getTime() - bDate.getTime();
-      });
-      
-      // Format messages
-      const formatted = sortedMessages.map(message => {
-        const sender = message.userId;
-        const text = message.content.text;
-        return `${sender}: ${text}`;
-      }).join('\n');
-      
-      return formatted;
-    } catch (error) {
-      this.logger.error(`${this.name}: Error getting message history: ${error}`);
-      return "Error retrieving message history.";
-    }
-  }
-  
-  /**
-   * Shutdown the plugin
-   */
-  async shutdown(): Promise<void> {
-    this.logger.info(`${this.name}: Shutting down`);
-    
-    // Stop the conversation check interval
-    if (this.checkIntervalId) {
-      clearInterval(this.checkIntervalId);
-      this.checkIntervalId = null;
-    }
-    
-    // Stop all kickstarters
-    for (const [groupId, kickstarter] of this.kickstarters.entries()) {
-      try {
-        await kickstarter.shutdown();
-        this.logger.info(`${this.name}: Stopped kickstarter for group ${groupId}`);
-      } catch (error) {
-        this.logger.error(`${this.name}: Error stopping kickstarter for group ${groupId}: ${error}`);
-      }
-    }
-    
-    // Shutdown conversation manager
-    try {
-      await this.conversationManager.shutdown();
-      this.logger.info(`${this.name}: Conversation manager shutdown complete`);
-    } catch (error) {
-      this.logger.error(`${this.name}: Error shutting down conversation manager: ${error}`);
-    }
-    
-    // Disconnect from relay server
-    try {
-      await this.relay.disconnect();
-      this.logger.info(`${this.name}: Disconnected from relay server`);
-    } catch (error) {
-      this.logger.error(`${this.name}: Error disconnecting from relay server: ${error}`);
-    }
-    
-    this.logger.info(`${this.name}: Shutdown complete`);
-  }
-  
-  /**
-   * Setup kickstarters for each group
-   * 
-   * @param groupIds - Group IDs to create kickstarters for
-   * @param relay - Telegram relay
-   * @param character - Character information
-   */
-  private async setupKickstarters(
-    groupIds: string[],
-    relay: TelegramRelay,
-    character: Character | null
-  ): Promise<void> {
-    if (!groupIds || groupIds.length === 0) {
-      this.logger.warn(`${this.name}: No group IDs configured, skipping kickstarter setup`);
-      return;
-    }
-    
-    try {
-      // Wait for runtime to be available
-      await this.waitForRuntime();
-      
-      // Log successful runtime access
-      this.logger.info(`[RUNTIME] Runtime methods: getAgentId=available`);
-      
-      // Get agent ID safely
-      const agentId = this.getAgentIdSafe();
-      this.logger.info(`[AGENT] Agent ID: ${agentId}`);
-      
-      // Log successful relay registration
-      this.logger.info(`[RELAY] Successfully registered ${agentId}`);
-      
-      for (const groupId of groupIds) {
-        // Create personality enhancer with runtime
-        const personality = this.createPersonalityEnhancer();
-        
-        // Create conversation kickstarter
-        const kickstarter = new ConversationKickstarter(
-          this.logger,
-          this.conversationManager,
-          relay,
-          this.config.kickstarterConfig || {
-            probabilityFactor: 0.2,
-            minIntervalMs: 300000, // 5 minutes
-            includeTopics: true,
-            shouldTagAgents: true,
-            maxAgentsToTag: 2
-          },
-          groupId,
-          personality
-        );
-        
-        // Set runtime
-        kickstarter.setRuntime(this.runtime);
-        
-        // Initialize the kickstarter
-        await kickstarter.initialize();
-        
-        // Store kickstarter
-        this.kickstarters.set(groupId, kickstarter);
-        
-        this.logger.info(`${this.name}: Created kickstarter for group ${groupId}`);
-        console.log(`[KICKSTARTER] ${this.name}: Created kickstarter for group ${groupId}`);
-      }
-    } catch (error) {
-      this.logger.error(`${this.name}: Error setting up kickstarters: ${error}`);
-      console.log(`[ERROR] ${this.name}: Error setting up kickstarters: ${error}`);
-    }
-  }
-
-  /**
-   * Get the current character
-   * @returns The character from runtime or local storage
-   */
-  private getCharacter(): Character | null {
-    try {
-      // First try from runtime
-      if (this.runtime?.character) {
-        return this.runtime.character;
-      }
-      
-      // Then try local copy
-      if (this.character) {
-        return this.character;
-      }
-      
-      return null;
-    } catch (error) {
-      this.logger.error(`Error getting character: ${error.message}`);
-      return null;
-    }
-  }
-
-  /**
-   * Send a response to a Telegram group
-   * @param groupId - The group ID
-   * @param text - The message text to send
-   */
-  private async sendResponse(groupId: string | number, text: string): Promise<void> {
-    try {
-      if (!this.relay) {
-        this.logger.error('[PLUGIN] Cannot send response: Relay server not initialized');
-        return;
-      }
-      
-      // First send to Telegram directly
-      const botToken = this.findBotToken();
-      if (botToken) {
+      // Store message in memory if memory manager exists
+      if (this.fallbackMemory) {
         try {
-          // Send to Telegram
-          const telegramResponse = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              chat_id: groupId,
-              text: text,
-              parse_mode: 'Markdown'
-            })
+          this.logger.info(`[PLUGIN][VALHALLA][FLOW] Storing message in memory`, '', '');
+          this.logger.info(`[MEMORY] Current memory backend: ${this.fallbackMemory.getUseSqlite ? 'SQLite' : 'In-Memory'}`, '', '');
+          
+          // VALHALLA FIX: Simplify memory creation to avoid type errors
+          await this.fallbackMemory.createMemory({
+            content: { 
+              text: message.text || ''
+              // No additional fields to avoid type errors
+            },
+            type: 'message',
+            userId: String(message.from?.id || 'user'),
+            roomId: String(message.chat?.id || 'default')
+            // No metadata to avoid type errors
           });
           
-          if (!telegramResponse.ok) {
-            const errorText = await telegramResponse.text();
-            this.logger.error(`[TELEGRAM] Error sending message to Telegram: ${errorText}`);
-          } else {
-            const responseData = await telegramResponse.json();
-            if (responseData.ok) {
-              this.logger.info(`[TELEGRAM] Message sent to Telegram, message ID: ${responseData.result?.message_id}`);
+          this.logger.info(`[PLUGIN][VALHALLA][FLOW] Memory created successfully`, '', '');
+        } catch (memoryError) {
+          this.logger.error(`[PLUGIN][VALHALLA][FLOW] Memory creation error: ${memoryError.message}`, '', '');
+        }
+      } else {
+        this.logger.warn(`[PLUGIN][VALHALLA][FLOW] No memory manager available for message storage`, '', '');
+      }
+      
+      // VALHALLA FIX: Check if we should reply to the message using enhanced logic
+      let shouldRespond = true;
+      const isBotMessage = message.from?.is_bot || this.knownAgents.has(message.sender_agent_id || '');
+      
+      if (isBotMessage) {
+        // Calculate random probability for bot-to-bot responses
+        // This prevents infinite loops between bots while still allowing some interaction
+        if (Math.random() > 0.5) { // 50% chance to respond to other bots
+          shouldRespond = false;
+          this.logger.info(`[PLUGIN][VALHALLA][FLOW] Randomly choosing NOT to respond to bot message`, '', '');
+        }
+      }
+      
+      if (!shouldRespond) {
+        this.logger.info(`[PLUGIN][VALHALLA][FLOW] Skipping response based on bot policy`, '', '');
+        return;
+      }
+      
+      // Call runtime to handle the message
+      this.logger.info(`[PLUGIN][VALHALLA][FLOW] Calling runtime.handleMessage() for processing`, '', '');
+      const response = await this.callRuntimeHandleMessage(message);
+      
+      // VALHALLA FIX: Log the response status and content
+      if (response) {
+        this.logger.info(`[PLUGIN][VALHALLA][FLOW] Runtime returned response: ${JSON.stringify({
+          hasText: Boolean(response.text), 
+          textLength: response.text?.length || 0,
+          action: response.content?.action || 'unknown'
+        })}`, '', '');
+        
+        if (response.text) {
+          this.logger.info(`[PLUGIN][VALHALLA][FLOW] Response text preview: "${response.text.substring(0, 100)}..."`, '', '');
+          
+          // If there's text, send it to the group
+          if (response.text.trim().length > 0) {
+            // Check if the response has a (NONE) action but contains valid text
+            if (response.content?.action?.toUpperCase() === 'NONE') {
+              this.logger.info(`[PLUGIN][VALHALLA][FLOW] Bypassing action=NONE to force relay message`, '', '');
             }
+
+            // Get the group ID from the message
+            const groupId = message.chat?.id;
+            
+            if (!groupId) {
+              this.logger.error(`[PLUGIN][VALHALLA][FLOW] No group ID found in message, cannot send response`, '', '');
+              return;
+            }
+            
+            // Clean the response text (remove action tags)
+            const cleanedText = response.text.replace(/\(NONE\)$/i, '').trim();
+            
+            // Send the response to Telegram
+            this.logger.info(`[PLUGIN][VALHALLA][FLOW] Sending response to group ${groupId}: "${cleanedText.substring(0, 50)}..."`, '', '');
+            
+            // Log token and chatId for debugging
+            this.logger.warn(`[PLUGIN] Sending to Telegram: chatId=${groupId}, text=${cleanedText.substring(0, 30)}...`);
+
+            // First try to use our properly initialized telegramClient
+            if (this.telegramClient) {
+              try {
+                await this.telegramClient.sendMessage(groupId, cleanedText);
+                this.logger.info(`[PLUGIN] Message sent via telegramClient successfully`);
+                
+                // Forward to relay so other bots can see it
+                if (this.relay) {
+                  await this.relay.sendMessage(groupId, cleanedText);
+                  this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message forwarded to relay for other bots`, '', '');
+                }
+                return;
+              } catch (telegramError) {
+                this.logger.error(`[PLUGIN] Error sending with telegramClient: ${telegramError.message}`);
+              }
+            }
+            
+            // If we have the Telegram client from ElizaOS, use it
+            if (this.runtime?.client?.telegram) {
+              try {
+                // Send via ElizaOS client
+                await this.runtime.client.telegram.sendMessage(groupId, cleanedText);
+                this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message sent via ElizaOS Telegram client`, '', '');
+                
+                // Forward to relay so other bots can see it
+                if (this.relay) {
+                  await this.relay.sendMessage(groupId, cleanedText);
+                  this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message forwarded to relay for other bots`, '', '');
+                }
+              } catch (telegramError) {
+                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error sending message via ElizaOS client: ${telegramError.message}`, '', '');
+                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Stack trace: ${telegramError.stack}`, '', '');
+                
+                // Fallback to direct Telegram API if ElizaOS client failed
+                try {
+                  this.logger.info(`[PLUGIN][VALHALLA][FLOW] Attempting fallback to direct Telegram API`, '', '');
+                  if (this.config.botToken) {
+                    this.sendMessageToTelegram(this.config.botToken, Number(groupId), cleanedText);
+                    this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message sent via direct Telegram API fallback`, '', '');
+                  } else {
+                    this.logger.error(`[PLUGIN][VALHALLA][FLOW] No bot token available for direct API fallback`, '', '');
+                  }
+                } catch (fallbackError) {
+                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] Fallback also failed: ${fallbackError.message}`, '', '');
+                }
+              }
+            } else {
+              this.logger.error(`[PLUGIN][VALHALLA][FLOW] ElizaOS Telegram client not available`, '', '');
+              this.logger.error(`[PLUGIN][VALHALLA][FLOW] Runtime client keys: ${this.runtime?.client ? Object.keys(this.runtime.client).join(', ') : 'No client object'}`, '', '');
+              
+              // Attempt to use direct Telegram API as fallback
+              try {
+                this.logger.info(`[PLUGIN][VALHALLA][FLOW] Attempting to use direct Telegram API since client is missing`, '', '');
+                if (this.config.botToken) {
+                  this.sendMessageToTelegram(this.config.botToken, Number(groupId), cleanedText);
+                  this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message sent via direct Telegram API`, '', '');
+                } else {
+                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] No bot token available for direct API`, '', '');
+                }
+              } catch (directError) {
+                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Direct Telegram API failed: ${directError.message}`, '', '');
+              }
+              
+              // Still forward to relay for other bots
+              if (this.relay) {
+                try {
+                  await this.relay.sendMessage(groupId, cleanedText);
+                  this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message forwarded to relay despite Telegram client missing`, '', '');
+                } catch (relayError) {
+                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] Relay forwarding failed: ${relayError.message}`, '', '');
+                }
+              }
+            }
+          } else {
+            this.logger.info(`[PLUGIN][VALHALLA][FLOW] Response text is empty after trimming, not sending`, '', '');
           }
-        } catch (error) {
-          this.logger.error(`[TELEGRAM] Error sending to Telegram: ${error.message}`);
-        }
-      } else {
-        this.logger.error('[TELEGRAM] No bot token found, cannot send to Telegram');
-      }
-      
-      // Then also send via relay to inform other bots
-      // Convert groupId to string if it's a number
-      const groupIdStr = groupId.toString();
-      await this.relay.sendMessage(groupIdStr, text);
-      this.logger.info(`[RELAY] Message forwarded to relay: "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`);
-      
-      // Track this response to avoid immediate repeat responses
-      this.lastResponseTimes.set(groupIdStr, Date.now());
-      this.lastSpeaker.set(groupIdStr, this.agentId);
-      this.trackResponse(groupIdStr, this.agentId);
-    } catch (error) {
-      this.logger.error(`[PLUGIN] Error sending response: ${error.message}`);
-    }
-  }
-
-  /**
-   * Find the bot token for this agent
-   */
-  private findBotToken(): string | null {
-    // Each agent process should have its own TELEGRAM_BOT_TOKEN set by start_agents.sh
-    // The token lookup was changed to use a custom format, but we need to respect the
-    // multi-process architecture where each agent has its own process with its own
-    // TELEGRAM_BOT_TOKEN env var
-    
-    // First try the direct environment variable that should be set for each agent process
-    if (process.env.TELEGRAM_BOT_TOKEN) {
-      this.logger.info(`[TOKEN] Using process-specific TELEGRAM_BOT_TOKEN`);
-      return process.env.TELEGRAM_BOT_TOKEN;
-    }
-    
-    // Fallback to prefixed environment variables
-    const agentId = process.env.AGENT_ID;
-    if (agentId) {
-      const envVar = `TELEGRAM_BOT_TOKEN_${agentId}`;
-      this.logger.debug(`[TOKEN] Looking for token using AGENT_ID: ${envVar}`);
-      
-      if (process.env[envVar]) {
-        this.logger.info(`[TOKEN] Found token using AGENT_ID: ${envVar}`);
-        return process.env[envVar];
-      }
-    }
-    
-    // Log available token env vars for debugging
-    const tokenVars = Object.keys(process.env).filter(k => 
-      k.includes('TELEGRAM_BOT_TOKEN') || k.includes('BOT_TOKEN')
-    );
-    
-    this.logger.error(`[TOKEN] No bot token found for agent ${this.agentId}`);
-    this.logger.debug(`[TOKEN] Available token env vars: ${tokenVars.join(', ')}`);
-    
-    return null;
-  }
-
-  /**
-   * Ensure relay connection is healthy, re-register if needed
-   */
-  private async ensureRelayConnection(): Promise<boolean> {
-    if (!this.relay) {
-      this.logger.warn('[PLUGIN] Relay not initialized, cannot check connection');
-      return false;
-    }
-
-    try {
-      // First check if already connected
-      if (this.relay.isConnected()) {
-        // Check relay server health directly 
-        const health = await fetch(`${this.config.relayServerUrl}/health`);
-        
-        if (health.ok) {
-          const healthData = await health.json();
-          
-          // Check if our agent is in the online agents list
-          if (healthData.agents_list && 
-              healthData.agents_list.includes(this.agentId)) {
-            this.logger.debug('[PLUGIN] Relay connection is healthy');
-            return true;
-          }
-          
-          this.logger.info('[PLUGIN] Agent not found in online agents list, will re-register');
         } else {
-          this.logger.warn(`[PLUGIN] Relay server health check failed: ${health.status}`);
+          this.logger.info(`[PLUGIN][VALHALLA][FLOW] No response returned from runtime.handleMessage()`, '', '');
         }
       } else {
-        this.logger.warn('[PLUGIN] Relay not connected, attempting to reconnect');
+        this.logger.warn(`[PLUGIN][VALHALLA][FLOW] No response returned from runtime.handleMessage()`, '', '');
       }
-      
-      // Try to re-register with relay
-      this.logger.info('[PLUGIN] Re-registering with relay server');
-      
-      const connected = await this.relay.connect();
-      if (connected) {
-        this.logger.info('[PLUGIN] Successfully re-registered with relay');
-        
-        // Send immediate heartbeat
-        try {
-          await this.sendHeartbeat();
-          this.logger.info('[PLUGIN] Heartbeat sent after re-registration');
-        } catch (error) {
-          this.logger.warn(`[PLUGIN] Failed to send heartbeat after re-registration: ${error.message}`);
-        }
-        
-        return true;
-      } else {
-        this.logger.error('[PLUGIN] Failed to re-register with relay');
-        return false;
-      }
-    } catch (e) {
-      this.logger.error(`[PLUGIN] Error ensuring relay connection: ${e.message}`);
-      return false;
+    } catch (error) {
+      this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error in handleIncomingMessage: ${error.message}`, '', '');
+      this.logger.error(`Stack trace: ${error.stack}`, '', '');
     }
   }
 
@@ -1556,7 +1123,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         throw new Error(`Heartbeat failed with status ${response.status}`);
       }
 
-      this.logger.debug('[PLUGIN] Heartbeat sent successfully');
+      this.logger.debug('[PLUGIN] Heartbeat sent successfully', '', '');
     } catch (error) {
       this.logger.error(`[PLUGIN] Heartbeat error: ${error.message}`);
       throw error;
@@ -1667,6 +1234,454 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.logger.info(`Next step: Run a test message with plugin.testMessage()`);
     } catch (error) {
       this.logger.error(`[VERIFY] Error during verification: ${error.message}`);
+    }
+  }
+
+  // Fixed sendMessage helper to relay
+  private async sendMessageToRelay(relay: any, agentId: string, text: string, originalMessage?: any): Promise<void> {
+    // Enhanced validation before sending
+    if (!relay || !agentId) {
+      this.logger.warn(`[RELAY] Cannot send message: missing relay or agentId`, '', '');
+      return;
+    }
+
+    try {
+      await relay.sendMessage(agentId, text);
+      this.logger.info(`[RELAY] Message sent to relay for agent ${agentId}`, '', '');
+    } catch (error) {
+      this.logger.error(`[RELAY] Error sending message: ${error.message}`, '', '');
+    }
+  }
+
+  private async generateFallbackResponse(): Promise<string> {
+    return "I'm sorry, I couldn't process your request at the moment. Please try again later.";
+  }
+
+  private sendMessageToTelegram(botToken: string, chatId: number, text: string): void {
+    try {
+      this.logger.info(`[TELEGRAM] Sending message to Telegram chat ${chatId}`, '', '');
+      
+      // Use the Telegram API to send the message
+      if (!botToken) {
+        this.logger.error(`[TELEGRAM] Cannot send message: missing bot token`, '', '');
+        return;
+      }
+      
+      // Send the message via fetch request to Telegram API
+      const url = `https://api.telegram.org/bot${botToken}/sendMessage`;
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: text,
+          parse_mode: 'Markdown'
+        })
+      }).then(response => {
+        if (!response.ok) {
+          this.logger.error(`[TELEGRAM] Error sending message: ${response.status} ${response.statusText}`, '', '');
+        } else {
+          this.logger.info(`[TELEGRAM] Message sent successfully to chat ${chatId}`, '', '');
+        }
+      }).catch(error => {
+        this.logger.error(`[TELEGRAM] Error sending message: ${error.message}`, '', '');
+      });
+    } catch (error) {
+      this.logger.error(`[TELEGRAM] Error in sendMessageToTelegram: ${error.message}`, '', '');
+    }
+  }
+
+  /**
+   * Safely initialize the memory manager with proper error handling
+   * @private
+   */
+  private async initializeMemoryManager(): Promise<void> {
+    try {
+      this.logger.info(`[MEMORY] Initializing memory manager for agent ${this.agentId}`, '', '');
+      
+      // Initialize SQLite adapter if dbPath is provided
+      if (this.config.dbPath) {
+        try {
+          this.logger.info(`[MEMORY] Initializing SQLite adapter with path: ${this.config.dbPath}`, '', '');
+          
+          // Initialize the SQLite adapter
+          this.dbAdapter = await this.createSqliteAdapter(this.config.dbPath);
+          
+          if (!this.dbAdapter) {
+            this.logger.error('[MEMORY] Failed to create SQLite adapter, falling back to in-memory storage', '', '');
+          } else {
+            this.logger.info('[MEMORY] SQLite adapter created successfully', '', '');
+          }
+        } catch (error) {
+          this.logger.error(`[MEMORY] Error initializing SQLite adapter: ${error.message}`, '', '');
+          this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+          this.dbAdapter = null;
+        }
+      } else {
+        this.logger.info('[MEMORY] No dbPath provided, using in-memory storage only', '', '');
+        this.dbAdapter = null;
+      }
+      
+      // Create memory manager with or without SQLite adapter
+      this.memoryManager = new FallbackMemoryManager(this.agentId, this.dbAdapter, this.logger);
+      
+      // Test SQLite connectivity if adapter is available
+      if (this.dbAdapter) {
+        this.logger.info('[MEMORY] Testing SQLite connectivity...', '', '');
+        const sqliteTestResult = await this.memoryManager.testSqliteConnection();
+        
+        if (sqliteTestResult) {
+          this.logger.info('[MEMORY] SQLite connectivity test passed, using SQLite storage', '', '');
+        } else {
+          this.logger.warn('[MEMORY] SQLite connectivity test failed, falling back to in-memory storage', '', '');
+          // The memory manager will handle the fallback automatically
+        }
+      }
+    } catch (error) {
+      this.logger.error(`[MEMORY] Error initializing memory manager: ${error.message}`, '', '');
+      this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+      
+      // Create a fallback memory manager without SQLite in case of errors
+      this.memoryManager = new FallbackMemoryManager(this.agentId, null, this.logger);
+      this.logger.warn('[MEMORY] Created fallback memory manager without SQLite due to initialization error', '', '');
+    }
+  }
+
+  /**
+   * Create SQLite adapter with proper error handling
+   * @private
+   */
+  private async createSqliteAdapter(dbPath: string): Promise<any> {
+    try {
+      this.logger.info(`[MEMORY] Creating SQLite adapter for database at: ${dbPath}`, '', '');
+      
+      // Import sqlite3 and sqlite dynamically
+      const sqlite3 = (await import('sqlite3')).default;
+      const { open } = await import('sqlite');
+      
+      // Open the database connection
+      const db = await open({
+        filename: dbPath,
+        driver: sqlite3.Database
+      });
+      
+      this.logger.info('[MEMORY] SQLite database opened successfully', '', '');
+      
+      // Create a simple adapter object that wraps the sqlite operations
+      return {
+        async query(sql: string, params: any[] = []): Promise<any[]> {
+          try {
+            return await db.all(sql, params);
+          } catch (error) {
+            throw error;
+          }
+        },
+        
+        async execute(sql: string, params: any[] = []): Promise<void> {
+          try {
+            await db.run(sql, params);
+          } catch (error) {
+            throw error;
+          }
+        },
+        
+        async close(): Promise<void> {
+          try {
+            await db.close();
+          } catch (error) {
+            throw error;
+          }
+        }
+      };
+    } catch (error) {
+      this.logger.error(`[MEMORY] Failed to create SQLite adapter: ${error.message}`, '', '');
+      this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+      return null;
+    }
+  }
+
+  /**
+   * Safe method to normalize agent ID
+   * Implements consistent agent ID normalization across the plugin
+   */
+  private normalizeAgentId(agentId: string): string {
+    // Handle _bot suffix and convert to lowercase for consistency
+    return agentId?.toLowerCase() || 'unknown';
+  }
+
+  /**
+   * Force garbage collection if enabled
+   */
+  private forceGarbageCollection(): void {
+    if (global.gc && process.env.FORCE_GC === '1') {
+      try {
+        this.logger.debug('[MEMORY] Forcing garbage collection');
+        global.gc();
+        
+        // Log memory usage after GC
+        const memUsage = process.memoryUsage();
+        this.logger.debug(`[MEMORY] Usage after GC: ${Math.round(memUsage.heapUsed / 1024 / 1024)} MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)} MB`);
+      } catch (e) {
+        this.logger.error(`[MEMORY] Error forcing garbage collection: ${e.message}`);
+      }
+    }
+  }
+
+  private async startRelayPolling(): Promise<void> {
+    // VALHALLA FIX: Check if polling is disabled by environment variable
+    if (process.env.DISABLE_POLLING === 'true') {
+      this.logger.info('[RELAY][VALHALLA] Relay polling disabled by DISABLE_POLLING environment variable');
+      return;
+    }
+    
+    if (!this.config.relayServerUrl) {
+      this.logger.warn('Relay server URL not configured, skipping relay polling');
+      return;
+    }
+    
+    this.logger.info(`[RELAY] Starting polling for agent ${this.agentId}`);
+    
+    // Set up interval for polling the relay server
+    const pollingIntervalMs = this.config.pollingIntervalMs || 2000;
+    
+    // VALHALLA FIX: Only set up polling interval if not disabled
+    this.logger.info(`[RELAY] Polling relay for messages...`);
+    
+    // POLLING FIX: Only set up interval if DISABLE_POLLING is not set or explicitly false
+    if (!process.env.DISABLE_POLLING || process.env.DISABLE_POLLING === 'false') {
+      setInterval(async () => {
+        if (!this.relay) {
+          this.logger.warn(`[RELAY] Relay not initialized for polling`);
+          return;
+        }
+        
+        try {
+          // Poll the relay for any new messages for this agent
+          const messages = await this.relay.getRelayUpdates();
+          
+          if (messages && messages.length > 0) {
+            this.logger.info(`[RELAY] Found ${messages.length} new messages via polling`);
+            
+            for (const message of messages) {
+              this.logger.info(`[RELAY] Processing polled message: "${message.text?.substring(0, 50)}..."`);
+              await this.handleIncomingMessage(message);
+            }
+          }
+        } catch (error) {
+          this.logger.error(`[RELAY] Error in message polling: ${error.message}`);
+        }
+      }, pollingIntervalMs);
+      this.logger.info(`[RELAY] Polling interval set to ${pollingIntervalMs}ms`);
+    } else {
+      this.logger.info(`[RELAY] Polling interval NOT created due to DISABLE_POLLING=${process.env.DISABLE_POLLING}`);
+    }
+  }
+
+  // New helper method to create a minimal Telegram client implementation
+  private createMinimalTelegramClient(): void {
+    this.logger.warn('[VALHALLA] Creating minimal Telegram client implementation as fallback');
+    
+    try {
+      // Create a minimal implementation with just the required methods
+      const minimalTelegramClient = {
+        botInfo: {
+          username: process.env.AGENT_ID ? process.env.AGENT_ID + '_bot' : 'unknown_bot'
+        },
+        
+        // Mock methods for minimal functionality
+        sendMessage: async (chatId: number | string, text: string, options: any = {}) => {
+          this.logger.info(`[VALHALLA][TELEGRAM] Would send to ${chatId}: ${text.substring(0, 50)}...`);
+          return { message_id: Date.now() };
+        },
+        
+        // Add simulateMessage method for testing
+        simulateMessage: (message: any) => {
+          this.logger.info(`[VALHALLA][TELEGRAM] Simulating message from minimal client: ${message.text}`);
+          this.handleIncomingMessage(message);
+        },
+        
+        on: (event: string, handler: Function) => {
+          this.logger.info(`[VALHALLA][TELEGRAM] Registered handler for ${event} event`);
+          // Store the handler to allow emit to work
+          if (!this._eventHandlers) {
+            (this as any)._eventHandlers = {};
+          }
+          if (!this._eventHandlers[event]) {
+            (this as any)._eventHandlers[event] = [];
+          }
+          (this as any)._eventHandlers[event].push(handler);
+          return minimalTelegramClient; // Return this for chaining
+        },
+        
+        // Add emit method to simulate events
+        emit: (event: string, ...args: any[]) => {
+          this.logger.info(`[VALHALLA][TELEGRAM] Emitting event: ${event}`);
+          if ((this as any)._eventHandlers && (this as any)._eventHandlers[event]) {
+            for (const handler of (this as any)._eventHandlers[event]) {
+              try {
+                handler(...args);
+              } catch (err) {
+                this.logger.error(`[VALHALLA][TELEGRAM] Error in event handler: ${err.message}`);
+              }
+            }
+          } else {
+            this.logger.warn(`[VALHALLA][TELEGRAM] No handlers registered for event: ${event}`);
+          }
+          return true;
+        },
+        
+        // Method to support Telegram Bot launch functionality
+        launch: () => {
+          this.logger.info(`[VALHALLA][TELEGRAM] Minimal client 'launched' - this is a stub`);
+          return Promise.resolve();
+        },
+        
+        getChat: async (chatId: number | string) => {
+          return { id: chatId, type: 'group', title: 'Mock Group' };
+        }
+      };
+      
+      // Attach to runtime and save locally
+      if (this.runtime && this.runtime.clients) {
+        this.runtime.clients.telegram = minimalTelegramClient;
+        this.telegramClient = minimalTelegramClient;
+        this.logger.info('[VALHALLA] Created and attached minimal Telegram client to runtime.clients.telegram');
+      } else {
+        this.logger.error('[VALHALLA] Could not attach minimal client - runtime or clients object is undefined');
+      }
+    } catch (error) {
+      this.logger.error(`[VALHALLA] Failed to create minimal Telegram client: ${error.message}`);
+    }
+  }
+
+  // Add this new function near the testMessage method
+  /**
+   * Run a direct manual test with properly formatted message
+   */
+  async runValhallaMeanualTest(): Promise<void> {
+    try {
+      // Create a test message with valid format and structure
+      const testChatId = process.env.TELEGRAM_TEST_CHAT_ID || "-1002550618173"; // Use configured group
+      
+      // Parse the chat ID to ensure it's in the correct format
+      const chatId = typeof testChatId === 'string' ? parseInt(testChatId, 10) : testChatId;
+      
+      // Multiple test messages to check different responses
+      const testMessages = [
+        {
+          message_id: 999991,
+          from: { id: 12345, is_bot: false, first_name: "ValhallaTester", username: "valhalla_test" },
+          chat: { id: chatId, type: "group", title: "Valhalla Test Group" },
+          date: Math.floor(Date.now() / 1000),
+          text: "What's your opinion on Ethereum's future?",
+        },
+        {
+          message_id: 999992,
+          from: { id: 12345, is_bot: false, first_name: "ValhallaTester", username: "valhalla_test" },
+          chat: { id: chatId, type: "group", title: "Valhalla Test Group" },
+          date: Math.floor(Date.now() / 1000),
+          text: "Do you think Bitcoin is better than Ethereum?",
+        },
+        {
+          message_id: 999993,
+          from: { id: 12345, is_bot: false, first_name: "ValhallaTester", username: "valhalla_test" },
+          chat: { id: chatId, type: "group", title: "Valhalla Test Group" },
+          date: Math.floor(Date.now() / 1000),
+          text: "What's the price of ETH going to be next year?",
+        },
+        {
+          message_id: 999994,
+          from: { id: 12345, is_bot: false, first_name: "ValhallaTester", username: "valhalla_test" },
+          chat: { id: chatId, type: "group", title: "Valhalla Test Group" },
+          date: Math.floor(Date.now() / 1000),
+          text: "Hello, I'm new to crypto! Any tips?",
+        }
+      ];
+      
+      this.logger.info(`[VALHALLA] DIRECT TEST: Running ${testMessages.length} test messages with chat ID: ${chatId}`);
+      
+      // Test each message
+      for (let i = 0; i < testMessages.length; i++) {
+        const testMessage = testMessages[i];
+        
+        this.logger.info(`[VALHALLA] DIRECT TEST: Testing message ${i+1}/${testMessages.length}: "${testMessage.text}"`);
+        
+        // First try direct handleMessage on runtime
+        if (this.runtime && this.runtime.handleMessage) {
+          this.logger.info(`[VALHALLA] DIRECT TEST: Calling runtime.handleMessage directly for test ${i+1}`);
+          
+          try {
+            // Handle the message directly and wait for response
+            const response = await this.runtime.handleMessage(testMessage);
+            
+            this.logger.info(`[VALHALLA] DIRECT TEST: Response ${i+1}: ${JSON.stringify(response?.text)}`);
+            
+            // If we have a response and a telegramClient, attempt to send it
+            if (response && response.text && this.telegramClient && this.config.botToken) {
+              try {
+                this.logger.info(`[VALHALLA] DIRECT TEST: Attempting to send response ${i+1} via Telegram API`);
+                
+                // Send message directly to Telegram API
+                this.sendMessageToTelegram(this.config.botToken, chatId, response.text);
+              } catch (sendError) {
+                this.logger.error(`[VALHALLA] DIRECT TEST: Error sending Telegram response ${i+1}: ${sendError.message}`);
+              }
+            }
+          } catch (testError) {
+            this.logger.error(`[VALHALLA] DIRECT TEST: Error testing message ${i+1}: ${testError.message}`);
+          }
+          
+          // Add a small delay between tests
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else {
+          this.logger.error('[VALHALLA] DIRECT TEST: No runtime.handleMessage available, trying handleIncomingMessage');
+          
+          // Try our handleIncomingMessage method as fallback
+          await this.handleIncomingMessage(testMessage);
+        }
+      }
+      
+      this.logger.info(`[VALHALLA] DIRECT TEST: Manual test complete for all messages`);
+    } catch (error) {
+      this.logger.error(`[VALHALLA] DIRECT TEST: Error in direct test: ${error.message}`);
+      if (error.stack) {
+        this.logger.error(`[VALHALLA] DIRECT TEST: Stack trace: ${error.stack}`);
+      }
+    }
+  }
+
+  /**
+   * Get character name from runtime for token lookup
+   */
+  private getCharacterName(): string {
+    try {
+      // Try to get character name from runtime
+      if (this.runtime && this.runtime.character && this.runtime.character.name) {
+        const name = this.runtime.character.name;
+        return name.replace(/\s+/g, '');
+      }
+      
+      // Try to get from environment
+      if (process.env.CHARACTER_NAME) {
+        return process.env.CHARACTER_NAME.replace(/\s+/g, '');
+      }
+      
+      // Try to infer from AGENT_ID
+      if (process.env.AGENT_ID) {
+        // Common pattern in Valhalla: vc_shark_99, eth_memelord_9000
+        const match = process.env.AGENT_ID.match(/([a-z]+_[a-z]+)/i);
+        if (match) {
+          return match[1].replace('_', '');
+        }
+        return process.env.AGENT_ID;
+      }
+      
+      // Fallback
+      return "unknown";
+    } catch (error) {
+      return "unknown";
     }
   }
 }

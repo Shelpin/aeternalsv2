@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / IAgentRuntime
+[@elizaos/core v0.25.9](../index.md) / IAgentRuntime
 
 # Interface: IAgentRuntime
 
@@ -12,7 +12,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1289](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1289)
+[packages/core/src/types.ts:1295](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1295)
 
 ***
 
@@ -22,7 +22,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1290](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1290)
+[packages/core/src/types.ts:1296](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1296)
 
 ***
 
@@ -32,7 +32,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1291](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1291)
+[packages/core/src/types.ts:1297](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1297)
 
 ***
 
@@ -42,7 +42,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1292](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1292)
+[packages/core/src/types.ts:1298](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1298)
 
 ***
 
@@ -52,7 +52,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1293](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1293)
+[packages/core/src/types.ts:1299](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1299)
 
 ***
 
@@ -62,7 +62,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1294](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1294)
+[packages/core/src/types.ts:1300](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1300)
 
 ***
 
@@ -72,7 +72,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1295](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1295)
+[packages/core/src/types.ts:1301](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1301)
 
 ***
 
@@ -82,7 +82,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1296](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1296)
+[packages/core/src/types.ts:1302](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1302)
 
 ***
 
@@ -92,7 +92,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1297](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1297)
+[packages/core/src/types.ts:1303](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1303)
 
 ***
 
@@ -102,7 +102,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1298](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1298)
+[packages/core/src/types.ts:1304](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1304)
 
 ***
 
@@ -112,7 +112,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1299](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1299)
+[packages/core/src/types.ts:1305](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1305)
 
 ***
 
@@ -122,7 +122,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1300](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1300)
+[packages/core/src/types.ts:1306](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1306)
 
 ***
 
@@ -154,7 +154,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1302](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1302)
+[packages/core/src/types.ts:1308](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1308)
 
 ***
 
@@ -164,7 +164,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1304](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1304)
+[packages/core/src/types.ts:1310](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1310)
 
 ***
 
@@ -174,7 +174,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1305](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1305)
+[packages/core/src/types.ts:1311](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1311)
 
 ***
 
@@ -184,7 +184,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1306](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1306)
+[packages/core/src/types.ts:1312](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1312)
 
 ***
 
@@ -194,7 +194,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1307](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1307)
+[packages/core/src/types.ts:1313](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1313)
 
 ***
 
@@ -204,7 +204,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1308](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1308)
+[packages/core/src/types.ts:1314](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1314)
 
 ***
 
@@ -214,7 +214,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1309](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1309)
+[packages/core/src/types.ts:1315](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1315)
 
 ***
 
@@ -224,7 +224,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1311](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1311)
+[packages/core/src/types.ts:1317](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1317)
 
 ***
 
@@ -234,7 +234,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1313](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1313)
+[packages/core/src/types.ts:1319](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1319)
 
 ***
 
@@ -244,7 +244,7 @@ Properties
 
 #### Defined in
 
-[packages/core/src/types.ts:1314](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1314)
+[packages/core/src/types.ts:1320](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1320)
 
 ## Methods
 
@@ -260,7 +260,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/types.ts:1318](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1318)
+[packages/core/src/types.ts:1324](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1324)
 
 ***
 
@@ -278,7 +278,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/types.ts:1320](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1320)
+[packages/core/src/types.ts:1326](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1326)
 
 ***
 
@@ -296,7 +296,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/types.ts:1322](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1322)
+[packages/core/src/types.ts:1328](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1328)
 
 ***
 
@@ -318,7 +318,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/types.ts:1324](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1324)
+[packages/core/src/types.ts:1330](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1330)
 
 ***
 
@@ -336,7 +336,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/types.ts:1326](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1326)
+[packages/core/src/types.ts:1332](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1332)
 
 ***
 
@@ -354,7 +354,7 @@ verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
 
 #### Defined in
 
-[packages/core/src/types.ts:1328](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1328)
+[packages/core/src/types.ts:1334](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1334)
 
 ***
 
@@ -370,7 +370,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1331](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1331)
+[packages/core/src/types.ts:1337](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1337)
 
 ***
 
@@ -394,7 +394,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1333](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1333)
+[packages/core/src/types.ts:1339](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1339)
 
 ***
 
@@ -418,7 +418,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1340](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1340)
+[packages/core/src/types.ts:1346](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1346)
 
 ***
 
@@ -438,7 +438,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1347](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1347)
+[packages/core/src/types.ts:1353](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1353)
 
 ***
 
@@ -462,7 +462,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1349](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1349)
+[packages/core/src/types.ts:1355](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1355)
 
 ***
 
@@ -480,7 +480,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1356](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1356)
+[packages/core/src/types.ts:1362](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1362)
 
 ***
 
@@ -506,7 +506,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1358](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1358)
+[packages/core/src/types.ts:1364](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1364)
 
 ***
 
@@ -526,7 +526,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1366](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1366)
+[packages/core/src/types.ts:1372](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1372)
 
 ***
 
@@ -544,7 +544,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1368](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1368)
+[packages/core/src/types.ts:1374](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1374)
 
 ***
 
@@ -564,7 +564,7 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1370](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1370)
+[packages/core/src/types.ts:1376](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1376)
 
 ***
 
@@ -582,4 +582,4 @@ Methods
 
 #### Defined in
 
-[packages/core/src/types.ts:1375](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1375)
+[packages/core/src/types.ts:1381](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1381)

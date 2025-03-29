@@ -100,24 +100,31 @@ export interface Plugin {
   shutdown(): Promise<void>;
 }
 
+// Add TypingSimulation interface
+export interface TypingSimulation {
+  enabled: boolean;
+  baseTypingSpeedCPM: number;  // Characters per minute
+  randomVariation: number;     // Random factor (0.0-1.0)
+}
+
 /**
  * Telegram Multi-Agent Plugin Configuration
  */
 export interface TelegramMultiAgentConfig {
   enabled?: boolean;
-  relayServerUrl?: string;
-  authToken?: string;
-  groupIds?: string[] | number[];
+  relayServerUrl: string;
+  authToken: string;
+  typingSimulation?: TypingSimulation;
+  botToken?: string;
+  groupIds?: string[];
+  conversationCheckIntervalMs?: number;
+  heartbeatInterval?: number;
+  pollingIntervalMs?: number;
   dbPath?: string;
   logLevel?: string;
-  conversationCheckIntervalMs?: number;
   maxRetries?: number;
+  disablePolling?: boolean;
   kickstarterConfig?: KickstarterConfig;
-  typingSimulation?: {
-    enabled: boolean;
-    baseTypingSpeedCPM: number;  // Characters per minute
-    randomVariation: number;     // Random factor (0.0-1.0)
-  };
 }
 
 /**
@@ -183,6 +190,7 @@ export interface RelayMessage {
   date: number;
   text: string;
   sender_agent_id?: string;
+  isFromRelay?: boolean;
 }
 
 // Telegram relay configuration

@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / hasEnvVariable
+[@elizaos/core v0.25.9](../index.md) / hasEnvVariable
 
 # Function: hasEnvVariable()
 
@@ -20,4 +20,4 @@ True if the environment variable exists
 
 ## Defined in
 
-[packages/core/src/settings.ts:131](https://github.com/elizaOS/eliza/blob/main/packages/core/src/settings.ts#L131)
+[packages/core/src/settings.ts:131](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/settings.ts#L131)

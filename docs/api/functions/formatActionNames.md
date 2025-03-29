@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / formatActionNames
+[@elizaos/core v0.25.9](../index.md) / formatActionNames
 
 # Function: formatActionNames()
 
@@ -20,4 +20,4 @@ A comma-separated string of action names.
 
 ## Defined in
 
-[packages/core/src/actions.ts:61](https://github.com/elizaOS/eliza/blob/main/packages/core/src/actions.ts#L61)
+[packages/core/src/actions.ts:61](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/actions.ts#L61)

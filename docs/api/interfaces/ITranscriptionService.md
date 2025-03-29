@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / ITranscriptionService
+[@elizaos/core v0.25.9](../index.md) / ITranscriptionService
 
 # Interface: ITranscriptionService
 
@@ -24,7 +24,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1279](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1279)
+[packages/core/src/types.ts:1285](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1285)
 
 ## Methods
 
@@ -48,7 +48,7 @@ Add abstract initialize method that must be implemented by derived classes
 
 #### Defined in
 
-[packages/core/src/types.ts:1284](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1284)
+[packages/core/src/types.ts:1290](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1290)
 
 ***
 
@@ -66,7 +66,7 @@ Add abstract initialize method that must be implemented by derived classes
 
 #### Defined in
 
-[packages/core/src/types.ts:1385](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1385)
+[packages/core/src/types.ts:1391](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1391)
 
 ***
 
@@ -84,7 +84,7 @@ Add abstract initialize method that must be implemented by derived classes
 
 #### Defined in
 
-[packages/core/src/types.ts:1386](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1386)
+[packages/core/src/types.ts:1392](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1392)
 
 ***
 
@@ -102,7 +102,7 @@ Add abstract initialize method that must be implemented by derived classes
 
 #### Defined in
 
-[packages/core/src/types.ts:1389](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1389)
+[packages/core/src/types.ts:1395](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1395)
 
 ***
 
@@ -120,4 +120,4 @@ Add abstract initialize method that must be implemented by derived classes
 
 #### Defined in
 
-[packages/core/src/types.ts:1390](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1390)
+[packages/core/src/types.ts:1396](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1396)

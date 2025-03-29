@@ -196,10 +196,17 @@ export class TelegramRelay {
       // Start heartbeat
       this.setupPingInterval();
       
-      // VALHALLA FIX: Add polling for relay messages
-      this.startRelayPolling();
+      // VALHALLA FIX: Check if polling should be disabled
+      const disablePolling = process.env.DISABLE_POLLING === 'true';
+      if (disablePolling) {
+        this.logger.info('[RELAY] Polling disabled by DISABLE_POLLING environment variable');
+      } else {
+        // Start polling for relay updates
+        this.startRelayPolling();
+        this.logger.info('[RELAY] Polling started for updates');
+      }
       
-      this.logger.info('[RELAY] Connected successfully - polling for relay messages');
+      this.logger.info('[RELAY] Connected successfully');
       
       return true;
     } catch (error) {
@@ -257,6 +264,17 @@ export class TelegramRelay {
    */
   onMessage(handler: (message: RelayMessage) => void): void {
     this.messageHandlers.push(handler);
+  }
+
+  /**
+   * Register a message handler for incoming relay messages
+   * VALHALLA FIX: Added as an alias to onMessage for clearer API
+   * 
+   * @param handler Function to call when a message is received
+   */
+  registerMessageHandler(handler: (message: RelayMessage) => void): void {
+    this.messageHandlers.push(handler);
+    this.logger.info(`[RELAY] Handler registered. Total: ${this.messageHandlers.length}`);
   }
 
   /**
@@ -450,7 +468,43 @@ export class TelegramRelay {
   }
 
   /**
-   * Schedule a reconnect attempt
+   * Get updates from the relay server
+   * @returns Array of messages from the relay
+   */
+  async getRelayUpdates(): Promise<any[]> {
+    try {
+      const response = await this.fetchWithTimeout(
+        `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=0`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${this.config.authToken}`
+          }
+        },
+        10000 // 10-second timeout
+      );
+      
+      if (!response.ok) {
+        this.logger.warn(`[RELAY] Failed to poll relay updates: ${response.status} ${response.statusText}`);
+        return [];
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success) {
+        this.logger.warn(`[RELAY] Relay update polling failed: ${data.error || 'Unknown error'}`);
+        return [];
+      }
+      
+      return data.messages || [];
+    } catch (error) {
+      this.logger.error(`[RELAY] Error getting relay updates: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Schedule a reconnect after disconnect
    */
   private scheduleReconnect(): void {
     if (this.reconnectTimeout) {
@@ -560,88 +614,89 @@ export class TelegramRelay {
   }
 
   /**
-   * Start polling for updates from the relay server
+   * Start polling for relay updates
+   * VALHALLA FIX: Added as separate method to poll for relay updates
    */
   private startRelayPolling(): void {
+    // Clear any existing polling interval
     if (this.updatePollingInterval) {
       clearInterval(this.updatePollingInterval);
+      this.updatePollingInterval = null;
     }
     
-    // Offset for tracking processed messages
-    let lastUpdateId = 0;
+    // Start with an immediate poll
+    this.pollRelayServer();
     
-    // VALHALLA FIX: Disable relay polling as ElizaOS core should own polling
-    // this.updatePollingInterval = setInterval(async () => {
-    this.logger.info('[RELAY] Relay polling disabled - ElizaOS core will handle message delivery');
+    // Set up interval for regular polling
+    this.updatePollingInterval = setInterval(() => {
+      this.pollRelayServer();
+    }, 2000); // Poll every 2 seconds
     
-    /*
-    // Original polling code commented out
-    this.updatePollingInterval = setInterval(async () => {
-      if (!this.connected) {
-        return;
-      }
+    this.logger.info('[RELAY] Started polling relay server for updates');
+  }
+  
+  /**
+   * Poll the relay server for updates
+   * VALHALLA FIX: Extracted method for better error handling and memory management
+   */
+  private async pollRelayServer(): Promise<void> {
+    try {
+      this.logger.debug('[RELAY] Polling relay for messages...');
       
-      try {
-        this.logger.debug(`[RELAY] Polling for updates with agent_id=${this.config.agentId}, offset=${lastUpdateId}`);
-        
-        const response = await this.fetchWithTimeout(
-          `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=${lastUpdateId}`,
-          {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${this.config.authToken}`
-            }
-          },
-          10000 // 10-second timeout
-        );
-        
-        if (!response.ok) {
-          this.logger.warn(`[RELAY] Failed to poll relay updates: ${response.status}`);
-          return;
-        }
-        
-        const data = await response.json();
-        
-        if (!data.success) {
-          this.logger.warn(`[RELAY] Relay update polling failed: ${data.error || 'Unknown error'}`);
-          return;
-        }
-        
-        if (data.messages && data.messages.length > 0) {
-          this.logger.info(`[RELAY] Received ${data.messages.length} messages from relay`);
-          
-          for (const message of data.messages) {
-            // Update lastUpdateId to avoid duplicate processing
-            if (message.update_id) {
-              lastUpdateId = Math.max(lastUpdateId, message.update_id + 1);
-            }
-            
-            // Process message
-            if (message.message) {
-              this.logger.debug(`[RELAY] Processing message: ${message.message.text?.substring(0, 50) || 'No text'}`);
-              
-              // Notify all handlers
-              for (const handler of this.messageHandlers) {
-                handler(message.message);
-              }
-            }
-            
-            // Process agent updates
-            if (message.agent_updates) {
-              this.logger.info(`[RELAY] Received agent updates: ${message.agent_updates.length} updates`);
-              
-              // Get updated agent list and notify handlers
-              const agents = await this.getAvailableAgents();
-              for (const handler of this.agentUpdateHandlers) {
-                handler(agents);
-              }
-            }
+      const updates = await this.getRelayUpdates();
+      
+      this.logger.debug(`[RELAY] Received ${updates.length} updates`);
+      
+      // Process each update
+      for (const update of updates) {
+        for (const handler of this.messageHandlers) {
+          try {
+            handler(update);
+          } catch (error) {
+            this.logger.error(`[RELAY] Error in message handler: ${error.message}`);
           }
         }
-      } catch (error) {
-        this.logger.error(`[RELAY] Error polling relay updates: ${error.message}`);
       }
-    }, 2000); // Poll every 2 seconds
-    */
+      
+      // Force garbage collection if environment variable is set
+      if (process.env.FORCE_GC === 'true' && global.gc) {
+        try {
+          global.gc();
+          this.logger.debug('[RELAY] Forced garbage collection after polling');
+        } catch (error) {
+          this.logger.error(`[RELAY] Error during forced GC: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`[RELAY] Error polling relay server: ${error.message}`);
+    }
   }
-} 
+
+  /**
+   * Process updates from the relay server
+   * This method is called by the Telegram client plugin when messages are received
+   * @param message The message that was received
+   */
+  processUpdate(message: RelayMessage): void {
+    // VALHALLA FIX: Process a single message from the Telegram client plugin
+    if (!message) {
+      this.logger.debug('[RELAY] Received null message from Telegram client');
+      return;
+    }
+    
+    this.logger.debug(`[RELAY] Processing update from Telegram client: ${JSON.stringify({
+      message_id: message.message_id,
+      from: message.from?.username || 'unknown',
+      text: message.text?.substring(0, 50)
+    })}`);
+    
+    // Call all registered handlers
+    for (const handler of this.messageHandlers) {
+      try {
+        handler(message);
+      } catch (error) {
+        this.logger.error(`[RELAY] Error in message handler: ${error.message}`);
+      }
+    }
+  }
+}

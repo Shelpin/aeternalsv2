@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / EmbeddingProvider
+[@elizaos/core v0.25.9](../index.md) / EmbeddingProvider
 
 # Variable: EmbeddingProvider
 
@@ -28,4 +28,4 @@
 
 ## Defined in
 
-[packages/core/src/embedding.ts:17](https://github.com/elizaOS/eliza/blob/main/packages/core/src/embedding.ts#L17)
+[packages/core/src/embedding.ts:17](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/embedding.ts#L17)

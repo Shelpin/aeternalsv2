@@ -1,0 +1,1 @@
+bash: ./relaunch_valhalla.sh: Permission denied

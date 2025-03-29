@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / normalizeJsonString
+[@elizaos/core v0.25.9](../index.md) / normalizeJsonString
 
 # Function: normalizeJsonString()
 
@@ -28,4 +28,4 @@ A properly formatted JSON string.
 
 ## Defined in
 
-[packages/core/src/parsing.ts:237](https://github.com/elizaOS/eliza/blob/main/packages/core/src/parsing.ts#L237)
+[packages/core/src/parsing.ts:237](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/parsing.ts#L237)

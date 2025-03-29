@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / parseJSONObjectFromText
+[@elizaos/core v0.25.9](../index.md) / parseJSONObjectFromText
 
 # Function: parseJSONObjectFromText()
 
@@ -24,4 +24,4 @@ An object parsed from the JSON string if successful; otherwise, null or the resu
 
 ## Defined in
 
-[packages/core/src/parsing.ts:142](https://github.com/elizaOS/eliza/blob/main/packages/core/src/parsing.ts#L142)
+[packages/core/src/parsing.ts:142](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/parsing.ts#L142)

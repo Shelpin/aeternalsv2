@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / Plugin
+[@elizaos/core v0.25.9](../index.md) / Plugin
 
 # Type Alias: Plugin
 
@@ -72,6 +72,26 @@ Optional clients
 
 Optional adapters
 
+### initialize()?
+
+> `optional` **initialize**: () => `Promise`\<`void`\>
+
+Optional initialize method
+
+#### Returns
+
+`Promise`\<`void`\>
+
+### shutdown()?
+
+> `optional` **shutdown**: () => `Promise`\<`void`\>
+
+Optional shutdown method
+
+#### Returns
+
+`Promise`\<`void`\>
+
 ### handlePostCharacterLoaded()?
 
 > `optional` **handlePostCharacterLoaded**: (`char`) => `Promise`\<[`Character`](Character.md)\>
@@ -88,4 +108,4 @@ Optional post charactor processor handler
 
 ## Defined in
 
-[packages/core/src/types.ts:650](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L650)
+[packages/core/src/types.ts:650](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L650)

@@ -5,6 +5,10 @@
  * This script applies the necessary patches before starting the agent
  */
 
+// Load environment variables first
+import dotenv from 'dotenv';
+dotenv.config();
+
 import { spawn } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -18,9 +22,16 @@ const rootDir = path.resolve(__dirname, '..');
 // Parse command line arguments to pass to the agent
 const args = process.argv.slice(2);
 
+// Extract character files from arguments
+const charactersArg = args.find(arg => arg.startsWith('--characters='));
+const charactersValue = charactersArg ? charactersArg.split('=')[1] : '';
+const characterFiles = charactersValue ? charactersValue.split(',') : [];
+
 // Log the process
 console.log('🚀 Starting ElizaOS agent with Valhalla runtime patches');
 console.log(`📂 Working directory: ${process.cwd()}`);
+console.log(`🔧 Environment variables loaded: ${process.env.USE_OPENAI_EMBEDDING ? 'OpenAI' : 'Ollama'} embedding enabled`);
+console.log(`🔧 Character files: ${characterFiles.join(', ') || 'None provided'}`);
 
 async function main() {
   try {
@@ -36,6 +47,7 @@ async function main() {
     
     console.log('✅ Runtime patches applied successfully');
     console.log(`✅ runtime.handleMessage is now ${typeof runtime.handleMessage === 'function' ? 'available' : 'not available'}`);
+    console.log(`✅ Added runtime to globalThis.__elizaRuntime`);
     
     // Apply relay fixes (in background)
     console.log('🔧 Applying relay fixes...');

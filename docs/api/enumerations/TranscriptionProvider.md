@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / TranscriptionProvider
+[@elizaos/core v0.25.9](../index.md) / TranscriptionProvider
 
 # Enumeration: TranscriptionProvider
 
@@ -10,7 +10,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1595](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1595)
+[packages/core/src/types.ts:1601](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1601)
 
 ***
 
@@ -20,7 +20,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1596](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1596)
+[packages/core/src/types.ts:1602](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1602)
 
 ***
 
@@ -30,4 +30,4 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1597](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1597)
+[packages/core/src/types.ts:1603](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1603)

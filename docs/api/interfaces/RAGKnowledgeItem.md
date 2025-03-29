@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / RAGKnowledgeItem
+[@elizaos/core v0.25.9](../index.md) / RAGKnowledgeItem
 
 # Interface: RAGKnowledgeItem
 
@@ -10,7 +10,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1557](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1557)
+[packages/core/src/types.ts:1563](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1563)
 
 ***
 
@@ -20,7 +20,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1558](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1558)
+[packages/core/src/types.ts:1564](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1564)
 
 ***
 
@@ -70,7 +70,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1559](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1559)
+[packages/core/src/types.ts:1565](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1565)
 
 ***
 
@@ -80,7 +80,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1572](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1572)
+[packages/core/src/types.ts:1578](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1578)
 
 ***
 
@@ -90,7 +90,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1573](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1573)
+[packages/core/src/types.ts:1579](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1579)
 
 ***
 
@@ -100,7 +100,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1574](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1574)
+[packages/core/src/types.ts:1580](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1580)
 
 ***
 
@@ -110,4 +110,4 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1575](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1575)
+[packages/core/src/types.ts:1581](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1581)

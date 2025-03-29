@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / CharacterSchema
+[@elizaos/core v0.25.9](../index.md) / CharacterSchema
 
 # Variable: CharacterSchema
 
@@ -104,4 +104,4 @@ Main Character schema
 
 ## Defined in
 
-[packages/core/src/environment.ts:67](https://github.com/elizaOS/eliza/blob/main/packages/core/src/environment.ts#L67)
+[packages/core/src/environment.ts:67](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/environment.ts#L67)

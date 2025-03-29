@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / ModelSettings
+[@elizaos/core v0.25.9](../index.md) / ModelSettings
 
 # Type Alias: ModelSettings
 
@@ -64,4 +64,4 @@ Optional telemetry configuration (experimental)
 
 ## Defined in
 
-[packages/core/src/types.ts:142](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L142)
+[packages/core/src/types.ts:142](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L142)

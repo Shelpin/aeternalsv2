@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / ActionExample
+[@elizaos/core v0.25.9](../index.md) / ActionExample
 
 # Interface: ActionExample
 
@@ -14,7 +14,7 @@ User associated with the example
 
 #### Defined in
 
-[packages/core/src/types.ts:39](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L39)
+[packages/core/src/types.ts:39](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L39)
 
 ***
 
@@ -26,4 +26,4 @@ Content of the example
 
 #### Defined in
 
-[packages/core/src/types.ts:42](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L42)
+[packages/core/src/types.ts:42](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L42)

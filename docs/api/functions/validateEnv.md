@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / validateEnv
+[@elizaos/core v0.25.9](../index.md) / validateEnv
 
 # Function: validateEnv()
 
@@ -12,4 +12,4 @@ Validation function
 
 ## Defined in
 
-[packages/core/src/environment.ts:27](https://github.com/elizaOS/eliza/blob/main/packages/core/src/environment.ts#L27)
+[packages/core/src/environment.ts:27](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/environment.ts#L27)

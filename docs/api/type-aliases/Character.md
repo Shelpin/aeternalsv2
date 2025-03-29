@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / Character
+[@elizaos/core v0.25.9](../index.md) / Character
 
 # Type Alias: Character
 
@@ -718,4 +718,4 @@ Optinal Parent characters to inherit information from
 
 ## Defined in
 
-[packages/core/src/types.ts:728](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L728)
+[packages/core/src/types.ts:734](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L734)

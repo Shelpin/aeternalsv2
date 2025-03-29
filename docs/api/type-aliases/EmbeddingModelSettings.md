@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / EmbeddingModelSettings
+[@elizaos/core v0.25.9](../index.md) / EmbeddingModelSettings
 
 # Type Alias: EmbeddingModelSettings
 
@@ -18,4 +18,4 @@ Embedding model settings
 
 ## Defined in
 
-[packages/core/src/types.ts:178](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L178)
+[packages/core/src/types.ts:178](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L178)

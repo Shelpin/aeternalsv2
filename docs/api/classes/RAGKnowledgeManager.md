@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / RAGKnowledgeManager
+[@elizaos/core v0.25.9](../index.md) / RAGKnowledgeManager
 
 # Class: RAGKnowledgeManager
 
@@ -38,7 +38,7 @@ The AgentRuntime instance associated with this manager.
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:40](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L40)
+[packages/core/src/ragknowledge.ts:40](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L40)
 
 ## Properties
 
@@ -54,7 +54,7 @@ The AgentRuntime instance associated with this manager.
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:22](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L22)
+[packages/core/src/ragknowledge.ts:22](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L22)
 
 ***
 
@@ -70,7 +70,7 @@ The name of the database table this manager operates on.
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:27](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L27)
+[packages/core/src/ragknowledge.ts:27](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L27)
 
 ***
 
@@ -82,7 +82,7 @@ The root directory where RAG knowledge files are located (internal)
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:32](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L32)
+[packages/core/src/ragknowledge.ts:32](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L32)
 
 ## Methods
 
@@ -114,7 +114,7 @@ The root directory where RAG knowledge files are located (internal)
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:180](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L180)
+[packages/core/src/ragknowledge.ts:180](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L180)
 
 ***
 
@@ -136,7 +136,7 @@ The root directory where RAG knowledge files are located (internal)
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:289](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L289)
+[packages/core/src/ragknowledge.ts:289](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L289)
 
 ***
 
@@ -168,7 +168,7 @@ The root directory where RAG knowledge files are located (internal)
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:350](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L350)
+[packages/core/src/ragknowledge.ts:350](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L350)
 
 ***
 
@@ -190,7 +190,7 @@ The root directory where RAG knowledge files are located (internal)
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:377](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L377)
+[packages/core/src/ragknowledge.ts:377](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L377)
 
 ***
 
@@ -212,7 +212,7 @@ The root directory where RAG knowledge files are located (internal)
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:381](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L381)
+[packages/core/src/ragknowledge.ts:381](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L381)
 
 ***
 
@@ -237,7 +237,7 @@ Array of RAGKnowledgeItem entries
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:395](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L395)
+[packages/core/src/ragknowledge.ts:395](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L395)
 
 ***
 
@@ -255,7 +255,7 @@ Array of RAGKnowledgeItem entries
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:419](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L419)
+[packages/core/src/ragknowledge.ts:419](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L419)
 
 ***
 
@@ -279,7 +279,7 @@ Array of RAGKnowledgeItem entries
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:501](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L501)
+[packages/core/src/ragknowledge.ts:501](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L501)
 
 ***
 
@@ -309,4 +309,4 @@ Array of RAGKnowledgeItem entries
 
 #### Defined in
 
-[packages/core/src/ragknowledge.ts:508](https://github.com/elizaOS/eliza/blob/main/packages/core/src/ragknowledge.ts#L508)
+[packages/core/src/ragknowledge.ts:508](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/ragknowledge.ts#L508)

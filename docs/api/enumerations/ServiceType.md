@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / ServiceType
+[@elizaos/core v0.25.9](../index.md) / ServiceType
 
 # Enumeration: ServiceType
 
@@ -10,7 +10,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1525](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1525)
+[packages/core/src/types.ts:1531](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1531)
 
 ***
 
@@ -20,7 +20,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1526](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1526)
+[packages/core/src/types.ts:1532](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1532)
 
 ***
 
@@ -30,7 +30,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1527](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1527)
+[packages/core/src/types.ts:1533](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1533)
 
 ***
 
@@ -40,7 +40,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1528](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1528)
+[packages/core/src/types.ts:1534](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1534)
 
 ***
 
@@ -50,7 +50,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1529](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1529)
+[packages/core/src/types.ts:1535](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1535)
 
 ***
 
@@ -60,7 +60,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1530](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1530)
+[packages/core/src/types.ts:1536](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1536)
 
 ***
 
@@ -70,7 +70,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1531](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1531)
+[packages/core/src/types.ts:1537](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1537)
 
 ***
 
@@ -80,7 +80,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1532](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1532)
+[packages/core/src/types.ts:1538](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1538)
 
 ***
 
@@ -90,7 +90,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1533](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1533)
+[packages/core/src/types.ts:1539](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1539)
 
 ***
 
@@ -100,7 +100,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1534](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1534)
+[packages/core/src/types.ts:1540](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1540)
 
 ***
 
@@ -110,7 +110,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1535](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1535)
+[packages/core/src/types.ts:1541](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1541)
 
 ***
 
@@ -120,7 +120,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1536](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1536)
+[packages/core/src/types.ts:1542](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1542)
 
 ***
 
@@ -130,7 +130,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1537](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1537)
+[packages/core/src/types.ts:1543](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1543)
 
 ***
 
@@ -140,7 +140,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1538](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1538)
+[packages/core/src/types.ts:1544](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1544)
 
 ***
 
@@ -150,7 +150,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1539](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1539)
+[packages/core/src/types.ts:1545](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1545)
 
 ***
 
@@ -160,7 +160,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1540](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1540)
+[packages/core/src/types.ts:1546](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1546)
 
 ***
 
@@ -170,7 +170,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1541](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1541)
+[packages/core/src/types.ts:1547](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1547)
 
 ***
 
@@ -180,4 +180,4 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1542](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1542)
+[packages/core/src/types.ts:1548](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1548)

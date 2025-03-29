@@ -159,65 +159,49 @@ export abstract class PluginComponent {
   }
   
   /**
-   * Wait for the runtime to be available and ready to use
-   * Uses adapter pattern to bridge interface/implementation mismatch
-   * 
-   * @param timeoutMs - Maximum time to wait in milliseconds (default: 60000)
-   * @returns Promise resolving to the runtime instance
-   * @throws Error if runtime is not available after timeout
+   * Wait for the runtime to be available
+   * @param timeoutMs Maximum time to wait in milliseconds
+   * @returns The runtime object or throws error if not available in time
    */
   protected async waitForRuntime(timeoutMs: number = 60000): Promise<IAgentRuntime> {
     const start = Date.now();
-    const maxDelay = 5000;
     let delay = 100;
-
-    this.logger.debug(`[PLUGIN] Waiting for runtime to be available (v${PLUGIN_VERSION}, timeout: ${timeoutMs}ms)`);
-
+    const maxDelay = 5000;
+    
+    this.logger.debug(`[RUNTIME] Waiting for runtime to be available (timeout: ${timeoutMs}ms)`);
+    
     while (Date.now() - start < timeoutMs) {
-      // Check this.runtime first if it's already a wrapped instance
+      // If already wrapped and valid, use it
       if (this.runtime && this.runtimeIsValid(this.runtime)) {
-        this.logger.info(`[PLUGIN] Runtime ready, agent ID: ${this.getAgentIdSafe()}`);
+        this.logger.info(`[RUNTIME] Using existing wrapped runtime`);
         return this.runtime;
       }
-
-      // Check globalThis.__elizaRuntime
-      const rawRt = globalThis.__elizaRuntime;
-      if (rawRt) {
-        // Extra verbose debugging for what properties actually exist
-        this.logger.debug(`[RUNTIME-DEBUG] Found __elizaRuntime, checking properties:`);
-        this.logger.debug(`[RUNTIME-DEBUG] Has agentId? ${typeof rawRt.agentId === 'string'}`);
-        this.logger.debug(`[RUNTIME-DEBUG] agentId value: ${rawRt.agentId}`);
-        this.logger.debug(`[RUNTIME-DEBUG] Has memoryManager? ${!!rawRt.memoryManager}`);
-        this.logger.debug(`[RUNTIME-DEBUG] Has memoryManagers? ${!!rawRt.memoryManagers}`);
-        this.logger.debug(`[RUNTIME-DEBUG] Has clients? ${!!rawRt.clients}`);
       
-        // Check if the runtime is valid for our needs
-        if (this.runtimeIsValid(rawRt)) {
-          // Log runtime constructor for debugging
-          this.logger.info(`[RUNTIME] Runtime constructor: ${rawRt.constructor?.name || 'unknown'}`);
+      // Check for global runtime first (Valhalla patching approach)
+      if (globalThis.__elizaRuntime && typeof globalThis.__elizaRuntime === 'object') {
+        this.logger.info(`[RUNTIME] Found globalThis.__elizaRuntime, attempting to wrap it`);
+        this.logger.debug(`[RUNTIME] Global runtime constructor: ${globalThis.__elizaRuntime.constructor?.name || 'unknown'}`);
+        this.logger.debug(`[RUNTIME] Global runtime handleMessage present: ${typeof globalThis.__elizaRuntime.handleMessage === 'function'}`);
+        
+        try {
+          const wrappedRuntime = this.createRuntimeWrapper(globalThis.__elizaRuntime);
+          this.runtime = wrappedRuntime;
           
-          // Create runtime proxy using the adapter pattern
-          const runtimeProxy = new Proxy(rawRt, this.createRuntimeProxyHandlers());
-          this.runtime = runtimeProxy;
-          
-          // Test if it works
-          try {
-            const agentId = this.getAgentIdSafe();
-            this.logger.info(`[AGENT] Agent ID: ${agentId} (from runtime v${PLUGIN_VERSION})`);
-            return runtimeProxy;
-          } catch (error) {
-            this.logger.error(`[RUNTIME] Error with runtime proxy: ${error.message}`);
-          }
-        } else {
-          this.logger.debug("[RUNTIME-DEBUG] Runtime found but validation failed");
+          const agentId = wrappedRuntime.getAgentId();
+          this.logger.info(`[RUNTIME] Successfully wrapped globalThis.__elizaRuntime with agent ID: ${agentId}`);
+          return wrappedRuntime;
+        } catch (error) {
+          this.logger.error(`[RUNTIME] Error with global runtime wrapper: ${error.message}`);
         }
       }
-
-      // Wait with exponential backoff
-      await new Promise(resolve => setTimeout(resolve, delay));
+      
+      // Not ready yet, wait and increase delay with exponential backoff
+      this.logger.trace(`[RUNTIME] Runtime not available yet, waiting ${delay}ms before retry...`);
+      await new Promise(res => setTimeout(res, delay));
       delay = Math.min(delay * 1.5, maxDelay);
     }
-
+    
+    this.logger.error(`[RUNTIME] Runtime wait timed out after ${timeoutMs}ms`);
     throw new Error(`Runtime wait timed out after ${timeoutMs}ms`);
   }
   

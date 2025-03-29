@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / ModelConfiguration
+[@elizaos/core v0.25.9](../index.md) / ModelConfiguration
 
 # Interface: ModelConfiguration
 
@@ -10,7 +10,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:715](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L715)
+[packages/core/src/types.ts:721](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L721)
 
 ***
 
@@ -20,7 +20,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:716](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L716)
+[packages/core/src/types.ts:722](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L722)
 
 ***
 
@@ -30,7 +30,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:717](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L717)
+[packages/core/src/types.ts:723](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L723)
 
 ***
 
@@ -40,7 +40,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:718](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L718)
+[packages/core/src/types.ts:724](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L724)
 
 ***
 
@@ -50,7 +50,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:719](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L719)
+[packages/core/src/types.ts:725](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L725)
 
 ***
 
@@ -60,4 +60,4 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:720](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L720)
+[packages/core/src/types.ts:726](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L726)

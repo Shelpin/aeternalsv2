@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / IrysDataType
+[@elizaos/core v0.25.9](../index.md) / IrysDataType
 
 # Enumeration: IrysDataType
 
@@ -10,7 +10,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1478](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1478)
+[packages/core/src/types.ts:1484](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1484)
 
 ***
 
@@ -20,7 +20,7 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1479](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1479)
+[packages/core/src/types.ts:1485](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1485)
 
 ***
 
@@ -30,4 +30,4 @@
 
 #### Defined in
 
-[packages/core/src/types.ts:1480](https://github.com/elizaOS/eliza/blob/main/packages/core/src/types.ts#L1480)
+[packages/core/src/types.ts:1486](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/types.ts#L1486)

@@ -1,4 +1,4 @@
-[@elizaos/core v0.25.8](../index.md) / validateUuid
+[@elizaos/core v0.25.9](../index.md) / validateUuid
 
 # Function: validateUuid()
 
@@ -14,4 +14,4 @@
 
 ## Defined in
 
-[packages/core/src/uuid.ts:7](https://github.com/elizaOS/eliza/blob/main/packages/core/src/uuid.ts#L7)
+[packages/core/src/uuid.ts:7](https://github.com/Shelpin/aeternalsv2/blob/main/packages/core/src/uuid.ts#L7)
