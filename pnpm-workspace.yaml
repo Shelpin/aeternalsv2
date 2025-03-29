@@ -1,5 +1,3 @@
 packages:
-    - "docs"
-    - "packages/*"
-    - "client"
-    - "agent"
+  - packages/*
+  - packages/clients/*

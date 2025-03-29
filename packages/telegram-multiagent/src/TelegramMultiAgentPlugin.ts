@@ -419,38 +419,60 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       
       // STEP 2 - Initialize the TelegramClient
       try {
-        // Paths to try when loading the TelegramClient module
-        const possiblePaths = [
-          // Absolute paths
-          '/root/eliza/node_modules/@elizaos-plugins/client-telegram',
-          '/root/eliza/node_modules/.pnpm/node_modules/@elizaos-plugins/client-telegram',
-          // Relative paths from current directory
-          path.resolve(process.cwd(), 'packages/clients'),
-          path.resolve(process.cwd(), 'node_modules/@elizaos-plugins/client-telegram'),
-          path.resolve(process.cwd(), '../packages/clients'),
-          // Fallback paths
-          '../packages/clients',
-          'packages/clients',
-          'packages/clients/client-telegram'
-        ];
-        
+        // First try a direct import (ES module)
         let TelegramClient = null;
         let loadedFrom = '';
         
-        // Try each path until we find the module
-        for (const modulePath of possiblePaths) {
-          try {
-            if (fs.existsSync(modulePath)) {
-              this.logger.info(`[PLUGIN] Attempting to load TelegramClient from ${modulePath}`);
-              
-              // If it's a directory, look for index file
-              if (fs.statSync(modulePath).isDirectory()) {
-                const files = fs.readdirSync(modulePath);
-                this.logger.info(`[PLUGIN] Directory contents of ${modulePath}: ${files.join(', ')}`);
+        try {
+          // Try direct import via require (CommonJS)
+          const telegramModule = require('@elizaos-plugins/client-telegram');
+          if (telegramModule && telegramModule.TelegramClient) {
+            TelegramClient = telegramModule.TelegramClient;
+            loadedFrom = '@elizaos-plugins/client-telegram (direct import)';
+            this.logger.info(`[PLUGIN] Successfully loaded TelegramClient via direct import`);
+          }
+        } catch (directImportError) {
+          this.logger.debug(`[PLUGIN] Direct import failed: ${directImportError.message}`);
+          
+          // If direct import fails, fallback to path resolution
+          const possiblePaths = [
+            // Direct import as expected by pnpm workspace
+            '@elizaos-plugins/client-telegram',
+            // Absolute paths with correct module name
+            '/root/eliza/node_modules/@elizaos-plugins/client-telegram',
+            '/root/eliza/node_modules/.pnpm/@elizaos-plugins+client-telegram@0.1.0/node_modules/@elizaos-plugins/client-telegram',
+            // Relative paths from current directory
+            path.resolve(process.cwd(), 'packages/clients/telegram'),
+            path.resolve(process.cwd(), 'packages/clients/telegram/dist'),
+            // Fallback paths with telegram subdirectory
+            '../packages/clients/telegram',
+            'packages/clients/telegram',
+            'packages/clients/telegram/dist'
+          ];
+          
+          // Try each path until we find the module
+          for (const modulePath of possiblePaths) {
+            try {
+              if (fs.existsSync(modulePath)) {
+                this.logger.info(`[PLUGIN] Attempting to load TelegramClient from ${modulePath}`);
                 
-                // Try to load from different entry points
-                if (files.includes('index.js') || files.includes('index.ts')) {
-                  // Try a standard import
+                // If it's a directory, look for index file
+                if (fs.statSync(modulePath).isDirectory()) {
+                  const files = fs.readdirSync(modulePath);
+                  this.logger.info(`[PLUGIN] Directory contents of ${modulePath}: ${files.join(', ')}`);
+                  
+                  // Try to load from different entry points
+                  if (files.includes('index.js') || files.includes('index.ts')) {
+                    // Try a standard import
+                    const module = require(modulePath);
+                    if (module && module.TelegramClient) {
+                      TelegramClient = module.TelegramClient;
+                      loadedFrom = modulePath;
+                      break;
+                    }
+                  }
+                } else {
+                  // It's a file, try to load it directly
                   const module = require(modulePath);
                   if (module && module.TelegramClient) {
                     TelegramClient = module.TelegramClient;
@@ -458,19 +480,11 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
                     break;
                   }
                 }
-              } else {
-                // It's a file, try to load it directly
-                const module = require(modulePath);
-                if (module && module.TelegramClient) {
-                  TelegramClient = module.TelegramClient;
-                  loadedFrom = modulePath;
-                  break;
-                }
               }
+            } catch (err) {
+              this.logger.debug(`[PLUGIN] Failed to load from ${modulePath}: ${err.message}`);
+              // Continue to the next path
             }
-          } catch (err) {
-            this.logger.debug(`[PLUGIN] Failed to load from ${modulePath}: ${err.message}`);
-            // Continue to the next path
           }
         }
         

@@ -70,7 +70,9 @@ fi
 echo -e "\n${YELLOW}[2.1] Cleaning up database files...${NC}"
 echo -e "   ${BLUE}Removing old SQLite database files to prevent schema conflicts...${NC}"
 rm -f ./agent/data/*.db
-rm -f ./packages/telegram-multiagent/test_memory.db
+rm -f ./agent/data/*.sqlite
+rm -f ./packages/**/test_memory.db
+rm -f ./packages/**/test_memory.sqlite
 echo -e "   ${GREEN}Database files removed. Fresh schema will be created on startup.${NC}"
 
 # Initialize database schema
@@ -112,6 +114,10 @@ if [ -f "package.json" ]; then
   if [ -f "pnpm-lock.yaml" ]; then
     # Force node environment to production for better performance
     NODE_ENV=production pnpm build
+    
+    # Build client packages specifically
+    echo -e "   ${BLUE}Building client packages...${NC}"
+    NODE_ENV=production pnpm build:clients
     
     if [ $? -eq 0 ]; then
       echo -e "   ${GREEN}Build successful!${NC}"
@@ -271,7 +277,7 @@ for agent in "${agents[@]}"; do
     AGENT_ID="${agent}" \
     TELEGRAM_BOT_TOKEN="${BOT_TOKEN}" \
     pnpm start --character="characters/${agent}.json" \
-              --clients=@elizaos-plugins/client-telegram \
+              --clients=@elizaos/client-telegram \
               --plugins=@elizaos/telegram-multiagent \
               --log-level=debug \
               --port=$PORT > $LOG_DIR/${agent}.log 2>&1 &

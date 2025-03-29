@@ -17,6 +17,9 @@ node-compile-cache
 .DS_Store
 
 dist/
+**/dist
+**/node_modules
+*.tsbuildinfo
 # Allow models directory but ignore model files
 models/*.gguf
 pgLite/
