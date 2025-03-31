@@ -204,7 +204,7 @@ try {
           elizaLogger.info('✅ [PATCH] Successfully added telegram client to runtime.clients.telegram');
         } catch (localImportError) {
           // If that fails, try the package name
-          const telegramClient = await import('@elizaos-plugins/client-telegram');
+          const telegramClient = await import('@elizaos/client-telegram');
           
           // Apply the same patch to the npm package
           if (telegramClient && telegramClient.default && telegramClient.default.prototype) {
@@ -228,7 +228,7 @@ try {
           }
           
           runtime.client.telegram = telegramClient;
-          elizaLogger.info('✅ [PATCH] Successfully injected telegram client from @elizaos-plugins/client-telegram');
+          elizaLogger.info('✅ [PATCH] Successfully injected telegram client from @elizaos/client-telegram');
           
           // VALHALLA FIX: Ensure client is also added to runtime.clients.telegram
           if (!runtime.clients) runtime.clients = {};

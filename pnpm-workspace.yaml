@@ -2,4 +2,5 @@ packages:
   - 'packages/*'
   - 'packages/clients/*'
   - 'packages/plugins/*'
+  - 'packages/agent'
 
