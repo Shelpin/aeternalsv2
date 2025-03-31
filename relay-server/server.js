@@ -17,7 +17,7 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Load API key from environment variable
-const RELAY_API_KEY = process.env.RELAY_API_KEY || 'elizaos-secure-relay-key';
+const RELAY_API_KEY = process.env.RELAY_AUTH_TOKEN || process.env.RELAY_API_KEY || 'elizaos-secure-relay-key';
 logWithTime(`🔑 Using relay API key: ${RELAY_API_KEY.substring(0, 5)}****`);
 
 // API key authentication middleware

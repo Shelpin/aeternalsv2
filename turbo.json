@@ -18,12 +18,17 @@
             "outputs": ["dist/**"],
             "dependsOn": []
         },
+        "@elizaos-plugins/clients#build": {
+            "outputs": ["dist/**"],
+            "dependsOn": ["@elizaos/client-telegram#build"]
+        },
         "eliza-docs#build": {
             "outputs": ["build/**"]
         },
         "dev": {
             "persistent": true,
             "cache": true
-        }
+        },
+        "clean": {}
     }
 }

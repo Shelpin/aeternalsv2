@@ -10,11 +10,12 @@
     "composite": true,
     "declaration": true,
     "sourceMap": true,
-    "noEmit": true
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@elizaos/client-telegram": ["./telegram/src"]
+    }
   },
   "include": ["*.ts"],
-  "exclude": ["node_modules", "dist", "telegram"],
-  "references": [
-    { "path": "./telegram" }
-  ]
+  "exclude": ["node_modules", "dist"]
 } 

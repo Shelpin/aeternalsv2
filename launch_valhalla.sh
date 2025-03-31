@@ -69,8 +69,8 @@ fi
 # Add database cleanup steps
 echo -e "\n${YELLOW}[2.1] Cleaning up database files...${NC}"
 echo -e "   ${BLUE}Removing old SQLite database files to prevent schema conflicts...${NC}"
-rm -f ./agent/data/*.db
-rm -f ./agent/data/*.sqlite
+rm -f ./packages/agent/data/*.db
+rm -f ./packages/agent/data/*.sqlite
 rm -f ./packages/**/test_memory.db
 rm -f ./packages/**/test_memory.sqlite
 echo -e "   ${GREEN}Database files removed. Fresh schema will be created on startup.${NC}"
@@ -276,11 +276,12 @@ for agent in "${agents[@]}"; do
     FORCE_GC=true \
     AGENT_ID="${agent}" \
     TELEGRAM_BOT_TOKEN="${BOT_TOKEN}" \
-    pnpm start --character="characters/${agent}.json" \
-              --clients=@elizaos/client-telegram \
-              --plugins=@elizaos/telegram-multiagent \
-              --log-level=debug \
-              --port=$PORT > $LOG_DIR/${agent}.log 2>&1 &
+    cd /root/eliza && pnpm --filter @elizaos/agent start --isRoot \
+      --character="characters/${agent}.json" \
+      --clients=@elizaos/client-telegram \
+      --plugins=@elizaos/telegram-multiagent \
+      --log-level=debug \
+      --port=$PORT > $LOG_DIR/${agent}.log 2>&1 &
     
     # Save PID
     AGENT_PID=$!

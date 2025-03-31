@@ -660,6 +660,9 @@ export type Plugin = {
     /** Plugin description */
     description: string;
 
+    /** Optional default export */
+    default?: any;
+
     /** Optional actions */
     actions?: Action[];
 

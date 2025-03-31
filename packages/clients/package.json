@@ -2,19 +2,28 @@
   "name": "@elizaos-plugins/clients",
   "version": "0.1.0",
   "description": "Client implementations for ElizaOS",
-  "main": "dist/index.js",
+  "type": "module",
+  "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsup index.ts --format esm --dts --external '@elizaos/client-telegram'",
     "clean": "rimraf dist"
   },
   "dependencies": {
+    "@elizaos/client-telegram": "workspace:*",
     "node-telegram-bot-api": "^0.61.0"
   },
   "devDependencies": {
     "@types/node": "^18.0.0",
     "@types/node-telegram-bot-api": "^0.61.0",
     "typescript": "^5.0.0",
-    "rimraf": "^3.0.2"
+    "rimraf": "^3.0.2",
+    "tsup": "8.3.5"
   }
 } 

@@ -10,7 +10,7 @@ console.log('[DB INIT] Database initialization script starting...');
 
 // Database paths
 const dbPaths = [
-  './agent/data/telegram-multiagent.db',
+  './packages/agent/data/telegram-multiagent.db',
   './packages/telegram-multiagent/test_memory.db'
 ];
 

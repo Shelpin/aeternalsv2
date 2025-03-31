@@ -5,5 +5,5 @@
  */
 
 // Export the Telegram client
-export * from './telegram/src/index';
-export { default as TelegramClient } from './telegram/src/index'; 
+export * from './telegram/src/index.js';
+export { default as TelegramClient } from './telegram/src/index.js'; 
