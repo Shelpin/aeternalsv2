@@ -331,7 +331,12 @@ app.post('/sendMessage', (req, res) => {
       message: {
         message_id: Math.floor(Math.random() * 1000000),
         from: {
-          id: parseInt(agent_id.replace(/\D/g, ''), 10) || 12345,
+          id: (() => {
+            const crypto = require('crypto');
+            return parseInt(crypto.createHash('md5')
+                .update(agent_id)
+                .digest('hex').slice(0, 8), 16);
+          })(),
           is_bot: true,
           first_name: agent_id,
           username: agent_id + "_bot",  // Ensure username has _bot suffix for Telegram format

@@ -361,11 +361,11 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.agentId = agentId;
       this.config.agentId = agentId;
       
-      // VALHALLA FIX: Simplify token resolution to match working ENV structure
+      // VALHALLA FIX: Get token using character username from runtime
       this.botToken =
         this.config.botToken ||
         process.env.TELEGRAM_BOT_TOKEN ||
-        process.env[`${this.config.agentId.toUpperCase()}_BOT_TOKEN`];
+        process.env[`TELEGRAM_BOT_TOKEN_${this.runtime.character.username}`];
       
       if (!this.botToken) {
         this.logger.error('❌ No bot token found for agent: ' + this.agentId);
@@ -533,45 +533,43 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       // VALHALLA ACTION CHECK: Log available actions
       if (this.runtime.actions) {
-        this.logger.info(`[VALHALLA] Available runtime.actions: ${JSON.stringify(Object.keys(this.runtime.actions))}`, '', '');
+        this.logger.info(`[VALHALLA] Available runtime.actions: ${JSON.stringify(this.runtime.actions.map(a => a.name))}`, '', '');
         
         // Check for specific action handlers
-        const actionNames = Object.keys(this.runtime.actions);
+        const actionNames = this.runtime.actions.map(a => a.name);
         this.logger.info(`[VALHALLA] Inspecting ${actionNames.length} actions for handlers...`, '', '');
         
         // Inspect the structure of actions
         for (let i = 0; i < Math.min(actionNames.length, 5); i++) {
-          const actionKey = actionNames[i];
-          const action = this.runtime.actions[actionKey];
-          this.logger.info(`[VALHALLA] Action ${actionKey} details:`, '', '');
+          const actionName = actionNames[i];
+          const action = this.runtime.actions.find(a => a.name === actionName);
+          this.logger.info(`[VALHALLA] Action ${i} details:`, '', '');
           
           if (action) {
-            if (action.name) this.logger.info(`[VALHALLA] Action ${actionKey} name: ${action.name}`, '', '');
-            if (action.description) this.logger.info(`[VALHALLA] Action ${actionKey} description: ${action.description}`, '', '');
+            if (action.name) this.logger.info(`[VALHALLA] Action ${i} name: ${action.name}`, '', '');
+            if (action.description) this.logger.info(`[VALHALLA] Action ${i} description: ${action.description}`, '', '');
             if (typeof action.handler === 'function') {
-              this.logger.info(`[VALHALLA] Action ${actionKey} has a function handler`, '', '');
+              this.logger.info(`[VALHALLA] Action ${i} has a function handler`, '', '');
               // Log the function's parameters if possible
               const funcStr = action.handler.toString().substring(0, 100);
-              this.logger.info(`[VALHALLA] Action ${actionKey} handler signature: ${funcStr}...`, '', '');
+              this.logger.info(`[VALHALLA] Action ${i} handler signature: ${funcStr}...`, '', '');
             }
           }
         }
         
         // Try to find a message handling action
-        const messageHandlers = actionNames.filter(key => {
-          const action = this.runtime.actions[key];
-          return action && 
-                (action.name === 'handleMessage' || 
-                action.name === 'processMessage' || 
-                action.name === 'processCharacterMessage' || 
-                action.name === 'sendMessage' ||
-                (action.name && action.name.toLowerCase().includes('message')));
-        });
+        const messageHandlers = this.runtime.actions.filter(action => 
+          action && 
+          (action.name === 'handleMessage' || 
+           action.name === 'processMessage' || 
+           action.name === 'processCharacterMessage' || 
+           action.name === 'sendMessage' ||
+           (action.name && action.name.toLowerCase().includes('message')))
+        );
         
         if (messageHandlers.length > 0) {
           this.logger.info(`[VALHALLA] Found ${messageHandlers.length} potential message handler actions`, '', '');
-          messageHandlers.forEach(key => {
-            const action = this.runtime.actions[key];
+          messageHandlers.forEach(action => {
             this.logger.info(`[VALHALLA] Message handler action found: ${action.name}`, '', '');
           });
         } else {

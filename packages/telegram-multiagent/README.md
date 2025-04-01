@@ -36,7 +36,7 @@ npm install @elizaos/telegram-multiagent
 pnpm add @elizaos/telegram-multiagent
 ```
 
-Or add it directly to your character configuration file:
+Add it directly to your character configuration file:
 
 ```json
 {
@@ -74,7 +74,7 @@ Configure the plugin behavior using environment variables:
 ```bash
 # Required configurations
 export AGENT_ID="your_agent_id"
-export TELEGRAM_GROUP_IDS="-1001234567890,-1009876543210"
+export TELEGRAM_GROUP_IDS="-_YOUR GROUPS IDS_"
 export RELAY_SERVER_URL="http://localhost:4000"
 export RELAY_AUTH_TOKEN="your-secure-token"
 
