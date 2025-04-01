@@ -116,6 +116,7 @@ export interface TelegramMultiAgentConfig {
   authToken: string;
   typingSimulation?: TypingSimulation;
   botToken?: string;
+  agentId?: string;
   groupIds?: string[];
   conversationCheckIntervalMs?: number;
   heartbeatInterval?: number;

@@ -1,0 +1,61 @@
+nohup: ignoring input
+[2025-03-31 20:44:58] [32mINFO[39m: [36mLoading embedding settings:[39m
+    USE_OPENAI_EMBEDDING: "true"
+    USE_OLLAMA_EMBEDDING: ""
+    OLLAMA_EMBEDDING_MODEL: "false"
+(node:1496620) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[2025-03-31 20:44:58] [34mDEBUG[39m: [36mLoading character settings:[39m
+    ARGV: [
+      "/root/.nvm/versions/node/v23.3.0/bin/node",
+      "/root/eliza/packages/agent/dist/index.js",
+      "--character=characters/eth_memelord_9000.json",
+      "--port=3000",
+      "--log-level=debug"
+    ]
+    CHARACTER_ARG: "--character=characters/eth_memelord_9000.json"
+    CWD: "/root/eliza"
+[2025-03-31 20:44:58] [37mLOG[39m: [36mLoaded .env file from: /root/eliza/.env[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mParsed settings:[39m
+    USE_OPENAI_EMBEDDING: "true"
+    USE_OPENAI_EMBEDDING_TYPE: "string"
+    USE_OLLAMA_EMBEDDING: ""
+    USE_OLLAMA_EMBEDDING_TYPE: "string"
+    OLLAMA_EMBEDDING_MODEL: "false"
+[2025-03-31 20:44:58] [37mLOG[39m: [36mDirectClient constructor[39m
+[2025-03-31 20:44:58] [37mLOG[39m: [36mCreating runtime for character Eliza[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Initializing AgentRuntime with options:[39m
+    character: "Eliza"
+    modelProvider: "llama_local"
+    characterModelProvider: "llama_local"
+[2025-03-31 20:44:58] [34mDEBUG[39m: [36m[AgentRuntime] Process working directory: /root/eliza[39m
+[2025-03-31 20:44:58] [34mDEBUG[39m: [36m[AgentRuntime] Process knowledgeRoot: /root/characters/knowledge[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mAgent ID: b850bc30-45f8-0041-a00a-83df46d8555d[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Setting Model Provider:[39m
+    characterModelProvider: "llama_local"
+    optsModelProvider: "llama_local"
+    finalSelection: "llama_local"
+[2025-03-31 20:44:58] [32mINFO[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Selected model provider: llama_local[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Selected image model provider: llama_local[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Selected image vision model provider: llama_local[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Registering action: CONTINUE[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Registering action: FOLLOW_ROOM[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Registering action: UNFOLLOW_ROOM[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Registering action: IGNORE[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Registering action: NONE[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Registering action: MUTE_ROOM[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mEliza(b850bc30-45f8-0041-a00a-83df46d8555d) - Registering action: UNMUTE_ROOM[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mInitializing SQLite database at /root/eliza/data/db.sqlite...[39m
+[RUNTIME PATCH] Exposed runtime globally
+Attempting to initialize plugin: bootstrap
+Plugin bootstrap does not have initialize method
+[RUNTIME PATCH] Runtime fully initialized and ready
+[2025-03-31 20:44:58] [37mLOG[39m: [36msqlite-vec extensions loaded successfully.[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mUsing Database Cache...[39m
+[2025-03-31 20:44:58] [31mERROR[39m: [36mFailed to connect to SQLite:[39m
+    code: "SQLITE_ERROR"
+[2025-03-31 20:44:58] [34mDEBUG[39m: [36mStarted Eliza as b850bc30-45f8-0041-a00a-83df46d8555d[39m
+[2025-03-31 20:44:58] [33mWARN[39m: [36mPort 3000 is in use, trying 3001[39m
+[2025-03-31 20:44:58] [33mWARN[39m: [36mServer started on alternate port 3001[39m
+[2025-03-31 20:44:58] [32mINFO[39m: [36mRun `pnpm start:client` to start the client and visit the outputted URL (http://localhost:5173) to chat with your agents. When running multiple agents, use client with different port `SERVER_PORT=3001 pnpm start:client`[39m
+[2025-03-31 20:44:58] [37mSUCCESS[39m: [36mREST API bound to 0.0.0.0:3001. If running locally, access it at http://localhost:3001.[39m

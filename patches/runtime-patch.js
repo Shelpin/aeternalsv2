@@ -202,6 +202,19 @@ try {
           if (!runtime.clients) runtime.clients = {};
           runtime.clients.telegram = telegramClient;
           elizaLogger.info('✅ [PATCH] Successfully added telegram client to runtime.clients.telegram');
+          
+          // VALHALLA FIX: Make telegram client available globally through __elizaRuntime for plugins
+          if (globalThis.__elizaRuntime) {
+            globalThis.__elizaRuntime.clients = {
+              ...globalThis.__elizaRuntime.clients,
+              telegram: telegramClient,
+            };
+            globalThis.__elizaRuntime.client = {
+              ...globalThis.__elizaRuntime.client,
+              telegram: telegramClient, // for legacy plugin access
+            };
+            elizaLogger.info('✅ [PATCH] Telegram client exposed globally through __elizaRuntime');
+          }
         } catch (localImportError) {
           // If that fails, try the package name
           const telegramClient = await import('@elizaos/client-telegram');
@@ -234,6 +247,19 @@ try {
           if (!runtime.clients) runtime.clients = {};
           runtime.clients.telegram = telegramClient;
           elizaLogger.info('✅ [PATCH] Successfully added telegram client to runtime.clients.telegram');
+          
+          // VALHALLA FIX: Make telegram client available globally through __elizaRuntime for plugins
+          if (globalThis.__elizaRuntime) {
+            globalThis.__elizaRuntime.clients = {
+              ...globalThis.__elizaRuntime.clients,
+              telegram: telegramClient,
+            };
+            globalThis.__elizaRuntime.client = {
+              ...globalThis.__elizaRuntime.client,
+              telegram: telegramClient, // for legacy plugin access
+            };
+            elizaLogger.info('✅ [PATCH] Telegram client exposed globally through __elizaRuntime');
+          }
         }
       } catch (importError) {
         elizaLogger.warn(`❌ [PATCH] Failed to import telegram client: ${importError.message}`);
@@ -378,6 +404,18 @@ try {
   // Make runtime globally available for plugins that need it
   globalThis.__elizaRuntime = runtime;
   
+  // VALHALLA FIX: Ensure Telegram client is available at the global level
+  if (runtime.client?.telegram) {
+    // Make sure Telegram client is properly available in the global runtime
+    if (!globalThis.__elizaRuntime.clients) globalThis.__elizaRuntime.clients = {};
+    if (!globalThis.__elizaRuntime.client) globalThis.__elizaRuntime.client = {};
+    
+    globalThis.__elizaRuntime.clients.telegram = runtime.client.telegram;
+    globalThis.__elizaRuntime.client.telegram = runtime.client.telegram;
+    
+    elizaLogger.info('✅ [PATCH] Verified Telegram client is accessible globally after runtime initialization');
+  }
+  
   // Add memory stats tracking
   setInterval(() => {
     try {
@@ -397,6 +435,14 @@ try {
   elizaLogger.info('✅ [PATCH] Successfully initialized ElizaOS runtime with memory optimizations');
   elizaLogger.info(`✅ [PATCH] Runtime handleMessage is ${typeof runtime.handleMessage === 'function' ? 'available' : 'not available'}`);
   elizaLogger.info(`✅ [PATCH] Telegram bot-to-bot communication support is enabled`);
+  
+  // VALHALLA FIX: Final verification of Telegram client availability
+  elizaLogger.info('🔍 [PATCH] Verifying global Telegram client availability:');
+  elizaLogger.info(`  - runtime.client.telegram: ${Boolean(runtime.client?.telegram)}`);
+  elizaLogger.info(`  - runtime.clients.telegram: ${Boolean(runtime.clients?.telegram)}`);
+  elizaLogger.info(`  - globalThis.__elizaRuntime.client.telegram: ${Boolean(globalThis.__elizaRuntime?.client?.telegram)}`);
+  elizaLogger.info(`  - globalThis.__elizaRuntime.clients.telegram: ${Boolean(globalThis.__elizaRuntime?.clients?.telegram)}`);
+  
 } catch (error) {
   elizaLogger.error(`❌ [PATCH] Failed to initialize ElizaOS runtime: ${error.message}`);
   if (error.stack) {
@@ -406,4 +452,4 @@ try {
 }
 
 // Export the initialized runtime
-export { runtime }; 
+export { runtime };

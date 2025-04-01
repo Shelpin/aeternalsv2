@@ -91,6 +91,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private checkIntervalId: ReturnType<typeof setInterval> | null = null;
   private initialized = false;
   private agentId: string = "unknown";
+  private botToken: string | undefined;
   private initializePromise: Promise<void> | null = null;
   private lastResponseTimes: Map<string, number> = new Map();
   private lastSpeaker: Map<string, string> = new Map();
@@ -355,67 +356,27 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         throw new Error('Runtime not available');
       }
       
-      // Get the agent ID and normalize it for token lookup
-      const rawAgentId = this.runtime.agentId || process.env.AGENT_ID || DEFAULT_AGENT_ID;
+      // Get the agent ID
+      const agentId = this.runtime.agentId || process.env.AGENT_ID || DEFAULT_AGENT_ID;
+      this.agentId = agentId;
+      this.config.agentId = agentId;
       
-      // Log the raw agent ID for debugging
-      this.logger.info(`[PLUGIN] Raw agent ID: ${rawAgentId}`);
+      // VALHALLA FIX: Simplify token resolution to match working ENV structure
+      this.botToken =
+        this.config.botToken ||
+        process.env.TELEGRAM_BOT_TOKEN ||
+        process.env[`${this.config.agentId.toUpperCase()}_BOT_TOKEN`];
       
-      // Multiple approaches to construct environment variable names for token lookup
-      const possibleEnvVars = [
-        // Standard normalized format
-        `TELEGRAM_BOT_TOKEN_${rawAgentId.replace(/[^a-zA-Z0-9]/g, '_')}`,
+      if (!this.botToken) {
+        this.logger.error('❌ No bot token found for agent: ' + this.agentId);
+      } else {
+        // Set the token in the config for future use
+        this.config.botToken = this.botToken;
         
-        // Character name-based lookup (common in Valhalla)
-        `TELEGRAM_BOT_TOKEN_${this.getCharacterName()}`,
-        
-        // Upper case transformation
-        `TELEGRAM_BOT_TOKEN_${rawAgentId.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`,
-        
-        // Camel case to snake case transformation
-        `TELEGRAM_BOT_TOKEN_${this.normalizeAgentId(rawAgentId)}`,
-        
-        // Simple fallbacks
-        'TELEGRAM_BOT_TOKEN',
-        `TELEGRAM_BOT_TOKEN_${rawAgentId}`
-      ];
-      
-      // Log the environment variables we're checking
-      this.logger.info(`[PLUGIN] Checking for token in environment variables: ${possibleEnvVars.join(', ')}`);
-      
-      // Try to find a matching environment variable with a token
-      let token = null;
-      let matchedVar = null;
-      
-      for (const envVar of possibleEnvVars) {
-        if (process.env[envVar]) {
-          token = process.env[envVar];
-          matchedVar = envVar;
-          this.logger.info(`[PLUGIN] Found token in environment variable: ${envVar}`);
-          break;
-        }
+        // Use just the beginning and end for logging (to avoid exposing full token)
+        const tokenMasked = this.botToken ? `${this.botToken.substring(0, 5)}...${this.botToken.substring(this.botToken.length - 3)}` : 'undefined';
+        this.logger.info(`[PLUGIN] Using bot token: ${tokenMasked}`);
       }
-      
-      // Also check config for token
-      if (!token && this.config.botToken) {
-        token = this.config.botToken;
-        this.logger.info(`[PLUGIN] Using token from plugin config`);
-      }
-      
-      // If still no token, throw error
-      if (!token) {
-        const envStr = possibleEnvVars.map(v => `${v}=...`).join(' or ');
-        this.logger.error(`[PLUGIN] No bot token found. Please set ${envStr} environment variable or configure botToken in plugin config.`);
-        throw new Error(`No bot token found for agent`);
-      }
-      
-      // Set the token in the config for future use
-      this.config.botToken = token;
-      
-      // Use just the beginning and end for logging (to avoid exposing full token)
-      const tokenMasked = token ? `${token.substring(0, 5)}...${token.substring(token.length - 3)}` : 'undefined';
-      this.logger.info(`[PLUGIN] Using bot token from ${matchedVar || 'config'}: ${tokenMasked}`);
-      this.logger.info(`[PLUGIN] Resolved Telegram token: ${tokenMasked}`);
       
       // STEP 2 - Initialize the TelegramClient
       try {
@@ -425,10 +386,10 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         
         try {
           // Try direct import via require (CommonJS)
-          const telegramModule = require('@elizaos-plugins/client-telegram');
+          const telegramModule = require('@elizaos/client-telegram');
           if (telegramModule && telegramModule.TelegramClient) {
             TelegramClient = telegramModule.TelegramClient;
-            loadedFrom = '@elizaos-plugins/client-telegram (direct import)';
+            loadedFrom = '@elizaos/client-telegram (direct import)';
             this.logger.info(`[PLUGIN] Successfully loaded TelegramClient via direct import`);
           }
         } catch (directImportError) {
@@ -437,10 +398,10 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           // If direct import fails, fallback to path resolution
           const possiblePaths = [
             // Direct import as expected by pnpm workspace
-            '@elizaos-plugins/client-telegram',
+            '@elizaos/client-telegram',
             // Absolute paths with correct module name
-            '/root/eliza/node_modules/@elizaos-plugins/client-telegram',
-            '/root/eliza/node_modules/.pnpm/@elizaos-plugins+client-telegram@0.1.0/node_modules/@elizaos-plugins/client-telegram',
+            '/root/eliza/node_modules/@elizaos/client-telegram',
+            '/root/eliza/node_modules/.pnpm/@elizaos+client-telegram@0.1.0/node_modules/@elizaos/client-telegram',
             // Relative paths from current directory
             path.resolve(process.cwd(), 'packages/clients/telegram'),
             path.resolve(process.cwd(), 'packages/clients/telegram/dist'),

@@ -39,6 +39,16 @@ async function main() {
     // Import and apply the runtime patches
     const patchModule = await import('./runtime-patch.js');
     
+    // Apply in-memory database fix
+    console.log('🔧 Applying in-memory database fix...');
+    await import('./in-memory-db-fix.js');
+    console.log('✅ In-memory database fix applied');
+    
+    // Apply relay configuration fix
+    console.log('🔧 Applying relay configuration fix...');
+    await import('./relay-config-fix.js');
+    console.log('✅ Relay configuration fix applied');
+
     // Get the patched runtime
     const { runtime } = patchModule;
     
