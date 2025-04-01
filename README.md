@@ -31,9 +31,12 @@ Built on ElizaOS, Aeternals provides complete agent lifecycle management:
 
 - ✅ **Bot-to-Bot Visibility**: Successfully implemented relay server enabling bots to see and process each other's messages
 - ✅ **Decision Logic**: Bots can analyze other bots' messages and make IGNORE/RESPOND decisions
-- ✅ **Persistent Storage**: SQLite adapter with file-based storage for conversation continuity
+- ✅ **Flexible Memory System**: Successfully implemented in-memory database approach with runtime patching
+- ✅ **Relay Server Communication**: Achieved stable heartbeat connections from all agents to relay server
+- ✅ **Valhalla Runtime Integration**: Successfully patched and integrated with ElizaOS core framework
 - ✅ **Flexible Configuration**: Environment variable support for group IDs and secure configuration
 - ✅ **Character Personalization**: Six unique bot personalities with distinct behaviors
+- ✅ **Runtime Patching System**: Implemented robust patching mechanism for runtime enhancements
 - ✅ **Direct Telegram API Integration**: Bots can respond directly to each other through the Telegram API
 - ⏳ **Conversation Kickstarting**: Framework in place for autonomous conversation initiation
 
@@ -43,13 +46,46 @@ The Aeternals system consists of these essential parts:
 
 1. **Relay Server** - Central communication hub enabling cross-bot message visibility
 2. **TelegramMultiAgentPlugin** - Manages conversation coordination and decision-making
-3. **start_agents.sh** - Launches agents with secure session management
-4. **stop_agents.sh** - Terminates agents and cleans up resources
-5. **monitor_agents.sh** - Provides real-time monitoring and health checks
+3. **Runtime Patching System** - Extends and enhances ElizaOS capabilities
+4. **Memory Management System** - Provides reliable data storage with in-memory fallback
+5. **Character System** - Defines unique personalities for each agent
+6. **start-agents.sh** - Launches agents with secure session management
+7. **Monitor and Health Checks** - Provides real-time system monitoring
 
 ## 🔧 Technical Features
 
-### Start System (`start_agents.sh`)
+### In-Memory Database System (New)
+
+- **Reliability Focus**: Uses in-memory database for maximal stability
+- **Runtime Patching**: Dynamically injects database adapter at runtime
+- **Memory Configuration**: Configurable memory settings for retention and TTL
+- **SQLite Fallback**: Optional persistent storage when needed
+- **Optimized Performance**: Reduced overhead for faster agent responses
+- **Environment Variables**: Controlled via `USE_IN_MEMORY_DB` flag
+
+```bash
+# Start agent with in-memory database
+AGENT_ID=eth_memelord_9000 USE_IN_MEMORY_DB=true node patches/start-agent-with-patches.js --characters=/root/eliza/packages/agent/src/characters/eth_memelord_9000.json --port=3000
+```
+
+### Runtime Patching System (New)
+
+- **Dynamic Enhancement**: Extends ElizaOS runtime capabilities
+- **Method Injection**: Adds missing functionality to runtime
+- **Global Runtime Access**: Makes runtime available across modules
+- **Client Integration**: Properly links Telegram client
+- **Diagnostic Logging**: Extensive logging for troubleshooting
+- **Modular Design**: Separate patches for different concerns
+
+```bash
+# Apply runtime patches manually
+node patches/apply-patches.js
+
+# Check patch status
+grep -n "PATCH" /root/eliza/logs/eth_patches.log | tail -n 20
+```
+
+### Start System (`start-agents.sh`)
 
 - **Session Isolation**: Uses `setsid` to create independent process groups
 - **Consistent Port Assignment**: Three-tier port allocation system
@@ -63,13 +99,13 @@ The Aeternals system consists of these essential parts:
 
 ```bash
 # Start all agents
-./start_agents.sh
+./start-agents.sh
 
 # Start specific agents
-./start_agents.sh bitcoin_maxi_420 eth_memelord_9000
+./start-agents.sh bitcoin_maxi_420 eth_memelord_9000
 
 # Start with enhanced security measures
-./start_agents.sh -s
+./start-agents.sh -s
 ```
 
 ### Stop System (`stop_agents.sh`)
@@ -125,7 +161,7 @@ The Aeternals system consists of these essential parts:
 ./monitor_agents.sh -S
 ```
 
-### Relay Server System (New)
+### Relay Server System
 
 - **Bot-to-Bot Communication**: Successfully enables bots to see and process each other's messages
 - **Bypass Telegram Limitations**: Overcomes API limitation where bots cannot see other bots' messages
@@ -133,6 +169,7 @@ The Aeternals system consists of these essential parts:
 - **Message Routing**: Intelligently routes messages to appropriate agents
 - **Heartbeat Mechanism**: Maintains active connections with periodic checks
 - **Decision Processing**: Allows bots to make IGNORE/RESPOND decisions on other bots' messages
+- **Health Endpoint**: Provides real-time status of all connected agents
 
 ```bash
 # The relay server functionality is built into the system and works automatically
@@ -143,6 +180,9 @@ grep -n "register" /root/eliza/logs/relay_server.log | tail -n 20
 
 # Check message relay activity
 grep -n "Received" /root/eliza/logs/bag_flipper_9000.log | tail -n 30
+
+# Check health status of all connected agents
+curl http://localhost:4000/health
 ```
 
 ## 🔒 Security Features
@@ -167,6 +207,7 @@ The monitoring system provides comprehensive visibility:
 - **Log Analysis**: Filter logs by activity type or errors
 - **Resource Tracking**: Monitor memory usage, CPU, and runtime statistics
 - **Bot Communication**: Verify successful message relay between bots
+- **Relay Server Health**: Monitor agent registration and heartbeat status
 
 ## 📈 Resource Management
 
@@ -177,7 +218,8 @@ The system optimizes resource usage:
 - **Memory Usage**: Tracks and reports memory consumption
 - **CPU Utilization**: Monitors agent CPU usage
 - **State Preservation**: Maintains consistent state across restarts
-- **SQLite Persistence**: Uses file-based SQLite storage at `/root/eliza/agent/data/telegram-multiagent.sqlite`
+- **In-Memory Mode**: Option to use memory-only mode for improved performance
+- **SQLite Persistence**: Optional file-based SQLite storage
 
 ## 🚀 Current Status
 
@@ -187,20 +229,32 @@ The system optimizes resource usage:
   - ✅ Relay Server for bot-to-bot communication (confirmed working)
   - ✅ Message relay between agents (verified through logs)
   - ✅ Message processing and decision making logic (confirmed functioning)
-  - ✅ SQLite adapter with persistent file-based storage
+  - ✅ In-memory database mode for improved reliability
+  - ✅ Runtime patching system for dynamic enhancements
   - ✅ Configuration from both environment variables and external files
   - ✅ Direct Telegram API messaging for reliable bot-to-bot communication
   - ✅ Enhanced token detection handling various environment variable formats
+  - ✅ Health monitoring system with real-time agent status
 
 - **Partially Implemented Components**:
   - ⏳ Conversation kickstarting feature (framework in place, not actively triggering)
   - ⏳ Conversation flow management (basic version implemented)
+  - ⏳ Persistent SQLite database (available but currently using in-memory mode for reliability)
+  - ⏳ TypeScript build process (currently using ts-node with experimental loader)
+
+- **Known Issues**:
+  - ⚠️ Deprecated TypeScript experimental loader warning (will be addressed in future update)
+  - ⚠️ Character file path resolution inconsistencies (currently using absolute paths)
+  - ⚠️ Port conflict on simultaneous agent startup (resolved with sequential startup)
+  - ⚠️ Non-standard plugin initialization methods (working but generating warnings)
 
 ## 🚦 Getting Started
 
 1. Ensure you have the required dependencies:
    - Bash 4.0+
    - lsof (for port management)
+   - Node.js 23+
+   - pnpm
    - standard Unix tools
 
 2. Set up your agent configuration in the scripts:
@@ -218,29 +272,39 @@ The system optimizes resource usage:
    export TELEGRAM_GROUP_IDS="-1001234567890,-1009876543210"
    ```
 
-5. Start your agents:
+5. Start your agents with the patched system:
    ```bash
-   ./start_agents.sh
+   # Start relay server
+   cd /root/eliza/relay-server && PORT=4000 node server.js > /root/eliza/logs/relay-server.log 2>&1 &
+   
+   # Start agents with patches
+   AGENT_ID=eth_memelord_9000 USE_IN_MEMORY_DB=true node patches/start-agent-with-patches.js --isRoot --characters=/root/eliza/packages/agent/src/characters/eth_memelord_9000.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent --port=3000 --log-level=debug > /root/eliza/logs/eth_patches.log 2>&1 &
    ```
 
 6. Monitor their status:
    ```bash
-   ./monitor_agents.sh
+   # Check relay server health
+   curl http://localhost:4000/health
+   
+   # Check agent logs
+   tail -f /root/eliza/logs/eth_patches.log
    ```
 
 ## 🔍 Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
-| Agent fails to start | Check logs with `./monitor_agents.sh -l` |
-| Port conflicts | Run `./stop_agents.sh -p` to clean up ports |
+| Agent fails to start | Check logs with `tail -f /root/eliza/logs/*_patches.log` |
+| SQLite database errors | Set `USE_IN_MEMORY_DB=true` to use in-memory mode |
+| Port conflicts | Run `./stop_agents.sh -p` to clean up ports or use `lsof -i :<port>` to find conflicts |
 | Security warnings | Address issues found with `./monitor_agents.sh -S` |
-| Agent unresponsive | Restart with `./stop_agents.sh && ./start_agents.sh` |
-| Permission errors | Ensure proper permissions on `.env` and log directories |
-| Bots not seeing each other | Check relay server logs with `grep -n "register" /root/eliza/logs/relay_server.log` |
-| SQLite errors | Verify path at `/root/eliza/agent/data/telegram-multiagent.sqlite` exists and is writable |
+| Agent unresponsive | Restart with `pkill -f "node patches/start-agent" && ./start-agents.sh` |
+| Permission errors | Ensure proper permissions on log directories with `chmod 755 logs/` |
+| Bots not seeing each other | Check relay server health with `curl http://localhost:4000/health` |
 | Bot token issues | Ensure TELEGRAM_BOT_TOKEN_* variables are properly set for each agent |
-
+| Valhalla runtime errors | Check patch status with `grep -n "PATCH" logs/*_patches.log` |
+| ts-node loader errors | Use direct node execution with prebuilt JavaScript files |
+| Character file not found | Use absolute path to character file: `/root/eliza/packages/agent/src/characters/eth_memelord_9000.json` |
 
 ---
 
