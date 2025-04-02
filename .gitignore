@@ -101,3 +101,6 @@ ton_nft_metadata/*
 
 ton_nft_images/
 ton_nft_images/*
+
+# Reports folder (local documentation)
+/reports/
