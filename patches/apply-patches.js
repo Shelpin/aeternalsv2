@@ -1,3 +1,5 @@
+import './telegram-client-static.js';
+
 /**
  * Valhalla Patch Loader
  * 

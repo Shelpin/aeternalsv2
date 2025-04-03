@@ -4,10 +4,10 @@
     "plugins": [
         "@elizaos-plugins/plugin-coingecko",
         "@elizaos-plugins/plugin-giphy",
-        "@elizaos-plugins/client-telegram",
+        "@elizaos/plugin-bootstrap",
         "@elizaos/telegram-multiagent"
     ],
-    "clients": ["@elizaos-plugins/client-telegram"],
+    "clients": ["@elizaos/client-telegram"],
     "modelProvider": "deepseek",
     "secrets": {
         "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN_CodeSamurai77}"

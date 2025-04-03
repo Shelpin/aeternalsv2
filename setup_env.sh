@@ -112,7 +112,17 @@ export_agent_vars() {
     
     if [ -n "$token_value" ]; then
         export TELEGRAM_BOT_TOKEN="$token_value"
-        echo "${GREEN}✅ Exported TELEGRAM_BOT_TOKEN for $character${NC}"
+        # Export additional runtime variables
+        export AGENT_ID="$character"
+        export USE_IN_MEMORY_DB=true
+        export RELAY_SERVER_URL="http://localhost:4000"
+        export RELAY_AUTH_TOKEN="elizaos-secure-relay-key"
+        export TELEGRAM_GROUP_IDS="-1002550618173"
+        export FORCE_EXACT_PORT=true
+        export DISABLE_POLLING=false
+        export FORCE_GC=true
+        
+        echo "${GREEN}✅ Exported TELEGRAM_BOT_TOKEN and runtime variables for $character${NC}"
         return 0
     else
         echo "${RED}❌ Failed to export token for $character${NC}"
@@ -140,6 +150,7 @@ main() {
                 echo "${RED}❌ Character name required for export${NC}"
                 return 1
             fi
+            echo "${YELLOW}ℹ️ Note: This script must be run once per agent terminal, before patches or agent launch.${NC}"
             validate_env && export_agent_vars "$character"
             ;;
         *)
