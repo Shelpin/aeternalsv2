@@ -16,7 +16,7 @@ import {
 } from "./evaluators.ts";
 import { generateText } from "./generation.ts";
 import { formatGoalsAsString, getGoals } from "./goals.ts";
-import { elizaLogger } from "./index.ts";
+import { elizaLogger } from "./internal/logger-internal.ts";
 import knowledge from "./knowledge.ts";
 import { MemoryManager } from "./memory.ts";
 import { formatActors, formatMessages, getActorDetails } from "./messages.ts";

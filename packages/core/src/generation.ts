@@ -18,7 +18,7 @@ import { encodingForModel, type TiktokenModel } from "js-tiktoken";
 // import { AutoTokenizer } from "@huggingface/transformers";
 import Together from "together-ai";
 import type { ZodSchema } from "zod";
-import { elizaLogger } from "./index.ts";
+import { elizaLogger } from "./internal/logger-internal.ts";
 import {
     models,
     getModelSettings,

@@ -1,8 +1,7 @@
-import telegramClient from '@elizaos/client-telegram';
-
 try {
+  const telegramClient = require('@elizaos/client-telegram');
   globalThis.__elizaTelegramClient = telegramClient;
   console.log('✅ Telegram client statically loaded');
-} catch (error) {
-  console.error('❌ Telegram client load failed:', error.message);
+} catch (err) {
+  console.error('❌ Failed to statically load Telegram client:', err.message);
 } 

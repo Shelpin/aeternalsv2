@@ -1,4 +1,4 @@
-import './telegram-client-static.js';
+require('./telegram-client-static.js');
 
 /**
  * Valhalla Patch Loader
