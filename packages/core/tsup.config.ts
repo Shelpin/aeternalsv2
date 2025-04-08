@@ -2,13 +2,14 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
     entry: ["src/index.ts"],
-    dts: {
-        entry: "src/public-api.ts"
-    },
+    // Commented out to prevent tsup from conflicting with tsc on type emission
+    // dts: {
+    //     entry: "src/public-api.ts"
+    // },
     outDir: "dist",
     sourcemap: true,
     clean: true,
-    format: ["esm"], // Ensure you're targeting CommonJS
+    format: ["esm", "cjs"],
     platform: "node",
     target: "node18",
     bundle: true,

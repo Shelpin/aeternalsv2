@@ -17,7 +17,7 @@ import {
 import { generateText } from "./generation.ts";
 import { formatGoalsAsString, getGoals } from "./goals.ts";
 import { elizaLogger } from "./internal/logger-internal.ts";
-import knowledge from "./knowledge.ts";
+import { callKnowledgeSet, callKnowledgeGet } from "./knowledge-bridge.ts";
 import { MemoryManager } from "./memory.ts";
 import { formatActors, formatMessages, getActorDetails } from "./messages.ts";
 import { parseJsonArrayFromText } from "./parsing.ts";
@@ -30,6 +30,7 @@ import {
     type Goal,
     type HandlerCallback,
     type IAgentRuntime,
+    type IAgentRuntimeBridge,
     type ICacheManager,
     type IDatabaseAdapter,
     type IMemoryManager,
@@ -637,27 +638,25 @@ export class AgentRuntime implements IAgentRuntime {
      * @param knowledge An array of knowledge items containing id, path, and content.
      */
     private async processCharacterKnowledge(items: string[]) {
-        for (const item of items) {
-            const knowledgeId = stringToUuid(item);
-            const existingDocument =
-                await this.documentsManager.getMemoryById(knowledgeId);
-            if (existingDocument) {
-                continue;
+        try {
+            for (const item of items) {
+                elizaLogger.debug(`Processing knowledge item: ${item}`);
+                if (!item) continue;
+                const result = await readFile(join(this.knowledgeRoot, item), {
+                    encoding: "utf-8",
+                });
+                elizaLogger.debug(
+                    `Loaded knowledge item: ${item}, size: ${result.length}`,
+                );
+                await callKnowledgeSet(this as unknown as IAgentRuntimeBridge, {
+                    path: item,
+                    content: result,
+                });
             }
-
-            elizaLogger.info(
-                "Processing knowledge for ",
-                this.character.name,
-                " - ",
-                item.slice(0, 100),
+        } catch (err) {
+            elizaLogger.error(
+                `Error processing knowledge: ${(err as Error).message}`,
             );
-
-            await knowledge.set(this, {
-                id: knowledgeId,
-                content: {
-                    text: item,
-                },
-            });
         }
     }
 
@@ -1534,7 +1533,7 @@ Text: ${attachment.text}
 
             formattedKnowledge = formatKnowledge(knowledgeData);
         } else {
-            knowledgeData = await knowledge.get(this, message);
+            knowledgeData = await callKnowledgeGet(this as unknown as IAgentRuntimeBridge, message);
 
             formattedKnowledge = formatKnowledge(knowledgeData);
         }

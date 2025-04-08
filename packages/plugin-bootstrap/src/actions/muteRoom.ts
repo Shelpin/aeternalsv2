@@ -1,6 +1,6 @@
-import { composeContext } from "@elizaos/core";
-import { generateTrueOrFalse } from "@elizaos/core";
-import { booleanFooter } from "@elizaos/core";
+import { composeContext } from "@elizaos/core/public-api";
+import { generateTrueOrFalse } from "@elizaos/core/public-api";
+import { booleanFooter } from "@elizaos/core/public-api";
 import {
     type Action,
     type ActionExample,
@@ -8,7 +8,7 @@ import {
     type Memory,
     ModelClass,
     type State,
-} from "@elizaos/core";
+} from "@elizaos/core/public-api";
 
 export const shouldMuteTemplate =
     `Based on the conversation so far:

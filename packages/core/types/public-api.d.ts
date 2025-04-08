@@ -1,23 +1,7 @@
-// Public API exports
 export * from "./api/types";
-
-// ✅ Explicit type re-exports:
-export type {
-  IAgentRuntime,
-  Client,
-  Content,
-  Media,
-  Memory,
-  Plugin
-} from "./types";
-
-// Temporary re-exports for backward compatibility
-// Note: These should be moved to appropriate public API modules in the future
 export { composeContext } from "./context";
 export { elizaLogger } from "./logger";
 export { generateMessageResponse, generateTrueOrFalse } from "./generation";
 export { getGoals } from "./goals";
 export { MemoryManager } from "./memory";
-
-// Export common functions
 export { default as knowledge } from "./knowledge";

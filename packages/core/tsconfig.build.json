@@ -1,8 +1,17 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "sourceMap": true,
-        "inlineSources": true,
-        "sourceRoot": "/"
-    }
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "outDir": "dist",
+        "rootDir": "src",
+        "composite": false,
+        "module": "ESNext",
+        "target": "ESNext",
+        "moduleResolution": "Bundler",
+        "skipLibCheck": true,
+        "esModuleInterop": true
+    },
+    "include": ["src/public-api.ts", "src/api/**/*"],
+    "exclude": ["**/__tests__", "types", "dist", "src/generation.ts"]
 }

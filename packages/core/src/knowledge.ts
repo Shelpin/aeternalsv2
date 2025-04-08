@@ -1,124 +1,19 @@
-import type { AgentRuntime } from "./runtime.ts";
-import { embed, getEmbeddingZeroVector } from "./embedding.ts";
-import type { KnowledgeItem, UUID, Memory } from "./types.ts";
-import { stringToUuid } from "./uuid.ts";
-import { splitChunks } from "./generation.ts";
-import elizaLogger from "./logger.ts";
+import type { Memory } from "./types";
+import type { IAgentRuntimeBridge } from "./api/types";
+import elizaLogger from "./logger";
 
-async function get(
-    runtime: AgentRuntime,
-    message: Memory
-): Promise<KnowledgeItem[]> {
-    // Add validation for message
-    if (!message?.content?.text) {
-        elizaLogger.warn("Invalid message for knowledge query:", {
-            message,
-            content: message?.content,
-            text: message?.content?.text,
-        });
-        return [];
+async function get(runtime: IAgentRuntimeBridge, message: Memory): Promise<any> {
+    if (!runtime.knowledgeManager) {
+        throw new Error("knowledgeManager is missing from runtime.");
     }
-
-    const processed = preprocess(message.content.text);
-    elizaLogger.debug("Knowledge query:", {
-        original: message.content.text,
-        processed,
-        length: processed?.length,
-    });
-
-    // Validate processed text
-    if (!processed || processed.trim().length === 0) {
-        elizaLogger.warn("Empty processed text for knowledge query");
-        return [];
-    }
-
-    const embedding = await embed(runtime, processed);
-    const fragments = await runtime.knowledgeManager.searchMemoriesByEmbedding(
-        embedding,
-        {
-            roomId: message.agentId,
-            count: 5,
-            match_threshold: 0.1,
-        }
-    );
-
-    const uniqueSources = [
-        ...new Set(
-            fragments.map((memory) => {
-                elizaLogger.log(
-                    `Matched fragment: ${memory.content.text} with similarity: ${memory.similarity}`
-                );
-                return memory.content.source;
-            })
-        ),
-    ];
-
-    const knowledgeDocuments = await Promise.all(
-        uniqueSources.map((source) =>
-            runtime.documentsManager.getMemoryById(source as UUID)
-        )
-    );
-
-    return knowledgeDocuments
-        .filter((memory) => memory !== null)
-        .map((memory) => ({ id: memory.id, content: memory.content }));
+    return await runtime.knowledgeManager.getKnowledge(message);
 }
 
-async function set(
-    runtime: AgentRuntime,
-    item: KnowledgeItem,
-    chunkSize = 512,
-    bleed = 20
-) {
-    await runtime.documentsManager.createMemory({
-        id: item.id,
-        agentId: runtime.agentId,
-        roomId: runtime.agentId,
-        userId: runtime.agentId,
-        createdAt: Date.now(),
-        content: item.content,
-        embedding: getEmbeddingZeroVector(),
-    });
-
-    const preprocessed = preprocess(item.content.text);
-    
-    // If text is shorter than chunk size, don't split it
-    if (preprocessed.length <= chunkSize) {
-        const embedding = await embed(runtime, preprocessed);
-        await runtime.knowledgeManager.createMemory({
-            id: stringToUuid(item.id + preprocessed),
-            roomId: runtime.agentId,
-            agentId: runtime.agentId,
-            userId: runtime.agentId,
-            createdAt: Date.now(),
-            content: {
-                source: item.id,
-                text: preprocessed,
-            },
-            embedding,
-        });
-        return;
+async function set(runtime: IAgentRuntimeBridge, item: any): Promise<void> {
+    if (!runtime.knowledgeManager) {
+        throw new Error("knowledgeManager is missing from runtime.");
     }
-
-    const fragments = await splitChunks(preprocessed, chunkSize, bleed);
-
-    for (const fragment of fragments) {
-        const embedding = await embed(runtime, fragment);
-        await runtime.knowledgeManager.createMemory({
-            // We namespace the knowledge base uuid to avoid id
-            // collision with the document above.
-            id: stringToUuid(item.id + fragment),
-            roomId: runtime.agentId,
-            agentId: runtime.agentId,
-            userId: runtime.agentId,
-            createdAt: Date.now(),
-            content: {
-                source: item.id,
-                text: fragment,
-            },
-            embedding,
-        });
-    }
+    await runtime.knowledgeManager.setKnowledge(item);
 }
 
 export function preprocess(content: string): string {

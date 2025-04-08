@@ -10,7 +10,6 @@ import {
     ModelClass,
     settings,
     stringToUuid,
-    type AgentRuntime,
     type Client,
     type Content,
     type IAgentRuntime,
@@ -28,6 +27,7 @@ import * as path from "path";
 import { z } from "zod";
 import { createApiRouter } from "./api.ts";
 import { createVerifiableLogApiRouter } from "./verifiable-log-api.ts";
+import handlebars from "handlebars";
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -286,6 +286,7 @@ export class DirectClient {
                 const context = composeContext({
                     state,
                     template: messageHandlerTemplate,
+                    templatingEngine: "handlebars"
                 });
 
                 const response = await generateMessageResponse({
@@ -447,6 +448,7 @@ export class DirectClient {
                 const context = composeContext({
                     state,
                     template,
+                    templatingEngine: "handlebars"
                 });
 
                 function createHyperfiOutSchema(
@@ -805,6 +807,7 @@ export class DirectClient {
                 const context = composeContext({
                     state,
                     template: messageHandlerTemplate,
+                    templatingEngine: "handlebars"
                 });
 
                 const response = await generateMessageResponse({

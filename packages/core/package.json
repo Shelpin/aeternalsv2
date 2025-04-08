@@ -5,7 +5,7 @@
     "type": "module",
     "main": "dist/index.js",
     "module": "dist/index.js",
-    "types": "dist/index.d.ts",
+    "types": "./dist/public-api.d.ts",
     "exports": {
         ".": {
             "import": "./dist/index.js",
@@ -20,14 +20,18 @@
         "dist"
     ],
     "scripts": {
-        "prebuild": "rimraf dist",
-        "build": "tsup --format esm,cjs --dts",
+        "prebuild": "rimraf dist && pnpm run check:types",
+        "build": "tsup",
+        "build:types": "tsc -p tsconfig.build.json",
+        "build:full": "pnpm build && pnpm build:types",
         "clean": "rimraf dist",
         "dev": "tsup --format esm,cjs --dts --watch",
         "build:docs": "cd docs && pnpm run build",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",
-        "test:watch": "vitest"
+        "test:watch": "vitest",
+        "check:types": "madge --circular --extensions ts ./src/api",
+        "check:full": "madge --circular --extensions ts ./src"
     },
     "author": "",
     "license": "MIT",

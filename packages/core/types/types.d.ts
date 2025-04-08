@@ -1,194 +1,151 @@
 export * from './api/types';
-
 import type { Readable } from "stream";
-
 /**
  * Represents a UUID string in the format "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
  */
 export type UUID = `${string}-${string}-${string}-${string}-${string}`;
-
 /**
  * Represents the content of a message or communication
  */
 export interface Content {
     /** The main text content */
     text: string;
-
     /** Optional action associated with the message */
     action?: string;
-
     /** Optional source/origin of the content */
     source?: string;
-
     /** URL of the original message/post (e.g. tweet URL, Discord message link) */
     url?: string;
-
     /** UUID of parent message if this is a reply/thread */
     inReplyTo?: UUID;
-
     /** Array of media attachments */
     attachments?: Media[];
-
     /** Additional dynamic properties */
     [key: string]: unknown;
 }
-
 /**
  * Example content with associated user for demonstration purposes
  */
 export interface ActionExample {
     /** User associated with the example */
     user: string;
-
     /** Content of the example */
     content: Content;
 }
-
 /**
  * Example conversation content with user ID
  */
 export interface ConversationExample {
     /** UUID of user in conversation */
     userId: UUID;
-
     /** Content of the conversation */
     content: Content;
 }
-
 /**
  * Represents an actor/participant in a conversation
  */
 export interface Actor {
     /** Display name */
     name: string;
-
     /** Username/handle */
     username: string;
-
     /** Additional profile details */
     details: {
         /** Short profile tagline */
         tagline: string;
-
         /** Longer profile summary */
         summary: string;
-
         /** Favorite quote */
         quote: string;
     };
-
     /** Unique identifier */
     id: UUID;
 }
-
 /**
  * Represents a single objective within a goal
  */
 export interface Objective {
     /** Optional unique identifier */
     id?: string;
-
     /** Description of what needs to be achieved */
     description: string;
-
     /** Whether objective is completed */
     completed: boolean;
 }
-
 /**
  * Status enum for goals
  */
-export enum GoalStatus {
+export declare enum GoalStatus {
     DONE = "DONE",
     FAILED = "FAILED",
-    IN_PROGRESS = "IN_PROGRESS",
+    IN_PROGRESS = "IN_PROGRESS"
 }
-
 /**
  * Represents a high-level goal composed of objectives
  */
 export interface Goal {
     /** Optional unique identifier */
     id?: UUID;
-
     /** Room ID where goal exists */
     roomId: UUID;
-
     /** User ID of goal owner */
     userId: UUID;
-
     /** Name/title of the goal */
     name: string;
-
     /** Current status */
     status: GoalStatus;
-
     /** Component objectives */
     objectives: Objective[];
 }
-
 /**
  * Model size/type classification
  */
-export enum ModelClass {
+export declare enum ModelClass {
     SMALL = "small",
     MEDIUM = "medium",
     LARGE = "large",
     EMBEDDING = "embedding",
-    IMAGE = "image",
+    IMAGE = "image"
 }
-
 /**
  * Model settings
  */
 export type ModelSettings = {
     /** Model name */
     name: string;
-
     /** Maximum input tokens */
     maxInputTokens: number;
-
     /** Maximum output tokens */
     maxOutputTokens: number;
-
     /** Optional frequency penalty */
     frequency_penalty?: number;
-
     /** Optional presence penalty */
     presence_penalty?: number;
-
     /** Optional repetition penalty */
     repetition_penalty?: number;
-
     /** Stop sequences */
     stop: string[];
-
     /** Temperature setting */
     temperature: number;
-
     /** Optional telemetry configuration (experimental) */
     experimental_telemetry?: TelemetrySettings;
 };
-
 /** Image model settings */
 export type ImageModelSettings = {
     name: string;
     steps?: number;
 };
-
 /** Embedding model settings */
 export type EmbeddingModelSettings = {
     name: string;
     dimensions?: number;
 };
-
 /**
  * Configuration for an AI model
  */
 export type Model = {
     /** Optional API endpoint */
     endpoint?: string;
-
     /** Model names by size class */
     model: {
         [ModelClass.SMALL]?: ModelSettings;
@@ -198,7 +155,6 @@ export type Model = {
         [ModelClass.IMAGE]?: ImageModelSettings;
     };
 };
-
 /**
  * Model configurations by provider
  */
@@ -238,11 +194,10 @@ export type Models = {
     [ModelProviderName.SECRETAI]: Model;
     [ModelProviderName.NEARAI]: Model;
 };
-
 /**
  * Available model providers
  */
-export enum ModelProviderName {
+export declare enum ModelProviderName {
     OPENAI = "openai",
     ETERNALAI = "eternalai",
     ANTHROPIC = "anthropic",
@@ -277,367 +232,267 @@ export enum ModelProviderName {
     BEDROCK = "bedrock",
     ATOMA = "atoma",
     SECRETAI = "secret_ai",
-    NEARAI = "nearai",
+    NEARAI = "nearai"
 }
-
 /**
  * Represents the current state/context of a conversation
  */
 export interface State {
     /** ID of user who sent current message */
     userId?: UUID;
-
     /** ID of agent in conversation */
     agentId?: UUID;
-
     /** Agent's biography */
     bio: string;
-
     /** Agent's background lore */
     lore: string;
-
     /** Message handling directions */
     messageDirections: string;
-
     /** Post handling directions */
     postDirections: string;
-
     /** Current room/conversation ID */
     roomId: UUID;
-
     /** Optional agent name */
     agentName?: string;
-
     /** Optional message sender name */
     senderName?: string;
-
     /** String representation of conversation actors */
     actors: string;
-
     /** Optional array of actor objects */
     actorsData?: Actor[];
-
     /** Optional string representation of goals */
     goals?: string;
-
     /** Optional array of goal objects */
     goalsData?: Goal[];
-
     /** Recent message history as string */
     recentMessages: string;
-
     /** Recent message objects */
     recentMessagesData: Memory[];
-
     /** Optional valid action names */
     actionNames?: string;
-
     /** Optional action descriptions */
     actions?: string;
-
     /** Optional action objects */
     actionsData?: Action[];
-
     /** Optional action examples */
     actionExamples?: string;
-
     /** Optional provider descriptions */
     providers?: string;
-
     /** Optional response content */
     responseData?: Content;
-
     /** Optional recent interaction objects */
     recentInteractionsData?: Memory[];
-
     /** Optional recent interactions string */
     recentInteractions?: string;
-
     /** Optional formatted conversation */
     formattedConversation?: string;
-
     /** Optional formatted knowledge */
     knowledge?: string;
     /** Optional knowledge data */
     knowledgeData?: KnowledgeItem[];
     /** Optional knowledge data */
     ragKnowledgeData?: RAGKnowledgeItem[];
-
     /** Additional dynamic properties */
     [key: string]: unknown;
 }
-
 /**
  * Represents a stored memory/message
  */
 export interface Memory {
     /** Optional unique identifier */
     id?: UUID;
-
     /** Associated user ID */
     userId: UUID;
-
     /** Associated agent ID */
     agentId: UUID;
-
     /** Optional creation timestamp */
     createdAt?: number;
-
     /** Memory content */
     content: Content;
-
     /** Optional embedding vector */
     embedding?: number[];
-
     /** Associated room ID */
     roomId: UUID;
-
     /** Whether memory is unique */
     unique?: boolean;
-
     /** Embedding similarity score */
     similarity?: number;
 }
-
 /**
  * Example message for demonstration
  */
 export interface MessageExample {
     /** Associated user */
     user: string;
-
     /** Message content */
     content: Content;
 }
-
 /**
  * Handler function type for processing messages
  */
-export type Handler = (
-    runtime: IAgentRuntime,
-    message: Memory,
-    state?: State,
-    options?: { [key: string]: unknown },
-    callback?: HandlerCallback,
-) => Promise<unknown>;
-
+export type Handler = (runtime: IAgentRuntime, message: Memory, state?: State, options?: {
+    [key: string]: unknown;
+}, callback?: HandlerCallback) => Promise<unknown>;
 /**
  * Callback function type for handlers
  */
-export type HandlerCallback = (
-    response: Content,
-    files?: any,
-) => Promise<Memory[]>;
-
+export type HandlerCallback = (response: Content, files?: any) => Promise<Memory[]>;
 /**
  * Validator function type for actions/evaluators
  */
-export type Validator = (
-    runtime: IAgentRuntime,
-    message: Memory,
-    state?: State,
-) => Promise<boolean>;
-
+export type Validator = (runtime: IAgentRuntime, message: Memory, state?: State) => Promise<boolean>;
 /**
  * Represents an action the agent can perform
  */
 export interface Action {
     /** Similar action descriptions */
     similes: string[];
-
     /** Detailed description */
     description: string;
-
     /** Example usages */
     examples: ActionExample[][];
-
     /** Handler function */
     handler: Handler;
-
     /** Action name */
     name: string;
-
     /** Validation function */
     validate: Validator;
-
     /** Whether to suppress the initial message when this action is used */
     suppressInitialMessage?: boolean;
 }
-
 /**
  * Example for evaluating agent behavior
  */
 export interface EvaluationExample {
     /** Evaluation context */
     context: string;
-
     /** Example messages */
     messages: Array<ActionExample>;
-
     /** Expected outcome */
     outcome: string;
 }
-
 /**
  * Evaluator for assessing agent responses
  */
 export interface Evaluator {
     /** Whether to always run */
     alwaysRun?: boolean;
-
     /** Detailed description */
     description: string;
-
     /** Similar evaluator descriptions */
     similes: string[];
-
     /** Example evaluations */
     examples: EvaluationExample[];
-
     /** Handler function */
     handler: Handler;
-
     /** Evaluator name */
     name: string;
-
     /** Validation function */
     validate: Validator;
 }
-
 /**
  * Provider for external data/services
  */
 export interface Provider {
     /** Data retrieval function */
-    get: (
-        runtime: IAgentRuntime,
-        message: Memory,
-        state?: State,
-    ) => Promise<any>;
+    get: (runtime: IAgentRuntime, message: Memory, state?: State) => Promise<any>;
 }
-
 /**
  * Represents a relationship between users
  */
 export interface Relationship {
     /** Unique identifier */
     id: UUID;
-
     /** First user ID */
     userA: UUID;
-
     /** Second user ID */
     userB: UUID;
-
     /** Primary user ID */
     userId: UUID;
-
     /** Associated room ID */
     roomId: UUID;
-
     /** Relationship status */
     status: string;
-
     /** Optional creation timestamp */
     createdAt?: string;
 }
-
 /**
  * Represents a user account
  */
 export interface Account {
     /** Unique identifier */
     id: UUID;
-
     /** Display name */
     name: string;
-
     /** Username */
     username: string;
-
     /** Optional additional details */
-    details?: { [key: string]: any };
-
+    details?: {
+        [key: string]: any;
+    };
     /** Optional email */
     email?: string;
-
     /** Optional avatar URL */
     avatarUrl?: string;
 }
-
 /**
  * Room participant with account details
  */
 export interface Participant {
     /** Unique identifier */
     id: UUID;
-
     /** Associated account */
     account: Account;
 }
-
 /**
  * Represents a conversation room
  */
 export interface Room {
     /** Unique identifier */
     id: UUID;
-
     /** Room participants */
     participants: Participant[];
 }
-
 /**
  * Represents a media attachment
  */
 export type Media = {
     /** Unique identifier */
     id: string;
-
     /** Media URL */
     url: string;
-
     /** Media title */
     title: string;
-
     /** Media source */
     source: string;
-
     /** Media description */
     description: string;
-
     /** Text content */
     text: string;
-
     /** Content type */
     contentType?: string;
 };
-
 /**
  * Client instance
  */
 export type ClientInstance = {
     /** Client name */
-    // name: string;
-
     /** Stop client connection */
     stop: (runtime: IAgentRuntime) => Promise<unknown>;
 };
-
 /**
  * Client interface for platform connections
  */
 export type Client = {
     /** Client name */
     name: string;
-
     /** Client configuration */
-    config?: { [key: string]: any };
-
+    config?: {
+        [key: string]: any;
+    };
     /** Start client connection */
     start: (runtime: IAgentRuntime) => Promise<ClientInstance>;
 };
-
 /**
  * Database adapter initialization
  */
@@ -645,58 +500,44 @@ export type Adapter = {
     /** Initialize the adapter */
     init: (runtime: IAgentRuntime) => IDatabaseAdapter & IDatabaseCacheAdapter;
 };
-
 /**
  * Plugin for extending agent functionality
  */
 export type Plugin = {
     /** Plugin name */
     name: string;
-
     /** Plugin npm name */
     npmName?: string;
-
     /** Plugin configuration */
-    config?: { [key: string]: any };
-
+    config?: {
+        [key: string]: any;
+    };
     /** Plugin description */
     description: string;
-
     /** Optional default export */
     default?: any;
-
     /** Optional actions */
     actions?: Action[];
-
     /** Optional providers */
     providers?: Provider[];
-
     /** Optional evaluators */
     evaluators?: Evaluator[];
-
     /** Optional services */
     services?: Service[];
-
     /** Optional clients */
     clients?: Client[];
-
     /** Optional adapters */
     adapters?: Adapter[];
-    
     /** Optional initialize method */
     initialize?: () => Promise<void>;
-    
     /** Optional shutdown method */
     shutdown?: () => Promise<void>;
-
     /** Optional post charactor processor handler */
     handlePostCharacterLoaded?: (char: Character) => Promise<Character>;
 };
-
 export interface IAgentConfig {
     [key: string]: string;
 }
-
 export type TelemetrySettings = {
     /**
      * Enable or disable telemetry. Disabled by default while experimental.
@@ -721,7 +562,6 @@ export type TelemetrySettings = {
      */
     functionId?: string;
 };
-
 export interface ModelConfiguration {
     temperature?: number;
     maxOutputTokens?: number;
@@ -730,40 +570,31 @@ export interface ModelConfiguration {
     maxInputTokens?: number;
     experimental_telemetry?: TelemetrySettings;
 }
-
-export type TemplateType = string | ((options: { state: State }) => string);
-
+export type TemplateType = string | ((options: {
+    state: State;
+}) => string);
 /**
  * Configuration for an agent character
  */
 export type Character = {
     /** Optional unique identifier */
     id?: UUID;
-
     /** Character name */
     name: string;
-
     /** Optional username */
     username?: string;
-
     /** Optional email */
     email?: string;
-
     /** Optional system prompt */
     system?: string;
-
     /** Model provider to use */
     modelProvider: ModelProviderName;
-
     /** Image model provider to use, if different from modelProvider */
     imageModelProvider?: ModelProviderName;
-
     /** Image Vision model provider to use, if different from modelProvider */
     imageVisionModelProvider?: ModelProviderName;
-
     /** Optional model endpoint override */
     modelEndpointOverride?: string;
-
     /** Optional prompt templates */
     templates?: {
         goalsTemplate?: TemplateType;
@@ -805,37 +636,35 @@ export type Character = {
         jeeterShouldRespondTemplate?: string;
         devaPostTemplate?: string;
     };
-
     /** Character biography */
     bio: string | string[];
-
     /** Character background lore */
     lore: string[];
-
     /** Example messages */
     messageExamples: MessageExample[][];
-
     /** Example posts */
     postExamples: string[];
-
     /** Known topics */
     topics: string[];
-
     /** Character traits */
     adjectives: string[];
-
     /** Optional knowledge base */
-    knowledge?: (string | { path: string; shared?: boolean } | { directory: string; shared?: boolean })[];
-
+    knowledge?: (string | {
+        path: string;
+        shared?: boolean;
+    } | {
+        directory: string;
+        shared?: boolean;
+    })[];
     /** Available plugins */
     plugins: Plugin[];
-
     /** Character Processor Plugins */
     postProcessors?: Pick<Plugin, 'name' | 'description' | 'handlePostCharacterLoaded'>[];
-
     /** Optional configuration */
     settings?: {
-        secrets?: { [key: string]: string };
+        secrets?: {
+            [key: string]: string;
+        };
         intiface?: boolean;
         imageSettings?: {
             steps?: number;
@@ -854,10 +683,9 @@ export type Character = {
             safeMode?: boolean;
         };
         voice?: {
-            model?: string; // For VITS
-            url?: string; // Legacy VITS support
+            model?: string;
+            url?: string;
             elevenlabs?: {
-                // New structured ElevenLabs config
                 voiceId: string;
                 model?: string;
                 stability?: string;
@@ -877,7 +705,6 @@ export type Character = {
         transcription?: TranscriptionProvider;
         ragKnowledge?: boolean;
     };
-
     /** Optional client-specific config */
     clientConfig?: {
         discord?: {
@@ -931,14 +758,12 @@ export type Character = {
             documentTriggers?: string[];
         };
     };
-
     /** Writing style guides */
     style: {
         all: string[];
         chat: string[];
         post: string[];
     };
-
     /** Optional Twitter profile */
     twitterProfile?: {
         id: string;
@@ -947,7 +772,6 @@ export type Character = {
         bio: string;
         nicknames?: string[];
     };
-
     /** Optional Instagram profile */
     instagramProfile?: {
         id: string;
@@ -955,7 +779,6 @@ export type Character = {
         bio: string;
         nicknames?: string[];
     };
-
     /** Optional SimsAI profile */
     simsaiProfile?: {
         id: string;
@@ -963,18 +786,14 @@ export type Character = {
         screenName: string;
         bio: string;
     };
-
     /** Optional NFT prompt */
     nft?: {
         prompt: string;
     };
-
     /**Optinal Parent characters to inherit information from */
     extends?: string[];
-
     twitterSpaces?: TwitterSpaceDecisionOptions;
 };
-
 export interface TwitterSpaceDecisionOptions {
     maxSpeakers?: number;
     topics?: string[];
@@ -990,26 +809,20 @@ export interface TwitterSpaceDecisionOptions {
     sttLanguage?: string;
     speakerMaxDurationMs?: number;
 }
-
 /**
  * Interface for database operations
  */
 export interface IDatabaseAdapter {
     /** Database instance */
     db: any;
-
     /** Optional initialization */
     init(): Promise<void>;
-
     /** Close database connection */
     close(): Promise<void>;
-
     /** Get account by ID */
     getAccountById(userId: UUID): Promise<Account | null>;
-
     /** Create new account */
     createAccount(account: Account): Promise<boolean>;
-
     /** Get memories matching criteria */
     getMemories(params: {
         roomId: UUID;
@@ -1020,18 +833,14 @@ export interface IDatabaseAdapter {
         start?: number;
         end?: number;
     }): Promise<Memory[]>;
-
     getMemoryById(id: UUID): Promise<Memory | null>;
-
     getMemoriesByIds(ids: UUID[], tableName?: string): Promise<Memory[]>;
-
     getMemoriesByRoomIds(params: {
         tableName: string;
         agentId: UUID;
         roomIds: UUID[];
         limit?: number;
     }): Promise<Memory[]>;
-
     getCachedEmbeddings(params: {
         query_table_name: string;
         query_threshold: number;
@@ -1039,17 +848,21 @@ export interface IDatabaseAdapter {
         query_field_name: string;
         query_field_sub_name: string;
         query_match_count: number;
-    }): Promise<{ embedding: number[]; levenshtein_score: number }[]>;
-
+    }): Promise<{
+        embedding: number[];
+        levenshtein_score: number;
+    }[]>;
     log(params: {
-        body: { [key: string]: unknown };
+        body: {
+            [key: string]: unknown;
+        };
         userId: UUID;
         roomId: UUID;
         type: string;
     }): Promise<void>;
-
-    getActorDetails(params: { roomId: UUID }): Promise<Actor[]>;
-
+    getActorDetails(params: {
+        roomId: UUID;
+    }): Promise<Actor[]>;
     searchMemories(params: {
         tableName: string;
         agentId: UUID;
@@ -1059,40 +872,22 @@ export interface IDatabaseAdapter {
         match_count: number;
         unique: boolean;
     }): Promise<Memory[]>;
-
     updateGoalStatus(params: {
         goalId: UUID;
         status: GoalStatus;
     }): Promise<void>;
-
-    searchMemoriesByEmbedding(
-        embedding: number[],
-        params: {
-            match_threshold?: number;
-            count?: number;
-            roomId?: UUID;
-            agentId?: UUID;
-            unique?: boolean;
-            tableName: string;
-        },
-    ): Promise<Memory[]>;
-
-    createMemory(
-        memory: Memory,
-        tableName: string,
-        unique?: boolean,
-    ): Promise<void>;
-
+    searchMemoriesByEmbedding(embedding: number[], params: {
+        match_threshold?: number;
+        count?: number;
+        roomId?: UUID;
+        agentId?: UUID;
+        unique?: boolean;
+        tableName: string;
+    }): Promise<Memory[]>;
+    createMemory(memory: Memory, tableName: string, unique?: boolean): Promise<void>;
     removeMemory(memoryId: UUID, tableName: string): Promise<void>;
-
     removeAllMemories(roomId: UUID, tableName: string): Promise<void>;
-
-    countMemories(
-        roomId: UUID,
-        unique?: boolean,
-        tableName?: string,
-    ): Promise<number>;
-
+    countMemories(roomId: UUID, unique?: boolean, tableName?: string): Promise<number>;
     getGoals(params: {
         agentId: UUID;
         roomId: UUID;
@@ -1100,53 +895,32 @@ export interface IDatabaseAdapter {
         onlyInProgress?: boolean;
         count?: number;
     }): Promise<Goal[]>;
-
     updateGoal(goal: Goal): Promise<void>;
-
     createGoal(goal: Goal): Promise<void>;
-
     removeGoal(goalId: UUID): Promise<void>;
-
     removeAllGoals(roomId: UUID): Promise<void>;
-
     getRoom(roomId: UUID): Promise<UUID | null>;
-
     createRoom(roomId?: UUID): Promise<UUID>;
-
     removeRoom(roomId: UUID): Promise<void>;
-
     getRoomsForParticipant(userId: UUID): Promise<UUID[]>;
-
     getRoomsForParticipants(userIds: UUID[]): Promise<UUID[]>;
-
     addParticipant(userId: UUID, roomId: UUID): Promise<boolean>;
-
     removeParticipant(userId: UUID, roomId: UUID): Promise<boolean>;
-
     getParticipantsForAccount(userId: UUID): Promise<Participant[]>;
-
     getParticipantsForRoom(roomId: UUID): Promise<UUID[]>;
-
-    getParticipantUserState(
-        roomId: UUID,
-        userId: UUID,
-    ): Promise<"FOLLOWED" | "MUTED" | null>;
-
-    setParticipantUserState(
-        roomId: UUID,
-        userId: UUID,
-        state: "FOLLOWED" | "MUTED" | null,
-    ): Promise<void>;
-
-    createRelationship(params: { userA: UUID; userB: UUID }): Promise<boolean>;
-
+    getParticipantUserState(roomId: UUID, userId: UUID): Promise<"FOLLOWED" | "MUTED" | null>;
+    setParticipantUserState(roomId: UUID, userId: UUID, state: "FOLLOWED" | "MUTED" | null): Promise<void>;
+    createRelationship(params: {
+        userA: UUID;
+        userB: UUID;
+    }): Promise<boolean>;
     getRelationship(params: {
         userA: UUID;
         userB: UUID;
     }): Promise<Relationship | null>;
-
-    getRelationships(params: { userId: UUID }): Promise<Relationship[]>;
-
+    getRelationships(params: {
+        userId: UUID;
+    }): Promise<Relationship[]>;
     getKnowledge(params: {
         id?: UUID;
         agentId: UUID;
@@ -1154,7 +928,6 @@ export interface IDatabaseAdapter {
         query?: string;
         conversationContext?: string;
     }): Promise<RAGKnowledgeItem[]>;
-
     searchKnowledge(params: {
         agentId: UUID;
         embedding: Float32Array;
@@ -1162,34 +935,30 @@ export interface IDatabaseAdapter {
         match_count: number;
         searchText?: string;
     }): Promise<RAGKnowledgeItem[]>;
-
     createKnowledge(knowledge: RAGKnowledgeItem): Promise<void>;
     removeKnowledge(id: UUID): Promise<void>;
     clearKnowledge(agentId: UUID, shared?: boolean): Promise<void>;
 }
-
 export interface IDatabaseCacheAdapter {
     getCache(params: {
         agentId: UUID;
         key: string;
     }): Promise<string | undefined>;
-
     setCache(params: {
         agentId: UUID;
         key: string;
         value: string;
     }): Promise<boolean>;
-
-    deleteCache(params: { agentId: UUID; key: string }): Promise<boolean>;
+    deleteCache(params: {
+        agentId: UUID;
+        key: string;
+    }): Promise<boolean>;
 }
-
 export interface IMemoryManager {
     runtime: IAgentRuntime;
     tableName: string;
     constructor: Function;
-
     addEmbeddingToMemory(memory: Memory): Promise<Memory>;
-
     getMemories(opts: {
         roomId: UUID;
         count?: number;
@@ -1197,39 +966,29 @@ export interface IMemoryManager {
         start?: number;
         end?: number;
     }): Promise<Memory[]>;
-
-    getCachedEmbeddings(
-        content: string,
-    ): Promise<{ embedding: number[]; levenshtein_score: number }[]>;
-
+    getCachedEmbeddings(content: string): Promise<{
+        embedding: number[];
+        levenshtein_score: number;
+    }[]>;
     getMemoryById(id: UUID): Promise<Memory | null>;
     getMemoriesByRoomIds(params: {
         roomIds: UUID[];
         limit?: number;
     }): Promise<Memory[]>;
-    searchMemoriesByEmbedding(
-        embedding: number[],
-        opts: {
-            match_threshold?: number;
-            count?: number;
-            roomId: UUID;
-            unique?: boolean;
-        },
-    ): Promise<Memory[]>;
-
+    searchMemoriesByEmbedding(embedding: number[], opts: {
+        match_threshold?: number;
+        count?: number;
+        roomId: UUID;
+        unique?: boolean;
+    }): Promise<Memory[]>;
     createMemory(memory: Memory, unique?: boolean): Promise<void>;
-
     removeMemory(memoryId: UUID): Promise<void>;
-
     removeAllMemories(roomId: UUID): Promise<void>;
-
     countMemories(roomId: UUID, unique?: boolean): Promise<number>;
 }
-
 export interface IRAGKnowledgeManager {
     runtime: IAgentRuntime;
     tableName: string;
-
     getKnowledge(params: {
         query?: string;
         id?: UUID;
@@ -1256,47 +1015,27 @@ export interface IRAGKnowledgeManager {
     cleanupDeletedKnowledgeFiles(): Promise<void>;
     generateScopedId(path: string, isShared: boolean): UUID;
 }
-
 export type CacheOptions = {
     expires?: number;
 };
-
-export enum CacheStore {
+export declare enum CacheStore {
     REDIS = "redis",
     DATABASE = "database",
-    FILESYSTEM = "filesystem",
+    FILESYSTEM = "filesystem"
 }
-
 export interface ICacheManager {
     get<T = unknown>(key: string): Promise<T | undefined>;
     set<T>(key: string, value: T, options?: CacheOptions): Promise<void>;
     delete(key: string): Promise<void>;
 }
-
-export abstract class Service {
-    private static instance: Service | null = null;
-
-    static get serviceType(): ServiceType {
-        throw new Error("Service must implement static serviceType getter");
-    }
-
-    public static getInstance<T extends Service>(): T {
-        if (!Service.instance) {
-            Service.instance = new (this as any)();
-        }
-        return Service.instance as T;
-    }
-
-    get serviceType(): ServiceType {
-        return (this.constructor as typeof Service).serviceType;
-    }
-
-    // Add abstract initialize method that must be implemented by derived classes
+export declare abstract class Service {
+    private static instance;
+    static get serviceType(): ServiceType;
+    static getInstance<T extends Service>(): T;
+    get serviceType(): ServiceType;
     abstract initialize(runtime: IAgentRuntime): Promise<void>;
 }
-
 export interface IAgentRuntime {
-    // Properties
     agentId: UUID;
     serverUrl: string;
     databaseAdapter: IDatabaseAdapter;
@@ -1309,230 +1048,123 @@ export interface IAgentRuntime {
     actions: Action[];
     evaluators: Evaluator[];
     plugins: Plugin[];
-
     fetch?: typeof fetch | null;
-
     messageManager: IMemoryManager;
     descriptionManager: IMemoryManager;
     documentsManager: IMemoryManager;
     knowledgeManager: IMemoryManager;
     ragKnowledgeManager: IRAGKnowledgeManager;
     loreManager: IMemoryManager;
-
     cacheManager: ICacheManager;
-
     services: Map<ServiceType, Service>;
     clients: ClientInstance[];
-
-    // verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
-
     initialize(): Promise<void>;
-
     registerMemoryManager(manager: IMemoryManager): void;
-
     getMemoryManager(name: string): IMemoryManager | null;
-
     getService<T extends Service>(service: ServiceType): T | null;
-
     registerService(service: Service): void;
-
     getSetting(key: string): string | null;
-
-    // Methods
     getConversationLength(): number;
-
-    processActions(
-        message: Memory,
-        responses: Memory[],
-        state?: State,
-        callback?: HandlerCallback,
-    ): Promise<void>;
-
-    evaluate(
-        message: Memory,
-        state?: State,
-        didRespond?: boolean,
-        callback?: HandlerCallback,
-    ): Promise<string[] | null>;
-
+    processActions(message: Memory, responses: Memory[], state?: State, callback?: HandlerCallback): Promise<void>;
+    evaluate(message: Memory, state?: State, didRespond?: boolean, callback?: HandlerCallback): Promise<string[] | null>;
     ensureParticipantExists(userId: UUID, roomId: UUID): Promise<void>;
-
-    ensureUserExists(
-        userId: UUID,
-        userName: string | null,
-        name: string | null,
-        source: string | null,
-    ): Promise<void>;
-
+    ensureUserExists(userId: UUID, userName: string | null, name: string | null, source: string | null): Promise<void>;
     registerAction(action: Action): void;
-
-    ensureConnection(
-        userId: UUID,
-        roomId: UUID,
-        userName?: string,
-        userScreenName?: string,
-        source?: string,
-    ): Promise<void>;
-
+    ensureConnection(userId: UUID, roomId: UUID, userName?: string, userScreenName?: string, source?: string): Promise<void>;
     ensureParticipantInRoom(userId: UUID, roomId: UUID): Promise<void>;
-
     ensureRoomExists(roomId: UUID): Promise<void>;
-
-    composeState(
-        message: Memory,
-        additionalKeys?: { [key: string]: unknown },
-    ): Promise<State>;
-
+    composeState(message: Memory, additionalKeys?: {
+        [key: string]: unknown;
+    }): Promise<State>;
     updateRecentMessageState(state: State): Promise<State>;
 }
-
 export interface IImageDescriptionService extends Service {
-    describeImage(
-        imageUrl: string,
-    ): Promise<{ title: string; description: string }>;
+    describeImage(imageUrl: string): Promise<{
+        title: string;
+        description: string;
+    }>;
 }
-
 export interface ITranscriptionService extends Service {
     transcribeAttachment(audioBuffer: ArrayBuffer): Promise<string | null>;
-    transcribeAttachmentLocally(
-        audioBuffer: ArrayBuffer,
-    ): Promise<string | null>;
+    transcribeAttachmentLocally(audioBuffer: ArrayBuffer): Promise<string | null>;
     transcribe(audioBuffer: ArrayBuffer): Promise<string | null>;
     transcribeLocally(audioBuffer: ArrayBuffer): Promise<string | null>;
 }
-
 export interface IVideoService extends Service {
     isVideoUrl(url: string): boolean;
     fetchVideoInfo(url: string): Promise<Media>;
     downloadVideo(videoInfo: Media): Promise<string>;
     processVideo(url: string, runtime: IAgentRuntime): Promise<Media>;
 }
-
 export interface ITextGenerationService extends Service {
     initializeModel(): Promise<void>;
-    queueMessageCompletion(
-        context: string,
-        temperature: number,
-        stop: string[],
-        frequency_penalty: number,
-        presence_penalty: number,
-        max_tokens: number,
-    ): Promise<any>;
-    queueTextCompletion(
-        context: string,
-        temperature: number,
-        stop: string[],
-        frequency_penalty: number,
-        presence_penalty: number,
-        max_tokens: number,
-    ): Promise<string>;
+    queueMessageCompletion(context: string, temperature: number, stop: string[], frequency_penalty: number, presence_penalty: number, max_tokens: number): Promise<any>;
+    queueTextCompletion(context: string, temperature: number, stop: string[], frequency_penalty: number, presence_penalty: number, max_tokens: number): Promise<string>;
     getEmbeddingResponse(input: string): Promise<number[] | undefined>;
 }
-
 export interface IBrowserService extends Service {
     closeBrowser(): Promise<void>;
-    getPageContent(
-        url: string,
-        runtime: IAgentRuntime,
-    ): Promise<{ title: string; description: string; bodyContent: string }>;
+    getPageContent(url: string, runtime: IAgentRuntime): Promise<{
+        title: string;
+        description: string;
+        bodyContent: string;
+    }>;
 }
-
 export interface ISpeechService extends Service {
     getInstance(): ISpeechService;
     generate(runtime: IAgentRuntime, text: string): Promise<Readable>;
 }
-
 export interface IPdfService extends Service {
     getInstance(): IPdfService;
     convertPdfToText(pdfBuffer: Buffer): Promise<string>;
 }
-
 export interface IAwsS3Service extends Service {
-    uploadFile(
-        imagePath: string,
-        subDirectory: string,
-        useSignedUrl: boolean,
-        expiresIn: number,
-    ): Promise<{
+    uploadFile(imagePath: string, subDirectory: string, useSignedUrl: boolean, expiresIn: number): Promise<{
         success: boolean;
         url?: string;
         error?: string;
     }>;
     generateSignedUrl(fileName: string, expiresIn: number): Promise<string>;
 }
-
 export interface UploadIrysResult {
     success: boolean;
     url?: string;
     error?: string;
     data?: any;
 }
-
 export interface DataIrysFetchedFromGQL {
     success: boolean;
     data: any;
     error?: string;
 }
-
 export interface GraphQLTag {
     name: string;
     values: any[];
 }
-
-export enum IrysMessageType {
+export declare enum IrysMessageType {
     REQUEST = "REQUEST",
     DATA_STORAGE = "DATA_STORAGE",
-    REQUEST_RESPONSE = "REQUEST_RESPONSE",
+    REQUEST_RESPONSE = "REQUEST_RESPONSE"
 }
-
-export enum IrysDataType {
+export declare enum IrysDataType {
     FILE = "FILE",
     IMAGE = "IMAGE",
-    OTHER = "OTHER",
+    OTHER = "OTHER"
 }
-
 export interface IrysTimestamp {
     from: number;
     to: number;
 }
-
 export interface IIrysService extends Service {
-    getDataFromAnAgent(
-        agentsWalletPublicKeys: string[],
-        tags: GraphQLTag[],
-        timestamp: IrysTimestamp,
-    ): Promise<DataIrysFetchedFromGQL>;
-    workerUploadDataOnIrys(
-        data: any,
-        dataType: IrysDataType,
-        messageType: IrysMessageType,
-        serviceCategory: string[],
-        protocol: string[],
-        validationThreshold: number[],
-        minimumProviders: number[],
-        testProvider: boolean[],
-        reputation: number[],
-    ): Promise<UploadIrysResult>;
-    providerUploadDataOnIrys(
-        data: any,
-        dataType: IrysDataType,
-        serviceCategory: string[],
-        protocol: string[],
-    ): Promise<UploadIrysResult>;
+    getDataFromAnAgent(agentsWalletPublicKeys: string[], tags: GraphQLTag[], timestamp: IrysTimestamp): Promise<DataIrysFetchedFromGQL>;
+    workerUploadDataOnIrys(data: any, dataType: IrysDataType, messageType: IrysMessageType, serviceCategory: string[], protocol: string[], validationThreshold: number[], minimumProviders: number[], testProvider: boolean[], reputation: number[]): Promise<UploadIrysResult>;
+    providerUploadDataOnIrys(data: any, dataType: IrysDataType, serviceCategory: string[], protocol: string[]): Promise<UploadIrysResult>;
 }
-
 export interface ITeeLogService extends Service {
     getInstance(): ITeeLogService;
-    log(
-        agentId: string,
-        roomId: string,
-        userId: string,
-        type: string,
-        content: string,
-    ): Promise<boolean>;
+    log(agentId: string, roomId: string, userId: string, type: string, content: string): Promise<boolean>;
 }
-
-export enum ServiceType {
+export declare enum ServiceType {
     IMAGE_DESCRIPTION = "image_description",
     TRANSCRIPTION = "transcription",
     VIDEO = "video",
@@ -1550,20 +1182,17 @@ export enum ServiceType {
     GOPLUS_SECURITY = "goplus_security",
     WEB_SEARCH = "web_search",
     EMAIL_AUTOMATION = "email_automation",
-    NKN_CLIENT_SERVICE = "nkn_client_service",
+    NKN_CLIENT_SERVICE = "nkn_client_service"
 }
-
-export enum LoggingLevel {
+export declare enum LoggingLevel {
     DEBUG = "debug",
     VERBOSE = "verbose",
-    NONE = "none",
+    NONE = "none"
 }
-
 export type KnowledgeItem = {
     id: UUID;
     content: Content;
 };
-
 export interface RAGKnowledgeItem {
     id: UUID;
     agentId: UUID;
@@ -1585,62 +1214,47 @@ export interface RAGKnowledgeItem {
     similarity?: number;
     score?: number;
 }
-
 export interface ActionResponse {
     like: boolean;
     retweet: boolean;
     quote?: boolean;
     reply?: boolean;
 }
-
 export interface ISlackService extends Service {
     client: any;
 }
-
-export enum TokenizerType {
+export declare enum TokenizerType {
     Auto = "auto",
-    TikToken = "tiktoken",
+    TikToken = "tiktoken"
 }
-
-export enum TranscriptionProvider {
+export declare enum TranscriptionProvider {
     OpenAI = "openai",
     Deepgram = "deepgram",
-    Local = "local",
+    Local = "local"
 }
-
-export enum ActionTimelineType {
+export declare enum ActionTimelineType {
     ForYou = "foryou",
-    Following = "following",
+    Following = "following"
 }
-export enum KnowledgeScope {
+export declare enum KnowledgeScope {
     SHARED = "shared",
-    PRIVATE = "private",
+    PRIVATE = "private"
 }
-
-export enum CacheKeyPrefix {
-    KNOWLEDGE = "knowledge",
+export declare enum CacheKeyPrefix {
+    KNOWLEDGE = "knowledge"
 }
-
 export interface DirectoryItem {
     directory: string;
     shared?: boolean;
 }
-
 export interface ChunkRow {
     id: string;
-    // Add other properties if needed
 }
-
-// Temporary re-export of API types for backward compatibility
 export * from "./api/types";
-
-// This simplified Memory interface is a duplicate and causes DTS conflict
-/*
 export interface Memory {
-  roomId: string;
-  userId: string;
-  content?: {
-    text?: string;
-  };
+    roomId: string;
+    userId: string;
+    content?: {
+        text?: string;
+    };
 }
-*/
