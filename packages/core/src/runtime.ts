@@ -258,7 +258,7 @@ export class AgentRuntime implements IAgentRuntime {
         services?: Service[]; // Map of service name to service instance
         managers?: IMemoryManager[]; // Map of table name to memory manager
         databaseAdapter?: IDatabaseAdapter; // The database adapter used for interacting with the database
-        fetch?: typeof fetch | unknown;
+        fetch?: typeof fetch; // Use standard fetch type to align with DOM lib
         speechModelPath?: string;
         cacheManager?: ICacheManager;
         logging?: boolean;

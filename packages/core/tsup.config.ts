@@ -1,11 +1,9 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-    entry: ["src/index.ts"],
-    // Commented out to prevent tsup from conflicting with tsc on type emission
-    // dts: {
-    //     entry: "src/public-api.ts"
-    // },
+    entry: ["src/index.ts", "src/public-api.ts"],
+    // DTS generation is handled by tsc using tsconfig.build.json
+    // Do not enable DTS in tsup to avoid conflicts
     outDir: "dist",
     sourcemap: true,
     clean: true,

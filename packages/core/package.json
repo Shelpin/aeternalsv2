@@ -8,24 +8,26 @@
     "types": "./dist/public-api.d.ts",
     "exports": {
         ".": {
+            "types": "./dist/index.d.ts",
             "import": "./dist/index.js",
             "require": "./dist/index.cjs"
         },
         "./public-api": {
             "types": "./dist/public-api.d.ts",
-            "import": "./dist/public-api.js"
+            "import": "./dist/public-api.js",
+            "require": "./dist/public-api.cjs"
         }
     },
     "files": [
         "dist"
     ],
     "scripts": {
-        "prebuild": "rimraf dist && pnpm run check:types",
-        "build": "tsup",
+        "prebuild": "rimraf dist",
+        "build": "tsup && tsc -p tsconfig.build.json",
         "build:types": "tsc -p tsconfig.build.json",
-        "build:full": "pnpm build && pnpm build:types",
+        "build:full": "pnpm build",
         "clean": "rimraf dist",
-        "dev": "tsup --format esm,cjs --dts --watch",
+        "dev": "tsup --format esm,cjs --watch",
         "build:docs": "cd docs && pnpm run build",
         "test": "vitest run",
         "test:coverage": "vitest run --coverage",

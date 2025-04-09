@@ -10,8 +10,9 @@
         "target": "ESNext",
         "moduleResolution": "Bundler",
         "skipLibCheck": true,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "declarationDir": "dist"
     },
-    "include": ["src/public-api.ts", "src/api/**/*"],
-    "exclude": ["**/__tests__", "types", "dist", "src/generation.ts"]
+    "include": ["src/public-api.ts", "src/index.ts", "src/api/**/*"],
+    "exclude": ["**/__tests__", "types", "dist", "src/**/*.d.ts"]
 }

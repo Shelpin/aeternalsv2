@@ -9,7 +9,7 @@
         "dev": "node --loader ts-node/esm src/index.ts",
         "check-types": "tsc --noEmit",
         "test": "jest",
-        "build": "tsup src/index.ts --format esm --dts",
+        "build": "tsup src/index.ts --format esm --dts-only=false",
         "clean": "rimraf dist"
     },
     "nodemonConfig": {

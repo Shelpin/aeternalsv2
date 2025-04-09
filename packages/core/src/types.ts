@@ -1633,14 +1633,3 @@ export interface ChunkRow {
 
 // Temporary re-export of API types for backward compatibility
 export * from "./api/types";
-
-// This simplified Memory interface is a duplicate and causes DTS conflict
-/*
-export interface Memory {
-  roomId: string;
-  userId: string;
-  content?: {
-    text?: string;
-  };
-}
-*/
