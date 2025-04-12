@@ -19,7 +19,7 @@ import {
     stringToUuid,
     validateCharacterConfig,
 } from "@elizaos/core";
-import { defaultCharacter } from "./defaultCharacter.ts";
+import { defaultCharacter } from "./defaultCharacter";
 
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import JSON5 from 'json5';
@@ -376,7 +376,7 @@ async function handlePluginImporting(plugins: string[]) {
         const importedPlugins = await Promise.all(
             plugins.map(async (plugin) => {
                 try {
-                    const importedPlugin:Plugin = await import(plugin);
+                    const importedPlugin: Plugin = await import(plugin);
                     const functionName =
                         plugin
                             .replace("@elizaos/plugin-", "")
@@ -384,11 +384,13 @@ async function handlePluginImporting(plugins: string[]) {
                             .replace(/-./g, (x) => x[1].toUpperCase()) +
                         "Plugin"; // Assumes plugin function is camelCased with Plugin suffix
                     if (!importedPlugin[functionName] && !importedPlugin.default) {
-                      elizaLogger.warn(plugin, 'does not have an default export or', functionName)
+                        elizaLogger.warn(plugin, 'does not have an default export or', functionName)
                     }
-                    return {...(
-                        importedPlugin.default || importedPlugin[functionName]
-                    ), npmName: plugin };
+                    return {
+                        ...(
+                            importedPlugin.default || importedPlugin[functionName]
+                        ), npmName: plugin
+                    };
                 } catch (importError) {
                     console.error(
                         `Failed to import plugin: ${plugin}`,
@@ -709,23 +711,23 @@ function initializeCache(
 }
 
 async function findDatabaseAdapter(runtime: AgentRuntime) {
-  const { adapters } = runtime;
-  let adapter: Adapter | undefined;
-  // if not found, default to sqlite
-  if (adapters.length === 0) {
-    const sqliteAdapterPlugin = await import('@elizaos-plugins/adapter-sqlite');
-    const sqliteAdapterPluginDefault = sqliteAdapterPlugin.default;
-    adapter = sqliteAdapterPluginDefault.adapters[0];
-    if (!adapter) {
-      throw new Error("Internal error: No database adapter found for default adapter-sqlite");
+    const { adapters } = runtime;
+    let adapter: Adapter | undefined;
+    // if not found, default to sqlite
+    if (adapters.length === 0) {
+        const sqliteAdapterPlugin = await import('@elizaos-plugins/adapter-sqlite');
+        const sqliteAdapterPluginDefault = sqliteAdapterPlugin.default;
+        adapter = sqliteAdapterPluginDefault.adapters[0];
+        if (!adapter) {
+            throw new Error("Internal error: No database adapter found for default adapter-sqlite");
+        }
+    } else if (adapters.length === 1) {
+        adapter = adapters[0];
+    } else {
+        throw new Error("Multiple database adapters found. You must have no more than one. Adjust your plugins configuration.");
     }
-  } else if (adapters.length === 1) {
-    adapter = adapters[0];
-  } else {
-    throw new Error("Multiple database adapters found. You must have no more than one. Adjust your plugins configuration.");
-    }
-  const adapterInterface = adapter?.init(runtime);
-  return adapterInterface;
+    const adapterInterface = adapter?.init(runtime);
+    return adapterInterface;
 }
 
 async function startAgent(

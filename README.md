@@ -611,3 +611,17 @@ We welcome contributions! Here's how you can help:
 - Add comments for complex logic
 - Update documentation for changes
 - Add tests for new features
+
+## IDE Configuration
+
+### VS Code
+Use the provided `.vscode/settings.json`. TypeScript server will be configured automatically.
+
+### JetBrains IDEs (WebStorm, IntelliJ)
+Open tsconfig.ide.json as the project's TypeScript configuration.
+
+### Other IDEs
+Configure your TypeScript Language Server to:
+- Use the workspace TypeScript version (5.6.3)
+- Use non-relative imports
+- Skip type checking in node_modules

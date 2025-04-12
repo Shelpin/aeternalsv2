@@ -1,0 +1,8 @@
+{
+    "name": "dynamic-imports",
+    "type": "module",
+    "main": "src/index.ts",
+    "scripts": {
+        "prebuild": "rimraf dist && find . -name '*.d.ts' -o -name '*.ts' | grep dist | xargs rm -f 2>/dev/null || true"
+    }
+}

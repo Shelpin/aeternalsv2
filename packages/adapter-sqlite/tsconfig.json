@@ -1,9 +1,27 @@
 {
-    "extends": "../core/tsconfig.json",
     "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "lib": [
+            "ESNext",
+            "dom"
+        ],
+        "moduleResolution": "Node",
         "outDir": "dist",
         "rootDir": "src",
-        "strict": true
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": false,
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "allowSyntheticDefaultImports": true
     },
-    "include": ["src/**/*.ts"]
+    "include": [
+        "src/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
 }

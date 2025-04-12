@@ -1,4 +1,4 @@
-import type { State, TemplateType } from "./types.ts";
+import type { State, TemplateType } from "./types";
 /**
  * Composes a context string by replacing placeholders in a template with corresponding values from the state.
  *

@@ -1,8 +1,8 @@
 import path from "path";
 import fs from "fs";
 
-export * from "./sqliteTables.ts";
-export * from "./sqlite_vec.ts";
+export * from "./sqliteTables";
+export * from "./sqlite_vec";
 
 import {
     DatabaseAdapter,
@@ -26,8 +26,8 @@ import type {
 } from "@elizaos/core";
 import type { Database as BetterSqlite3Database } from "better-sqlite3";
 import { v4 } from "uuid";
-import { load } from "./sqlite_vec.ts";
-import { sqliteTables } from "./sqliteTables.ts";
+import { load } from "./sqlite_vec";
+import { sqliteTables } from "./sqliteTables";
 
 import Database from "better-sqlite3";
 

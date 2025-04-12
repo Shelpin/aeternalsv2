@@ -9,14 +9,16 @@
     ".": {
       "import": "./dist/index.mjs",
       "types": "./dist/index.d.ts"
+    },
+    "./telegram": {
+      "types": "./dist/index.d.ts"
     }
   },
   "scripts": {
-    "build": "tsup index.ts --format esm --dts --external '@elizaos/client-telegram'",
+    "build": "tsup --config tsup.config.ts && ../../node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly",
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@elizaos/client-telegram": "workspace:*",
     "node-telegram-bot-api": "^0.61.0"
   },
   "devDependencies": {
@@ -26,4 +28,4 @@
     "rimraf": "^3.0.2",
     "tsup": "8.3.5"
   }
-} 
+}

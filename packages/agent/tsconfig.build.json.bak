@@ -1,0 +1,42 @@
+{
+    "extends": "../../tsconfig.build.base.json",
+    "compilerOptions": {
+        "target": "es2017",
+        "module": "commonjs",
+        "lib": [
+            "es2017",
+            "es7",
+            "es6",
+            "dom"
+        ],
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "outDir": "dist",
+        "rootDir": "src",
+        "strict": false,
+        "esModuleInterop": true,
+        "emitDeclarationOnly": true,
+        "declarationDir": "dist",
+        "types": [
+            "node",
+            "jest"
+        ],
+        "baseUrl": ".",
+        "paths": {
+            "@elizaos/core/*": [
+                "../core/src/*"
+            ]
+        }
+    },
+    "exclude": [
+        "dist",
+        "**/*.test.ts",
+        "**/*.spec.ts",
+        "**/*.d.ts",
+        "node_modules"
+    ],
+    "include": [
+        "src/**/*.ts"
+    ]
+}

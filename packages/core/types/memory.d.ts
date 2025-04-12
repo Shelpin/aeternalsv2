@@ -1,4 +1,4 @@
-import type { IAgentRuntime, IMemoryManager, Memory, UUID } from "./types.ts";
+import type { IAgentRuntime, IMemoryManager, Memory, UUID } from "./types";
 /**
  * Manage memories in the database.
  */

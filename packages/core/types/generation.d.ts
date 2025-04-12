@@ -1,6 +1,6 @@
 import { type CoreTool, type GenerateObjectResult, type StepResult as AIStepResult } from "ai";
 import type { ZodSchema } from "zod";
-import { type Content, type IAgentRuntime, ModelClass, ModelProviderName, type ActionResponse, type TelemetrySettings } from "./types.ts";
+import { type Content, type IAgentRuntime, ModelClass, ModelProviderName, type ActionResponse, type TelemetrySettings } from "./types";
 type Tool = CoreTool<any, any>;
 type StepResult = AIStepResult<any>;
 type GenerationResult = GenerateObjectResult<unknown>;

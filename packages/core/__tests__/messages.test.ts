@@ -3,8 +3,8 @@ import {
     formatMessages,
     getActorDetails,
     formatTimestamp,
-} from "../src/messages.ts";
-import type { IAgentRuntime, Actor, Content, Memory, UUID } from "../src/types.ts";
+} from "../src/messages";
+import type { IAgentRuntime, Actor, Content, Memory, UUID } from "../src/types";
 import { describe, test, expect, vi, beforeAll } from "vitest";
 
 describe("Messages Library", () => {

@@ -1,4 +1,4 @@
-import type { ActionResponse } from "./types.ts";
+import type { ActionResponse } from "./types";
 export declare const messageCompletionFooter = "\nResponse format should be formatted in a valid JSON block like this:\n```json\n{ \"user\": \"{{agentName}}\", \"text\": \"<string>\", \"action\": \"<string>\" }\n```\n\nThe \u201Caction\u201D field should be one of the options in [Available Actions] and the \"text\" field should be the response you want to send.\n";
 export declare const shouldRespondFooter = "The available options are [RESPOND], [IGNORE], or [STOP]. Choose the most appropriate option.\nIf {{agentName}} is talking too much, you can choose [IGNORE]\n\nYour response must include one of the options.";
 export declare const parseShouldRespondFromText: (text: string) => "RESPOND" | "IGNORE" | "STOP" | null;

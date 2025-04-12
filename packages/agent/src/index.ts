@@ -19,20 +19,21 @@ import {
     stringToUuid,
     validateCharacterConfig,
 } from "@elizaos/core/public-api";
-import { defaultCharacter } from "./defaultCharacter.ts";
+import { defaultCharacter } from "./defaultCharacter";
 
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import JSON5 from 'json5';
 
 import fs from "fs";
 import net from "net";
+import { getModulePath } from '@elizaos/core/utils/module-path';
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import yargs from "yargs";
 
-const __filename = fileURLToPath(import.meta.url); // get the resolved path to the file
-const __dirname = path.dirname(__filename); // get the name of the directory
+const { filename: __filename, dirname: __dirname } = getModulePath(); // get the resolved path to the file
+// const __dirname = path.dirname(__filename); // Removed duplicate declaration
 
 export const wait = (minTime = 1000, maxTime = 3000) => {
     const waitTime =

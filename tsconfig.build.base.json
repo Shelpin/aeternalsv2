@@ -1,0 +1,26 @@
+{
+    "compilerOptions": {
+        "target": "es2022",
+        "module": "NodeNext",
+        "lib": [
+            "es2022",
+            "dom"
+        ],
+        "moduleResolution": "NodeNext",
+        "declaration": true,
+        "emitDeclarationOnly": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "allowSyntheticDefaultImports": true,
+        "strict": true,
+        "isolatedModules": true,
+        "resolveJsonModule": true
+    },
+    "exclude": [
+        "dist",
+        "**/*.test.ts",
+        "node_modules"
+    ]
+}

@@ -1,4 +1,4 @@
-import { CacheManager, MemoryCacheAdapter } from "../src/cache.ts";
+import { CacheManager, MemoryCacheAdapter } from "../src/cache";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 describe("CacheManager", () => {

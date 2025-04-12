@@ -17,12 +17,19 @@ import {
 
 // import type { TeeLogQuery, TeeLogService } from "@elizaos/plugin-tee-log";
 // import { REST, Routes } from "discord.js";
-import type { DirectClient } from ".";
+// Remove direct import from index to break circular dependency
+// import type { DirectClient } from ".";
 import { validateUuid } from "@elizaos/core";
 
 interface UUIDParams {
     agentId: UUID;
     roomId?: UUID;
+}
+
+// Create an interface for the methods we need from DirectClient
+interface IDirectClientMethods {
+    unregisterAgent(agent: AgentRuntime): void;
+    startAgent(character: any): Promise<AgentRuntime>;
 }
 
 function validateUUIDParams(
@@ -53,8 +60,8 @@ function validateUUIDParams(
 
 export function createApiRouter(
     agents: Map<string, IAgentRuntime>,
-    directClient: DirectClient
-):Router {
+    directClient: IDirectClientMethods
+): Router {
     const router = express.Router();
 
     router.use(cors());

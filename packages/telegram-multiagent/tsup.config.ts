@@ -1,16 +1,14 @@
-import { defineConfig } from 'tsup';
+import { defineConfig } from "tsup";
+const { baseConfig, commonExternals } = require("../../tsup.base");
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['esm', 'cjs'],
-  dts: true,
-  splitting: false,
-  clean: true,
-  external: [
-    '@elizaos/core',
-    'better-sqlite3',
-    'sqlite',
-    'sqlite3',
-    'uuid'
-  ],
-});
+    ...baseConfig,
+    external: [
+        ...commonExternals,
+        // Telegram-specific externals
+        "node-telegram-bot-api", "ws",
+        /^@elizaos\/core/,
+        /^@elizaos\/agent/,
+        /^@elizaos\/adapter-sqlite/
+    ]
+}); 

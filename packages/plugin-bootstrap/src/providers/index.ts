@@ -1,3 +1,3 @@
-export * from "./boredom.ts";
-export * from "./time.ts";
-export * from "./facts.ts";
+export * from "./boredom";
+export * from "./time";
+export * from "./facts";

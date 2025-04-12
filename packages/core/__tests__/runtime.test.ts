@@ -7,7 +7,7 @@ import {
     type Memory,
     type UUID,
 } from "../src/types";
-import { mockCharacter } from "./mockCharacter.ts";
+import { mockCharacter } from "./mockCharacter";
 
 // Mock dependencies with minimal implementations
 const mockDatabaseAdapter: IDatabaseAdapter = {

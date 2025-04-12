@@ -1,5 +1,5 @@
-import { getModelSettings, getImageModelSettings, getEndpoint, models } from "../src/models.ts";
-import { ModelProviderName, ModelClass } from "../src/types.ts";
+import { getModelSettings, getImageModelSettings, getEndpoint, models } from "../src/models";
+import { ModelProviderName, ModelClass } from "../src/types";
 import { describe, test, expect, vi } from "vitest";
 
 // Mock settings

@@ -1,0 +1,24 @@
+{
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declarationDir": "dist",
+    "baseUrl": ".",
+    "typeRoots": [
+      "./types",
+      "./node_modules/@types"
+    ],
+    "paths": {
+      "@elizaos/core/*": [
+        "../core/src/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}

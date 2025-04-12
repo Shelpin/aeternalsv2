@@ -25,8 +25,8 @@ import multer from "multer";
 import OpenAI from "openai";
 import * as path from "path";
 import { z } from "zod";
-import { createApiRouter } from "./api.ts";
-import { createVerifiableLogApiRouter } from "./verifiable-log-api.ts";
+import { createApiRouter } from "./api";
+import { createVerifiableLogApiRouter } from "./verifiable-log-api";
 import handlebars from "handlebars";
 
 const storage = multer.diskStorage({

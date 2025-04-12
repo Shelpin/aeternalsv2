@@ -1,4 +1,4 @@
-import type { IAgentRuntime, Goal, UUID } from "./types.ts";
+import type { IAgentRuntime, Goal, UUID } from "./types";
 export declare const getGoals: ({ runtime, roomId, userId, onlyInProgress, count, }: {
     runtime: IAgentRuntime;
     roomId: UUID;
