@@ -1,30 +1,33 @@
 {
-    "compilerOptions": {
-        "target": "ESNext",
-        "module": "ESNext",
-        "lib": [
-            "ESNext",
-            "dom"
-        ],
-        "moduleResolution": "Bundler",
-        "outDir": "dist",
-        "rootDir": "src",
-        "strict": false,
-        "esModuleInterop": true,
-        "skipLibCheck": true,
-        "forceConsistentCasingInFileNames": false,
-        "declaration": true,
-        "types": [
-            "node",
-            "jest"
-        ]
-    },
-    "ts-node": {
-        "experimentalSpecifierResolution": "node",
-        "transpileOnly": true,
-        "esm": true
-    },
-    "include": [
-        "src"
-    ]
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "lib": [
+      "ESNext",
+      "dom"
+    ],
+    "moduleResolution": "Bundler",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": false,
+    "declaration": true,
+    "types": [
+      "node",
+      "jest"
+    ],
+    "noEmitOnError": false,
+    "isolatedModules": false,
+    "noImplicitAny": false
+  },
+  "ts-node": {
+    "experimentalSpecifierResolution": "node",
+    "transpileOnly": true,
+    "esm": true
+  },
+  "include": [
+    "src"
+  ]
 }

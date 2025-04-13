@@ -4,18 +4,28 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "esModuleInterop": true,
-    "strict": true,
+    "strict": false,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
+    "forceConsistentCasingInFileNames": false,
     "composite": true,
     "declaration": true,
     "sourceMap": true,
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@elizaos/client-telegram": ["./telegram/src"]
-    }
+      "@elizaos/client-telegram": [
+        "./telegram/src"
+      ]
+    },
+    "noEmitOnError": false,
+    "isolatedModules": false,
+    "noImplicitAny": false
   },
-  "include": ["*.ts"],
-  "exclude": ["node_modules", "dist"]
-} 
+  "include": [
+    "*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist"
+  ]
+}

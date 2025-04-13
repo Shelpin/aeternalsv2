@@ -1,9 +1,15 @@
 {
   "name": "elizaos-patches",
   "version": "1.0.0",
+  "description": "Patches for ElizaOS runtime",
   "type": "module",
-  "private": true,
+  "scripts": {
+    "init-db": "node init_db.js",
+    "telegram-patch": "node telegram-client-static.js",
+    "apply-all": "node apply-patches.js",
+    "start-agent": "node start-agent-with-patches.js"
+  },
   "dependencies": {
-    "@elizaos/core": "*"
+    "better-sqlite3": "^8.5.0"
   }
 }

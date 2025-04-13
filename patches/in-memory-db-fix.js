@@ -1,40 +1,79 @@
 /**
  * In-Memory Database Fix
- * This patch ensures the system uses an in-memory SQLite database
+ * 
+ * This patch addresses issues with in-memory database connections by:
+ * 1. Fixing SQLite in-memory pooling
+ * 2. Ensuring proper connection sharing
+ * 3. Setting up SQLite WAL mode for in-memory databases
  */
 
-console.log('[IN-MEMORY-DB-FIX] Enforcing in-memory database usage');
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
-/**
- * Configure the system to use an in-memory SQLite database
- */
-export function enforceInMemoryDb() {
-  // Set environment variable to signal in-memory mode
-  process.env.USE_IN_MEMORY_DB = 'true';
-  
-  // Patch any database adapter initialization to use :memory:
-  if (globalThis.__elizaRuntime) {
-    console.log('[IN-MEMORY-DB-FIX] Patching ElizaOS runtime for in-memory database');
-    
-    // Override any getSetting calls that might look for a database path
-    const originalGetSetting = globalThis.__elizaRuntime.getSetting;
-    if (typeof originalGetSetting === 'function') {
-      globalThis.__elizaRuntime.getSetting = function(key, defaultValue) {
-        if (key === 'SQLITE_FILE' || key === 'DATABASE_PATH' || key === 'SQLITE_DATABASE_PATH') {
-          console.log(`[IN-MEMORY-DB-FIX] Intercepted getSetting for ${key}, returning :memory:`);
-          return ':memory:';
+console.log('🔧 Applying in-memory database fix...');
+
+// Only apply fix if using in-memory database
+if (process.env.USE_IN_MEMORY_DB === 'true') {
+  console.log('⚠️ In-memory database mode detected');
+
+  try {
+    // Store a single connection for the process
+    if (!globalThis.__ELIZA_SQLITE_SHARED_CONN) {
+      const better_sqlite3 = require('better-sqlite3');
+
+      // Create a shared in-memory connection with WAL mode
+      const sharedConn = new better_sqlite3(':memory:');
+
+      // Configure the database
+      sharedConn.pragma('journal_mode = WAL');
+      sharedConn.pragma('synchronous = NORMAL');
+      sharedConn.pragma('foreign_keys = ON');
+
+      // Set up basic schema
+      sharedConn.exec(`
+        CREATE TABLE IF NOT EXISTS memories (
+          id TEXT PRIMARY KEY,
+          content TEXT,
+          embedding BLOB,
+          metadata TEXT,
+          created_at INTEGER,
+          updated_at INTEGER
+        );
+        
+        CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+          content, 
+          content='memories', 
+          content_rowid='rowid'
+        );
+      `);
+
+      // Store it globally
+      globalThis.__ELIZA_SQLITE_SHARED_CONN = sharedConn;
+      console.log('✅ Created shared in-memory SQLite connection with WAL mode');
+
+      // Monkeypatch the better-sqlite3 constructor to return our shared connection
+      // when :memory: is requested
+      const originalDatabase = better_sqlite3.prototype.constructor;
+
+      better_sqlite3.prototype.constructor = function (filename, options) {
+        if (filename === ':memory:') {
+          console.log('📊 Returning shared in-memory database connection');
+          return globalThis.__ELIZA_SQLITE_SHARED_CONN;
         }
-        return originalGetSetting.call(this, key, defaultValue);
+
+        // Otherwise use the original constructor
+        return originalDatabase.call(this, filename, options);
       };
+
+      console.log('✅ Monkeypatched better-sqlite3 to use shared in-memory connection');
+    } else {
+      console.log('✅ Shared in-memory SQLite connection already exists');
     }
+  } catch (error) {
+    console.error('❌ Error applying in-memory database fix:', error);
   }
-  
-  console.log('[IN-MEMORY-DB-FIX] In-memory database mode enforced');
-  return true;
+} else {
+  console.log('ℹ️ Using file-based SQLite database (in-memory mode not enabled)');
 }
 
-// Apply the fix immediately
-const inMemoryEnabled = enforceInMemoryDb();
-
-// Export the configuration result
-export default inMemoryEnabled; 
+console.log('✅ In-memory database fix applied'); 

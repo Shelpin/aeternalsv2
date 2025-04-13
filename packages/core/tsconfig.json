@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "lib": ["ESNext", "dom"],
+    "lib": [
+      "ESNext",
+      "dom"
+    ],
     "moduleResolution": "Bundler",
     "outDir": "./dist",
     "rootDir": "./src",
@@ -19,8 +22,23 @@
     "noEmitOnError": false,
     "moduleDetection": "force",
     "allowArbitraryExtensions": true,
-    "customConditions": ["@elizaos/source"]
+    "customConditions": [
+      "@elizaos/source"
+    ],
+    "noEmit": false,
+    "emitDecoratorMetadata": true,
+    "experimentalDecorators": true,
+    "preserveSymlinks": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": false
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.d.ts", "**/*.test.ts"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.d.ts",
+    "**/*.test.ts"
+  ]
 }
