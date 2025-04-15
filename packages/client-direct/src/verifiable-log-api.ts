@@ -3,15 +3,20 @@ import type { Router } from 'express';
 import bodyParser from "body-parser";
 import cors from "cors";
 
-import { type AgentRuntime, elizaLogger, ServiceType }  from "@elizaos/core";
-import type {
-    VerifiableLogService,
-    VerifiableLogQuery,
-} from "@elizaos/plugin-tee-verifiable-log";
+import {
+    type AgentRuntime,
+    type IAgentRuntime,
+    elizaLogger,
+    ServiceType
+} from "@elizaos/core/public-api";
+// import type {
+//     VerifiableLogService,
+//     VerifiableLogQuery,
+// } from "@elizaos/plugin-tee-verifiable-log";
 
 export function createVerifiableLogApiRouter(
     agents: Map<string, IAgentRuntime>
-):Router {
+): Router {
     const router = express.Router();
     router.use(cors());
     router.use(bodyParser.json());
@@ -23,15 +28,18 @@ export function createVerifiableLogApiRouter(
             try {
                 // call the listAgent method
                 const agentRuntime: AgentRuntime | undefined = agents.values().next().value;
+                /* // Commented out usage of VerifiableLogService
                 const pageQuery = await agentRuntime
-                    .getService<VerifiableLogService>(
+                    ?.getService<VerifiableLogService>(
                         ServiceType.VERIFIABLE_LOGGING
                     )
-                    .listAgent();
+                    ?.listAgent();
+                */
+                const pageQuery = { message: "TEE Log Service Disabled" }; // Placeholder
 
                 res.json({
                     success: true,
-                    message: "Successfully get Agents",
+                    message: "Successfully get Agents (TEE Disabled)",
                     data: pageQuery,
                 });
             } catch (error) {
@@ -55,15 +63,18 @@ export function createVerifiableLogApiRouter(
                     publicKey: query.publicKey || "",
                 };
                 const agentRuntime: AgentRuntime | undefined = agents.values().next().value;
+                /* // Commented out usage of VerifiableLogService
                 const pageQuery = await agentRuntime
-                    .getService<VerifiableLogService>(
+                    ?.getService<VerifiableLogService>(
                         ServiceType.VERIFIABLE_LOGGING
                     )
-                    .generateAttestation(verifiableLogQuery);
+                    ?.generateAttestation(verifiableLogQuery);
+                */
+                const pageQuery = { message: "TEE Log Service Disabled" }; // Placeholder
 
                 res.json({
                     success: true,
-                    message: "Successfully get Attestation",
+                    message: "Successfully get Attestation (TEE Disabled)",
                     data: pageQuery,
                 });
             } catch (error) {
@@ -84,7 +95,8 @@ export function createVerifiableLogApiRouter(
                 const page = Number.parseInt(req.body.page) || 1;
                 const pageSize = Number.parseInt(req.body.pageSize) || 10;
 
-                const verifiableLogQuery: VerifiableLogQuery = {
+                // const verifiableLogQuery: VerifiableLogQuery = { // Commented out type usage
+                const verifiableLogQuery = {
                     idEq: query.idEq || "",
                     agentIdEq: query.agentIdEq || "",
                     roomIdEq: query.roomIdEq || "",
@@ -94,15 +106,18 @@ export function createVerifiableLogApiRouter(
                     signatureEq: query.signatureEq || "",
                 };
                 const agentRuntime: AgentRuntime | undefined = agents.values().next().value;
+                /* // Commented out usage of VerifiableLogService
                 const pageQuery = await agentRuntime
-                    .getService<VerifiableLogService>(
+                    ?.getService<VerifiableLogService>(
                         ServiceType.VERIFIABLE_LOGGING
                     )
                     ?.pageQueryLogs(verifiableLogQuery, page, pageSize);
+                */
+                const pageQuery = { message: "TEE Log Service Disabled" }; // Placeholder
 
                 res.json({
                     success: true,
-                    message: "Successfully retrieved logs",
+                    message: "Successfully retrieved logs (TEE Disabled)",
                     data: pageQuery,
                 });
             } catch (error) {

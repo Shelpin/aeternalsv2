@@ -35,124 +35,163 @@ console.log(`🔧 Character files: ${characterFiles.join(', ') || 'None provided
 
 async function main() {
   try {
-    console.log('🔧 Applying runtime patches...');
+    // --- Start of Merged Patch Logic ---
+    console.log("🔧 Applying all ElizaOS runtime patches directly...");
+    let runtime = null;
 
-    // Apply all patches first
-    await import('./apply-patches.js');
-    console.log('✅ All patches applied successfully');
+    // Apply SQLite Path Fix
+    try {
+      const sqliteFix = await import("./sqlite-path-fix.js");
+      if (sqliteFix && typeof sqliteFix.applyFix === 'function') {
+        await sqliteFix.applyFix();
+      }
+    } catch (e) { console.error("Error applying sqlite-path-fix:", e); }
 
-    // Verify that the runtime is available
+    // Apply In-Memory DB Fix
+    try {
+      const memoryFix = await import("./in-memory-db-fix.js");
+      if (memoryFix && typeof memoryFix.applyFix === 'function') {
+        await memoryFix.applyFix();
+      }
+    } catch (e) { console.error("Error applying in-memory-db-fix:", e); }
+
+    // Apply Relay Config Fix
+    try {
+      const relayConfigFix = await import("./relay-config-fix.js");
+      if (relayConfigFix && typeof relayConfigFix.applyFix === 'function') {
+        await relayConfigFix.applyFix();
+      }
+    } catch (e) { console.error("Error applying relay-config-fix:", e); }
+
+    // Attempt to Initialize Telegram Client
+    let telegramClient = null; // Define variable outside try block
+    try {
+      console.log("🔧 Attempting to initialize Telegram client...");
+      // Use relative path for import
+      const telegramClientModule = await import("../packages/clients/telegram/dist/index.js");
+      telegramClient = telegramClientModule.default; // Assign to outer variable
+      const token = process.env.TELEGRAM_BOT_TOKEN;
+      if (telegramClient && typeof telegramClient.initialize === 'function' && token) {
+        telegramClient.initialize(token);
+        console.log("✅ Telegram client singleton initialized with token.");
+      } else if (!token) {
+        console.warn("⚠️ TELEGRAM_BOT_TOKEN environment variable not set. Cannot initialize Telegram client.");
+      } else {
+        console.warn("⚠️ Could not find exported telegramClient or initialize method.");
+      }
+    } catch (err) {
+      console.error("❌ Failed to load or initialize Telegram client (relative path):", err);
+    }
+
+    // Apply Runtime Patch (makes runtime global)
+    console.log("🔧 Applying runtime patch...");
+    try {
+      const runtimePatch = await import("./runtime-patch.js");
+      if (runtimePatch && typeof runtimePatch.applyPatch === 'function') {
+        runtime = await runtimePatch.applyPatch(); // Assign to local runtime variable
+        console.log("✅ Runtime patch applied and made globally available");
+        console.log(`🔧 Checking globalThis after patch: ${globalThis.__elizaRuntime ? 'SET' : 'NOT SET'}`);
+        if (globalThis.__elizaRuntime) {
+          console.log(`🔧 Global runtime name: ${globalThis.__elizaRuntime.name || 'Unknown Name'}`);
+        }
+      } else {
+        console.error("❌ Runtime patch module or applyPatch function not found.");
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error("❌ Failed to apply runtime patch:", error);
+      process.exit(1);
+    }
+
+    // Now try injecting the initialized client into the now-global runtime
+    // Use the telegramClient variable defined above
+    if (globalThis.__elizaRuntime && globalThis.__elizaRuntime.clients && telegramClient) {
+      if (!globalThis.__elizaRuntime.clients.telegram) {
+        globalThis.__elizaRuntime.clients.telegram = telegramClient;
+        console.log("✅ Injected initialized Telegram client into global runtime.");
+      } else {
+        console.log("ℹ️ Telegram client already present in global runtime.");
+      }
+    } else {
+      if (!telegramClient) {
+        console.warn("⚠️ Telegram client failed to load, cannot inject into runtime.");
+      } else {
+        console.warn("⚠️ Global runtime or runtime.clients not available for Telegram client injection.");
+      }
+    }
+
+    // Register handleMessage action
+    if (runtime && typeof runtime.registerAction === 'function' && typeof runtime.handleMessage === 'function') {
+      try {
+        console.log("🔌 Registering action: handleMessage (using runtime method)");
+        runtime.registerAction({
+          name: "handleMessage",
+          description: "Processes an incoming message (runtime core)",
+          handler: runtime.handleMessage.bind(runtime), // Use runtime's own method, bind this
+          similes: [],
+          examples: [],
+          validate: async () => true,
+        });
+        console.log("✅ Registered runtime.handleMessage as a formal runtime action");
+      } catch (error) {
+        console.error("❌ Failed to register handleMessage action:", error);
+      }
+    } else {
+      console.warn("⚠️ Local runtime variable, registerAction, or handleMessage not available, skipping handleMessage registration.");
+    }
+
+    // Apply Relay Fixes
+    try {
+      console.log("🔧 Applying relay fixes..."); // Add log before import
+      // Import the module to execute its patching logic immediately
+      await import("./relay-fixes.js");
+      // relay-fixes.js logs its own success/failure
+    } catch (e) {
+      console.error("❌ Error importing/applying relay-fixes:", e);
+    }
+
+    console.log("✅ All patches applied successfully (within start-agent script)");
+    // --- End of Merged Patch Logic ---
+
+    // Verify that the runtime is available (using the same check as before)
     if (!globalThis.__elizaRuntime) {
-      throw new Error('❌ Runtime not initialized by patches');
+      throw new Error('❌ Runtime not initialized by patches (checked after merge)');
     }
 
     console.log(`✅ runtime.handleMessage is now ${typeof globalThis.__elizaRuntime.handleMessage === 'function' ? 'available' : 'not available'}`);
 
-    // Create a simulated agent process for testing
-    console.log('🚀 Starting simulated agent process...');
-
-    // Verify environment variables
-    console.log(`🔧 AGENT_ID: ${process.env.AGENT_ID || 'not set'}`);
-    console.log(`🔧 AGENT_PORT: ${process.env.AGENT_PORT || 'not set'}`);
-    console.log(`🔧 RELAY_SERVER_URL: ${process.env.RELAY_SERVER_URL || 'not set'}`);
-
-    // If agent ID is set, run a longer simulation
-    if (process.env.AGENT_ID) {
-      console.log(`🚀 Starting agent: ${process.env.AGENT_ID}`);
-
-      // Set an interval to simulate incoming messages from Telegram
-      setInterval(() => {
-        try {
-          if (globalThis.__elizaTelegramClient && globalThis.__elizaTelegramClient.TelegramClient) {
-            // Create a mock client instance
-            const mockClient = new globalThis.__elizaTelegramClient.TelegramClient({
-              token: 'test-token'
-            });
-
-            // Simulate an incoming message
-            console.log('📱 Simulating an incoming Telegram message...');
-            const mockMessage = {
-              message_id: Date.now(),
-              from: { id: 12345, username: 'test_user' },
-              chat: { id: -1002550681173, type: 'group', title: 'Test Group' },
-              text: 'Hello, agent!',
-              date: Math.floor(Date.now() / 1000)
-            };
-
-            // Process the message with the runtime
-            if (globalThis.__elizaRuntime && typeof globalThis.__elizaRuntime.handleMessage === 'function') {
-              console.log('🧠 Processing message with runtime...');
-
-              globalThis.__elizaRuntime.handleMessage({
-                type: 'text',
-                content: mockMessage.text,
-                source: 'telegram',
-                target: process.env.AGENT_ID,
-                rawMessage: mockMessage
-              }).then(response => {
-                console.log(`🧠 Response from runtime: ${JSON.stringify(response).substring(0, 100)}...`);
-
-                // Simulate sending a response back via Telegram
-                mockClient.sendMessage(mockMessage.chat.id, response.content)
-                  .then(result => {
-                    console.log('📱 Mock response sent to Telegram');
-                  })
-                  .catch(err => {
-                    console.error('❌ Error sending mock response:', err);
-                  });
-              }).catch(err => {
-                console.error('❌ Error processing message with runtime:', err);
-              });
-            } else {
-              console.log('⚠️ Runtime message handler not available');
-            }
-          } else {
-            console.log('⚠️ Telegram client not available');
-          }
-        } catch (error) {
-          console.error('❌ Error in simulation:', error);
-        }
-      }, 15000); // Every 15 seconds
-    } else {
-      console.log('⚠️ AGENT_ID not set, skipping message simulation');
-    }
-
-    // Keep the process running
-    console.log('🚀 Agent simulation running...');
-
-    // For a real agent, we would use spawn:
-    /*
+    // --- Start Real Agent Spawn --- 
+    console.log('🚀 Spawning real agent process...');
     const npmCmd = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-    
-    // Start the agent with the same arguments
+
+    // Start the agent with the same arguments passed to this script
     const agentProcess = spawn(npmCmd, ['--filter', '@elizaos/agent', 'start', ...args], {
-      stdio: 'inherit',
+      stdio: 'inherit', // Show agent output directly in console
+      cwd: rootDir, // Ensure it runs from the project root
       env: {
-        ...process.env,
-        VALHALLA_PATCHED: 'true'
+        ...process.env, // Pass existing env vars (includes AGENT_ID, TOKEN, etc.)
+        VALHALLA_PATCHED: 'true' // Add a flag if needed
       }
     });
-    
+
     // Handle the agent process events
     agentProcess.on('close', (code) => {
       console.log(`Agent process exited with code ${code}`);
-      process.exit(code);
+      // Optionally exit this script too, or just let it end
+      // process.exit(code);
     });
-    
+
     agentProcess.on('error', (err) => {
-      console.error('Failed to start agent process:', err);
+      console.error('❌ Failed to start agent process:', err);
       process.exit(1);
     });
-    */
+    // --- End Real Agent Spawn --- 
 
   } catch (error) {
-    console.error('❌ Error applying patches:', error);
+    // Catch errors from both patch application and simulation setup
+    console.error('❌ Error in main function:', error);
     process.exit(1);
   }
 }
 
-// Run the main function
-main().catch(err => {
-  console.error('Unhandled error in patch script:', err);
-  process.exit(1);
-});
+main();

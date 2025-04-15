@@ -149,19 +149,19 @@ export class RAGKnowledgeManager implements IRAGKnowledgeManager {
         if (!text || !terms.length) {
             return false;
         }
-    
+
         const words = text.toLowerCase().split(" ").filter(w => w.length > 0);
-        
+
         // Find all positions for each term (not just first occurrence)
-        const allPositions = terms.flatMap(term => 
+        const allPositions = terms.flatMap(term =>
             words.reduce((positions, word, idx) => {
                 if (word.includes(term)) positions.push(idx);
                 return positions;
             }, [] as number[])
         ).sort((a, b) => a - b);
-    
+
         if (allPositions.length < 2) return false;
-    
+
         // Check proximity
         for (let i = 0; i < allPositions.length - 1; i++) {
             if (Math.abs(allPositions[i] - allPositions[i + 1]) <= 5) {
@@ -173,7 +173,7 @@ export class RAGKnowledgeManager implements IRAGKnowledgeManager {
                 return true;
             }
         }
-    
+
         return false;
     }
 
@@ -232,50 +232,49 @@ export class RAGKnowledgeManager implements IRAGKnowledgeManager {
                 const rerankedResults = results
                     .map((result) => {
                         let score = result.similarity;
-
-                        // Check for direct query term matches
                         const queryTerms = this.getQueryTerms(processedQuery);
-
+                        // Calculate matchingTerms outside the score check
                         const matchingTerms = queryTerms.filter((term) =>
                             result.content.text.toLowerCase().includes(term)
                         );
 
-                        if (matchingTerms.length > 0) {
-                            // Much stronger boost for matches
-                            score *=
-                                1 +
-                                (matchingTerms.length / queryTerms.length) * 2; // Double the boost
+                        // Ensure score is a number before modifying
+                        if (typeof score === 'number') {
+                            if (matchingTerms.length > 0) {
+                                // Much stronger boost for matches
+                                score *=
+                                    1 +
+                                    (matchingTerms.length / queryTerms.length) * 2; // Double the boost
 
-                            if (
-                                this.hasProximityMatch(
-                                    result.content.text,
-                                    matchingTerms
-                                )
-                            ) {
-                                score *= 1.5; // Stronger proximity boost
-                            }
-                        } else {
-                            // More aggressive penalty
-                            if (!params.conversationContext) {
+                                // Use matchingTerms here now it's in scope
+                                if (
+                                    this.hasProximityMatch(
+                                        result.content.text,
+                                        matchingTerms // Use matchingTerms instead of queryTerms
+                                    )
+                                ) {
+                                    score *= 1.5; // Stronger proximity boost
+                                }
+                            } else {
+                                // Check if terms exist but not matching - penalize
                                 score *= 0.3; // Stronger penalty
                             }
                         }
 
-                        return {
-                            ...result,
-                            score,
-                            matchedTerms: matchingTerms, // Add for debugging
-                        };
+                        return { ...result, score };
                     })
-                    .sort((a, b) => b.score - a.score);
-
-                // Filter and return results
-                return rerankedResults
+                    // Handle potentially undefined scores in sorting
+                    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
                     .filter(
                         (result) =>
+                            // Handle potentially undefined score in comparison
+                            typeof result.score === 'number' &&
                             result.score >= this.defaultRAGMatchThreshold
                     )
                     .slice(0, params.limit || this.defaultRAGMatchCount);
+
+                // Filter and return results
+                return rerankedResults;
             } catch (error) {
                 console.log(`[RAG Search Error] ${error}`);
                 return [];
@@ -442,50 +441,44 @@ export class RAGKnowledgeManager implements IRAGKnowledgeManager {
 
             for (const item of parentDocuments) {
                 const relativePath = item.content.metadata?.source;
-                const filePath = join(this.knowledgeRoot, relativePath);
+                // Check if relativePath is a string before joining
+                if (typeof relativePath === 'string') {
+                    const filePath = join(this.knowledgeRoot, relativePath);
 
-                elizaLogger.debug(
-                    `[Cleanup] Checking joined file path: ${filePath}`
-                );
-
-                if (!existsSync(filePath)) {
-                    elizaLogger.warn(
-                        `[Cleanup] File not found, starting removal process: ${filePath}`
-                    );
-
-                    const idToRemove = item.id;
                     elizaLogger.debug(
-                        `[Cleanup] Using ID for removal: ${idToRemove}`
+                        `[Cleanup] Checking joined file path: ${filePath}`
                     );
 
-                    try {
-                        // Just remove the parent document - this will cascade to chunks
-                        await this.removeKnowledge(idToRemove);
-
-                        // // Clean up the cache
-                        // const baseCacheKeyWithWildcard = `${this.generateKnowledgeCacheKeyBase(
-                        //     idToRemove,
-                        //     item.content.metadata?.isShared || false
-                        // )}*`;
-                        // await this.cacheManager.deleteByPattern({
-                        //     keyPattern: baseCacheKeyWithWildcard,
-                        // });
-
-                        elizaLogger.success(
-                            `[Cleanup] Successfully removed knowledge for file: ${filePath}`
+                    if (!existsSync(filePath)) {
+                        elizaLogger.warn(
+                            `[Cleanup] File not found, starting removal process: ${filePath}`
                         );
-                    } catch (deleteError) {
-                        elizaLogger.error(
-                            `[Cleanup] Error during deletion process for ${filePath}:`,
-                            deleteError instanceof Error
-                                ? {
-                                      message: deleteError.message,
-                                      stack: deleteError.stack,
-                                      name: deleteError.name,
-                                  }
-                                : deleteError
+
+                        const idToRemove = item.id;
+                        elizaLogger.debug(
+                            `[Cleanup] Using ID for removal: ${idToRemove}`
                         );
-                    }
+
+                        try {
+                            await this.removeKnowledge(idToRemove);
+                            elizaLogger.success(
+                                `[Cleanup] Successfully removed knowledge for file: ${filePath}`
+                            );
+                        } catch (deleteError) {
+                            elizaLogger.error(
+                                `[Cleanup] Error during deletion process for ${filePath}:`,
+                                deleteError instanceof Error
+                                    ? {
+                                        message: deleteError.message,
+                                        stack: deleteError.stack,
+                                        name: deleteError.name,
+                                    }
+                                    : deleteError
+                            );
+                        }
+                    } // else: File exists, do nothing
+                } else {
+                    elizaLogger.warn(`[Cleanup] Skipping item ${item.id} due to missing or invalid source path.`);
                 }
             }
 
@@ -625,7 +618,7 @@ export class RAGKnowledgeManager implements IRAGKnowledgeManager {
         } catch (error) {
             if (
                 file.isShared &&
-                error?.code === "SQLITE_CONSTRAINT_PRIMARYKEY"
+                (error as any)?.code === "SQLITE_CONSTRAINT_PRIMARYKEY"
             ) {
                 elizaLogger.info(
                     `Shared knowledge ${file.path} already exists in database, skipping creation`

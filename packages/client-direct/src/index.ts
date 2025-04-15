@@ -16,6 +16,11 @@ import {
     type Media,
     type Memory,
     type Plugin,
+    type AgentRuntime,
+    type Character,
+    type ClientMessagePayload,
+    type ClientSettings,
+    type CommandSchema,
 } from "@elizaos/core";
 import bodyParser from "body-parser";
 import cors from "cors";
@@ -113,7 +118,6 @@ export class DirectClient {
     public app: express.Application;
     private agents: Map<string, IAgentRuntime>; // container management
     private server: any; // Store server instance
-    public startAgent: Function; // Store startAgent functor
     public loadCharacterTryPath: Function; // Store loadCharacterTryPath functor
     public jsonToCharacter: Function; // Store jsonToCharacter functor
 
@@ -458,34 +462,34 @@ export class DirectClient {
                     const lookAtSchema =
                         nearby.length > 1
                             ? z
-                                  .union(
-                                      nearby.map((item) => z.literal(item)) as [
-                                          z.ZodLiteral<string>,
-                                          z.ZodLiteral<string>,
-                                          ...z.ZodLiteral<string>[],
-                                      ]
-                                  )
-                                  .nullable()
+                                .union(
+                                    nearby.map((item) => z.literal(item)) as [
+                                        z.ZodLiteral<string>,
+                                        z.ZodLiteral<string>,
+                                        ...z.ZodLiteral<string>[],
+                                    ]
+                                )
+                                .nullable()
                             : nearby.length === 1
-                              ? z.literal(nearby[0]).nullable()
-                              : z.null(); // Fallback for empty array
+                                ? z.literal(nearby[0]).nullable()
+                                : z.null(); // Fallback for empty array
 
                     const emoteSchema =
                         availableEmotes.length > 1
                             ? z
-                                  .union(
-                                      availableEmotes.map((item) =>
-                                          z.literal(item)
-                                      ) as [
-                                          z.ZodLiteral<string>,
-                                          z.ZodLiteral<string>,
-                                          ...z.ZodLiteral<string>[],
-                                      ]
-                                  )
-                                  .nullable()
+                                .union(
+                                    availableEmotes.map((item) =>
+                                        z.literal(item)
+                                    ) as [
+                                        z.ZodLiteral<string>,
+                                        z.ZodLiteral<string>,
+                                        ...z.ZodLiteral<string>[],
+                                    ]
+                                )
+                                .nullable()
                             : availableEmotes.length === 1
-                              ? z.literal(availableEmotes[0]).nullable()
-                              : z.null(); // Fallback for empty array
+                                ? z.literal(availableEmotes[0]).nullable()
+                                : z.null(); // Fallback for empty array
 
                     return z.object({
                         lookAt: lookAtSchema,
@@ -871,7 +875,7 @@ export class DirectClient {
                             ),
                             similarity_boost: Number.parseFloat(
                                 process.env.ELEVENLABS_VOICE_SIMILARITY_BOOST ||
-                                    "0.9"
+                                "0.9"
                             ),
                             style: Number.parseFloat(
                                 process.env.ELEVENLABS_VOICE_STYLE || "0.66"
@@ -945,7 +949,7 @@ export class DirectClient {
                             ),
                             similarity_boost: Number.parseFloat(
                                 process.env.ELEVENLABS_VOICE_SIMILARITY_BOOST ||
-                                    "0.9"
+                                "0.9"
                             ),
                             style: Number.parseFloat(
                                 process.env.ELEVENLABS_VOICE_STYLE || "0.66"
@@ -983,17 +987,47 @@ export class DirectClient {
                 });
             }
         });
+    } // End of constructor
+
+    // Add startAgent method to satisfy IDirectClientMethods
+    public async startAgent(character: Character): Promise<IAgentRuntime> {
+        // Placeholder implementation - Actual logic might be injected or defined elsewhere
+        elizaLogger.warn(
+            "DirectClient.startAgent called, but not fully implemented. Returning rejected promise."
+        );
+        // If the actual startAgent function is assigned later, this might need adjustment
+        // For now, we reject to indicate it needs proper setup.
+        // A real implementation would create/add AgentRuntime and return it.
+        return Promise.reject(
+            new Error("startAgent not implemented or initialized.")
+        );
     }
 
-    // agent/src/index.ts:startAgent calls this
+    // Add unregisterAgent method to satisfy IDirectClientMethods
+    public unregisterAgent(agent: IAgentRuntime): void {
+        elizaLogger.log(`Unregistering agent: ${agent.agentId}`);
+        this.agents.delete(agent.agentId);
+        // Potentially add agent.stop() here if not handled elsewhere
+    }
+
+    public async message(
+        text: Content,
+        userId: string,
+        roomId: string,
+        agentId: string
+    ): Promise<Content[]> {
+        // Implementation for message method
+        // This is a placeholder and should be replaced with actual logic
+        elizaLogger.warn(
+            "DirectClient.message called, but not fully implemented. Returning empty array."
+        );
+        return [];
+    }
+
     public registerAgent(runtime: IAgentRuntime) {
         // register any plugin endpoints?
         // but once and only once
         this.agents.set(runtime.agentId, runtime);
-    }
-
-    public unregisterAgent(runtime: IAgentRuntime) {
-        this.agents.delete(runtime.agentId);
     }
 
     public start(port: number) {

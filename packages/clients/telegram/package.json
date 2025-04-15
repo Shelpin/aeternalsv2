@@ -1,5 +1,5 @@
 {
-  "name": "@elizaos/clients/telegram",
+  "name": "@elizaos/telegram-client",
   "type": "module",
   "main": "dist/index.cjs",
   "exports": {
@@ -12,6 +12,6 @@
   },
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "tsup --config tsup.config.ts && tsc -p tsconfig.build.json"
+    "build": "tsup --config tsup.config.ts --dts"
   }
 }

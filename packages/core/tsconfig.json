@@ -1,44 +1,20 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
+    "target": "ES2021",
     "module": "ESNext",
-    "lib": [
-      "ESNext",
-      "dom"
-    ],
-    "moduleResolution": "Bundler",
     "outDir": "./dist",
     "rootDir": "./src",
-    "strict": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": false,
     "declaration": true,
+    "baseUrl": ".",
+    "moduleResolution": "Bundler",
     "emitDeclarationOnly": true,
-    "resolveJsonModule": true,
-    "noImplicitAny": false,
-    "allowJs": true,
-    "checkJs": false,
-    "noEmitOnError": false,
-    "moduleDetection": "force",
-    "allowArbitraryExtensions": true,
-    "customConditions": [
-      "@elizaos/source"
-    ],
-    "noEmit": false,
-    "emitDecoratorMetadata": true,
-    "experimentalDecorators": true,
-    "preserveSymlinks": true,
-    "allowSyntheticDefaultImports": true,
-    "isolatedModules": false
+    "skipLibCheck": true
   },
   "include": [
-    "src/**/*"
+    "src/**/*.ts"
   ],
   "exclude": [
-    "node_modules",
-    "dist",
-    "src/**/*.d.ts",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "**/__tests__/**"
   ]
 }

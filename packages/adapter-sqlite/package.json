@@ -17,6 +17,9 @@
   },
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "tsup --config tsup.config.ts && ../../node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly"
+    "build": "pnpm exec tsup --config tsup.config.ts && tsc -p tsconfig.build.json --emitDeclarationOnly"
+  },
+  "dependencies": {
+    "@elizaos/core": "workspace:*"
   }
 }

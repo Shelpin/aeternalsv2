@@ -13,5 +13,12 @@
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
     "build": "tsup --config tsup.config.ts && ../../node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly"
+  },
+  "devDependencies": {
+    "@types/multer": "1.4.12"
+  },
+  "dependencies": {
+    "@elizaos/agent": "workspace:*",
+    "@elizaos/core": "workspace:*"
   }
 }

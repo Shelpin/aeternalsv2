@@ -5,76 +5,129 @@
  * It's designed to be run before starting the agent to ensure all patches are applied.
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+// ESM version of apply-patches.js
 
-// Get the directory of the current script
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Import necessary modules if needed (e.g., path, fs - ensure they work in ESM)
+// import path from 'path';
+// import fs from 'fs';
 
-console.log('🔧 Applying all ElizaOS runtime patches...');
-
-// Load patches in the correct order
+// Function to apply patches
 async function applyPatches() {
+  console.log("🔧 Applying all ElizaOS runtime patches...");
+  let runtime = null;
+
+  // Apply SQLite Path Fix
+  const sqliteFix = await import("./sqlite-path-fix.js");
+  if (sqliteFix && typeof sqliteFix.applyFix === 'function') {
+    await sqliteFix.applyFix();
+  }
+
+  // Apply In-Memory DB Fix
+  const memoryFix = await import("./in-memory-db-fix.js");
+  if (memoryFix && typeof memoryFix.applyFix === 'function') {
+    await memoryFix.applyFix();
+  }
+
+  // Apply Relay Config Fix
+  const relayConfigFix = await import("./relay-config-fix.js");
+  if (relayConfigFix && typeof relayConfigFix.applyFix === 'function') {
+    await relayConfigFix.applyFix();
+  }
+
+  // Attempt to Initialize Telegram Client
   try {
-    // 1. Apply SQLite path fix first
-    console.log('🔧 Applying SQLite path fix...');
-    await import('./sqlite-path-fix.js');
+    console.log("🔧 Attempting to initialize Telegram client...");
+    const telegramClientModule = await import("@elizaos/client-telegram");
+    const telegramClient = telegramClientModule.default; // Assuming default export is singleton
+    const token = process.env.TELEGRAM_BOT_TOKEN;
 
-    // 2. Initialize the database
-    console.log('🔧 Initializing database...');
-    // Convert init_db.cjs to ESM compatible import
-    const { execSync } = await import('child_process');
-    console.log('Running init_db.cjs via child process');
-    execSync('node patches/init_db.cjs', { stdio: 'inherit' });
+    if (telegramClient && typeof telegramClient.initialize === 'function' && token) {
+      telegramClient.initialize(token);
+      console.log("✅ Telegram client singleton initialized with token.");
+    } else if (!token) {
+      console.warn("⚠️ TELEGRAM_BOT_TOKEN environment variable not set. Cannot initialize Telegram client.");
+    } else {
+      console.warn("⚠️ Could not find exported telegramClient or initialize method.");
+    }
+  } catch (err) {
+    console.error("❌ Failed to load or initialize @elizaos/client-telegram:", err.message);
+  }
 
-    // 3. Apply in-memory database fix
-    console.log('🔧 Applying in-memory database fix...');
-    await import('./in-memory-db-fix.js');
+  // Apply Runtime Patch (makes runtime global)
+  console.log("🔧 Applying runtime patch...");
+  try {
+    const runtimePatch = await import("./runtime-patch.js");
+    if (runtimePatch && typeof runtimePatch.applyPatch === 'function') {
+      runtime = await runtimePatch.applyPatch();
+      console.log("✅ Runtime patch applied and made globally available");
+      console.log(`🔧 Checking globalThis after patch: ${globalThis.__elizaRuntime ? 'SET' : 'NOT SET'}`);
+      if (globalThis.__elizaRuntime) {
+        console.log(`🔧 Global runtime name: ${globalThis.__elizaRuntime.name || 'Unknown Name'}`);
+      }
+    } else {
+      console.error("❌ Runtime patch module or applyPatch function not found.");
+      process.exit(1);
+    }
+  } catch (error) {
+    console.error("❌ Failed to apply runtime patch:", error);
+    process.exit(1);
+  }
 
-    // 4. Apply relay configuration fixes
-    console.log('🔧 Applying relay configuration fixes...');
-    await import('./relay-config-fix.js');
+  // Now try injecting the initialized client into the now-global runtime
+  if (globalThis.__elizaRuntime && globalThis.__elizaRuntime.clients) {
+    try {
+      const telegramClientModule = await import("@elizaos/client-telegram");
+      const telegramClient = telegramClientModule.default;
+      if (telegramClient && !globalThis.__elizaRuntime.clients.telegram) {
+        globalThis.__elizaRuntime.clients.telegram = telegramClient;
+        console.log("✅ Injected initialized Telegram client into global runtime.");
+      }
+    } catch (err) {
+      console.warn("⚠️ Could not load telegram client to inject into runtime.");
+    }
+  } else {
+    console.warn("⚠️ Global runtime or runtime.clients not available for Telegram client injection.");
+  }
 
-    // 5. Load Telegram client statically
-    console.log('🔧 Loading Telegram client statically...');
-    // Convert telegram-client-static.js to ESM compatible import
-    execSync('node -e "global.globalThis = global; require(\'./patches/telegram-client-static.js\')"', { stdio: 'inherit' });
-
-    // 6. Apply runtime patch (module)
-    console.log('🔧 Applying runtime patch...');
-    const { runtime } = await import('./runtime-patch.js');
-
-    // Make runtime globally available
-    globalThis.__elizaRuntime = runtime;
-    console.log('✅ Runtime patch applied and made globally available');
-
-    // Register runtime actions
-    if (runtime && typeof runtime.handleMessage === 'function') {
-      if (runtime.registerAction) {
+  // Register handleMessage action
+  if (runtime && typeof runtime.registerAction === 'function') {
+    try {
+      console.log("🔌 Registering action: handleMessage");
+      const handleMessageModule = await import("./actions/handleMessage.js"); // Assuming path and ESM export
+      if (handleMessageModule && handleMessageModule.handleMessage) {
         runtime.registerAction({
           name: "handleMessage",
-          description: "Message handler",
-          handler: runtime.handleMessage.bind(runtime),
-          validate: () => true,
-          examples: []
+          description: "Processes an incoming message",
+          handler: handleMessageModule.handleMessage,
+          similes: [],
+          examples: [],
+          validate: async () => true,
         });
-        console.log('✅ Registered handleMessage as a formal runtime action');
+        console.log("✅ Registered handleMessage as a formal runtime action");
+      } else {
+        console.error("❌ handleMessage module or function not found.");
       }
+    } catch (error) {
+      console.error("❌ Failed to register handleMessage action:", error);
     }
-
-    // Apply relay fixes (depends on runtime)
-    console.log('🔧 Applying relay fixes...');
-    await import('./relay-fixes.js');
-    console.log('✅ Relay fixes applied');
-
-    console.log('✅ All patches applied successfully');
-  } catch (error) {
-    console.error('❌ Error applying patches:', error);
-    throw error;
+  } else {
+    console.warn("⚠️ Runtime not available or registerAction not found, skipping handleMessage registration.");
   }
+
+  // Apply Relay Fixes
+  const relayFixes = await import("./relay-fixes.js");
+  if (relayFixes && typeof relayFixes.applyFix === 'function') {
+    await relayFixes.applyFix(runtime);
+  }
+
+  console.log("✅ All patches applied successfully");
 }
 
-// Run the patches
-await applyPatches();
+// Execute patching
+applyPatches().catch(error => {
+  console.error("❌ Patching process failed:", error);
+  process.exit(1);
+});
+
+// For scripts that might import this, indicate completion
+// export const patchingComplete = true; // Use export for ESM

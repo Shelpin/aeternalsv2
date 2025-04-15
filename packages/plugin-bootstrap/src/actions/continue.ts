@@ -275,7 +275,7 @@ export const continueAction: Action = {
             {
                 user: "{{user1}}",
                 content: {
-                    text: "That it’s more about moments than things",
+                    text: "That it's more about moments than things",
                     action: "CONTINUE",
                 },
             },

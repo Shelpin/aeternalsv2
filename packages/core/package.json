@@ -13,10 +13,29 @@
       "import": "./dist/public-api.js",
       "require": "./dist/public-api.cjs"
     },
+    "./utils/*": {
+      "types": "./dist/utils/*.d.ts",
+      "import": "./dist/utils/*.js",
+      "require": "./dist/utils/*.cjs"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "tsup --config tsup.config.ts && ../../node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly"
+    "build": "pnpm exec tsup --config tsup.config.ts && pnpm exec tsc -p tsconfig.declaration.json --emitDeclarationOnly"
+  },
+  "dependencies": {
+    "@elizaos/adapter-sqlite": "workspace:*",
+    "@fal-ai/client": "1.3.0",
+    "fastembed": "1.14.4",
+    "js-tiktoken": "1.0.19",
+    "openai": "4.94.0",
+    "sql.js": "1.13.0",
+    "together-ai": "0.15.0"
+  },
+  "devDependencies": {
+    "@types/js-sha1": "0.6.3",
+    "@types/pino": "7.0.5",
+    "@types/pino-pretty": "5.0.0"
   }
 }

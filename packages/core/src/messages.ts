@@ -81,7 +81,8 @@ export const formatMessages = ({
                     ? ` (Attachments: ${attachments.map((media) => `[${media.id} - ${media.title} (${media.url})]`).join(", ")})`
                     : "";
 
-            const timestamp = formatTimestamp(message.createdAt);
+            // Check if createdAt exists before formatting
+            const timestamp = message.createdAt ? formatTimestamp(message.createdAt) : "unknown time";
 
             const shortId = message.userId.slice(-5);
 

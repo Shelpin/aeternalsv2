@@ -12,6 +12,9 @@
   },
   "scripts": {
     "prebuild": "rm -rf dist && mkdir -p dist",
-    "build": "tsup --config tsup.config.ts && ../../node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly"
+    "build": "tsup --config tsup.config.ts --dts"
+  },
+  "dependencies": {
+    "@elizaos/telegram-client": "workspace:*"
   }
 }

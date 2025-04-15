@@ -16,6 +16,7 @@ import {
     ModelProviderName,
     parseBooleanFromText,
     settings,
+    getModulePath,
     stringToUuid,
     validateCharacterConfig,
 } from "@elizaos/core/public-api";
@@ -26,7 +27,6 @@ import JSON5 from 'json5';
 
 import fs from "fs";
 import net from "net";
-import { getModulePath } from '@elizaos/core/utils/module-path';
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -377,7 +377,7 @@ async function handlePluginImporting(plugins: string[]) {
         const importedPlugins = await Promise.all(
             plugins.map(async (plugin) => {
                 try {
-                    const importedPlugin:Plugin = await import(plugin);
+                    const importedPlugin: Plugin = await import(plugin);
                     const functionName =
                         plugin
                             .replace("@elizaos/plugin-", "")
@@ -385,11 +385,13 @@ async function handlePluginImporting(plugins: string[]) {
                             .replace(/-./g, (x) => x[1].toUpperCase()) +
                         "Plugin"; // Assumes plugin function is camelCased with Plugin suffix
                     if (!importedPlugin[functionName] && !importedPlugin.default) {
-                      elizaLogger.warn(plugin, 'does not have an default export or', functionName)
+                        elizaLogger.warn(plugin, 'does not have an default export or', functionName)
                     }
-                    return {...(
-                        importedPlugin.default || importedPlugin[functionName]
-                    ), npmName: plugin };
+                    return {
+                        ...(
+                            importedPlugin.default || importedPlugin[functionName]
+                        ), npmName: plugin
+                    };
                 } catch (importError) {
                     console.error(
                         `Failed to import plugin: ${plugin}`,

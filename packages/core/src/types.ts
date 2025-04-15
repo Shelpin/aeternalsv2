@@ -397,6 +397,9 @@ export interface Memory {
 
     /** Embedding similarity score */
     similarity?: number;
+
+    /** Optional client name that originated the message */
+    clientName?: string;
 }
 
 /**
@@ -682,10 +685,10 @@ export type Plugin = {
 
     /** Optional adapters */
     adapters?: Adapter[];
-    
+
     /** Optional initialize method */
     initialize?: () => Promise<void>;
-    
+
     /** Optional shutdown method */
     shutdown?: () => Promise<void>;
 
@@ -872,10 +875,11 @@ export type Character = {
         chains?: {
             evm?: any[];
             solana?: any[];
-            [key: string]: any[];
+            [key: string]: any[] | undefined; // Allow undefined for optional chains
         };
         transcription?: TranscriptionProvider;
         ragKnowledge?: boolean;
+        [key: string]: any; // Add index signature for dynamic access
     };
 
     /** Optional client-specific config */

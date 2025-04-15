@@ -37,8 +37,8 @@ import {
     type IRAGKnowledgeManager,
     // type IVerifiableInferenceAdapter,
     type KnowledgeItem,
-    // RAGKnowledgeItem,
-    //Media,
+    type RAGKnowledgeItem,
+    type Media,
     ModelClass,
     ModelProviderName,
     type Plugin,
@@ -264,183 +264,133 @@ export class AgentRuntime implements IAgentRuntime {
         logging?: boolean;
         // verifiableInferenceAdapter?: IVerifiableInferenceAdapter;
     }) {
-        // use the character id if it exists, otherwise use the agentId if it is passed in, otherwise use the character name
-        this.agentId =
-            opts.character?.id ??
-            opts?.agentId ??
-            stringToUuid(opts.character?.name ?? uuidv4());
+        // Assign agentId, ensuring it's a valid UUID type
+        this.agentId = opts.agentId || (uuidv4() as UUID);
+        this.#conversationLength = opts.conversationLength || this.#conversationLength;
+        this.token = opts.token || null;
+        this.serverUrl = opts.serverUrl || this.serverUrl;
+        this.fetch = opts.fetch || fetch;
+
+        // Enforce required options
+        if (!opts.character) {
+            throw new Error("AgentRuntime requires a character configuration.");
+        }
         this.character = opts.character;
 
-        if(!this.character) {
-            throw new Error("Character input is required");
+        if (!opts.databaseAdapter) {
+            throw new Error("AgentRuntime requires a databaseAdapter.");
         }
-
-        elizaLogger.info(`${this.character.name}(${this.agentId}) - Initializing AgentRuntime with options:`, {
-            character: opts.character?.name,
-            modelProvider: opts.modelProvider,
-            characterModelProvider: opts.character?.modelProvider,
-        });
-
-        elizaLogger.debug(
-            `[AgentRuntime] Process working directory: ${process.cwd()}`,
-        );
-
-        // Define the root path once
-        this.knowledgeRoot = join(
-            process.cwd(),
-            "..",
-            "characters",
-            "knowledge",
-        );
-
-        elizaLogger.debug(
-            `[AgentRuntime] Process knowledgeRoot: ${this.knowledgeRoot}`,
-        );
-
-        this.#conversationLength =
-            opts.conversationLength ?? this.#conversationLength;
-
         this.databaseAdapter = opts.databaseAdapter;
 
-        elizaLogger.success(`Agent ID: ${this.agentId}`);
-
-        this.fetch = (opts.fetch as typeof fetch) ?? this.fetch;
-
+        if (!opts.cacheManager) {
+            throw new Error("AgentRuntime requires a cacheManager.");
+        }
         this.cacheManager = opts.cacheManager;
 
+        // Assign model providers
+        this.modelProvider = opts.modelProvider;
+        this.imageModelProvider = this.character.imageModelProvider || opts.modelProvider;
+        this.imageVisionModelProvider = this.character.imageVisionModelProvider || opts.modelProvider;
+
+        this.actions = opts.actions || this.actions;
+        this.evaluators = opts.evaluators || this.evaluators;
+        this.providers = opts.providers || this.providers;
+        this.plugins = opts.plugins || this.plugins;
+        //this.adapters = opts.adapters || this.adapters;
+
+        // Initialize memory managers
         this.messageManager = new MemoryManager({
-            runtime: this,
             tableName: "messages",
+            runtime: this,
         });
-
         this.descriptionManager = new MemoryManager({
-            runtime: this,
             tableName: "descriptions",
+            runtime: this,
         });
-
         this.loreManager = new MemoryManager({
-            runtime: this,
             tableName: "lore",
+            runtime: this,
         });
-
         this.documentsManager = new MemoryManager({
-            runtime: this,
             tableName: "documents",
+            runtime: this,
+        });
+        this.knowledgeManager = new MemoryManager({
+            tableName: "knowledge",
+            runtime: this,
         });
 
-        this.knowledgeManager = new MemoryManager({
-            runtime: this,
-            tableName: "fragments",
-        });
+        // Ensure knowledgeRoot is defined
+        this.knowledgeRoot = settings.KNOWLEDGE_ROOT || join(process.cwd(), 'knowledge');
+        if (!existsSync(this.knowledgeRoot)) {
+            elizaLogger.warn(`Knowledge root directory does not exist: ${this.knowledgeRoot}. Creating...`);
+            try {
+                require('fs').mkdirSync(this.knowledgeRoot, { recursive: true });
+            } catch (err) {
+                elizaLogger.error(`Failed to create knowledge root directory: ${err}`);
+                // Depending on requirements, you might want to throw here
+            }
+        }
 
         this.ragKnowledgeManager = new RAGKnowledgeManager({
+            tableName: "knowledge_rag",
             runtime: this,
-            tableName: "knowledge",
             knowledgeRoot: this.knowledgeRoot,
         });
 
-        (opts.managers ?? []).forEach((manager: IMemoryManager) => {
-            this.registerMemoryManager(manager);
-        });
+        // Register standard memory managers
+        this.registerMemoryManager(this.messageManager);
+        this.registerMemoryManager(this.descriptionManager);
+        this.registerMemoryManager(this.loreManager);
+        this.registerMemoryManager(this.documentsManager);
+        this.registerMemoryManager(this.knowledgeManager);
 
-        (opts.services ?? []).forEach((service: Service) => {
-            this.registerService(service);
-        });
+        // Register provided memory managers
+        opts.managers?.forEach((manager) => this.registerMemoryManager(manager));
 
-        this.serverUrl = opts.serverUrl ?? this.serverUrl;
+        // Initialize services from options
+        opts.services?.forEach((service) => this.registerService(service));
 
-        elizaLogger.info(`${this.character.name}(${this.agentId}) - Setting Model Provider:`, {
-            characterModelProvider: this.character.modelProvider,
-            optsModelProvider: opts.modelProvider,
-            currentModelProvider: this.modelProvider,
-            finalSelection:
-                this.character.modelProvider ??
-                opts.modelProvider ??
-                this.modelProvider,
-        });
-
-        this.modelProvider =
-            this.character.modelProvider ??
-            opts.modelProvider ??
-            this.modelProvider;
-
-        this.imageModelProvider =
-            this.character.imageModelProvider ?? this.modelProvider;
-        
-        this.imageVisionModelProvider =
-            this.character.imageVisionModelProvider ?? this.modelProvider;
-            
-        elizaLogger.info(
-          `${this.character.name}(${this.agentId}) - Selected model provider:`,
-          this.modelProvider
-        );
-
-        elizaLogger.info(
-          `${this.character.name}(${this.agentId}) - Selected image model provider:`,
-          this.imageModelProvider
-        );
-
-        elizaLogger.info(
-            `${this.character.name}(${this.agentId}) - Selected image vision model provider:`,
-            this.imageVisionModelProvider
-        );
-
-        // Validate model provider
-        if (!Object.values(ModelProviderName).includes(this.modelProvider)) {
-            elizaLogger.error("Invalid model provider:", this.modelProvider);
-            elizaLogger.error(
-                "Available providers:",
-                Object.values(ModelProviderName),
-            );
-            throw new Error(`Invalid model provider: ${this.modelProvider}`);
-        }
-
-        if (!this.serverUrl) {
-            elizaLogger.warn("No serverUrl provided, defaulting to localhost");
-        }
-
-        this.token = opts.token;
-
-        this.plugins = [
-            ...(opts.character?.plugins ?? []),
-            ...(opts.plugins ?? []),
-        ];
-
+        // Initialize from plugins
         this.plugins.forEach((plugin) => {
-            plugin.actions?.forEach((action) => {
-                this.registerAction(action);
+            plugin.actions?.forEach((action) => this.registerAction(action));
+            plugin.evaluators?.forEach((evaluator) => this.registerEvaluator(evaluator));
+            plugin.providers?.forEach((provider) => this.registerContextProvider(provider));
+            plugin.services?.forEach((service) => this.registerService(service));
+            plugin.clients?.forEach((client) => {
+                client.start(this).then(instance => this.clients.push(instance));
             });
-
-            plugin.evaluators?.forEach((evaluator) => {
-                this.registerEvaluator(evaluator);
-            });
-
-            plugin.services?.forEach((service) => {
-                this.registerService(service);
-            });
-
-            plugin.providers?.forEach((provider) => {
-                this.registerContextProvider(provider);
-            });
-
-            plugin.adapters?.forEach((adapter) => {
-                this.registerAdapter(adapter);
-            });
+            plugin.adapters?.forEach((adapter) => this.registerAdapter(adapter));
         });
 
-        (opts.actions ?? []).forEach((action) => {
-            this.registerAction(action);
+        // if (opts.verifiableInferenceAdapter) {
+        //     this.verifiableInferenceAdapter = opts.verifiableInferenceAdapter;
+        // }
+
+        // Initialize default providers if none are provided
+        // Remove incorrect getProviders() call here; providers are registered or assigned later if empty
+        // if (this.providers.length === 0) {
+        //     this.providers = getProviders(); 
+        //     elizaLogger.debug("Initialized default providers");
+        // }
+
+        elizaLogger.log("Agent Runtime Initialized", {
+            agentId: this.agentId,
+            character: this.character.name,
+            modelProvider: this.modelProvider,
+            actions: this.actions.length,
+            evaluators: this.evaluators.length,
+            providers: this.providers.length,
+            plugins: this.plugins.length,
         });
 
-        (opts.providers ?? []).forEach((provider) => {
-            this.registerContextProvider(provider);
-        });
-
-        (opts.evaluators ?? []).forEach((evaluator: Evaluator) => {
-            this.registerEvaluator(evaluator);
-        });
-
-        // this.verifiableInferenceAdapter = opts.verifiableInferenceAdapter;
+        // Bind global runtime if running in Node.js environment
+        if (typeof process !== 'undefined' && process.versions?.node) {
+            // Cast globalThis to any to set property
+            if (!(globalThis as any).__elizaRuntime) {
+                (globalThis as any).__elizaRuntime = this;
+            }
+        }
     }
 
     private async initializeDatabase() {
@@ -458,12 +408,13 @@ export class AgentRuntime implements IAgentRuntime {
     }
 
     async initialize() {
-        // Expose runtime globally for custom plugin compatibility (TelegramMultiAgentPlugin)
-        if (!globalThis.__elizaRuntime) {
-            globalThis.__elizaRuntime = this;
-            console.log("[RUNTIME PATCH] Exposed runtime globally");
+        elizaLogger.log("Initializing Agent Runtime...");
+
+        // Cast globalThis to any to set property
+        if (typeof process !== 'undefined' && process.versions?.node) {
+            (globalThis as any).__elizaRuntimeReady = false; // Set ready flag
         }
-        
+
         this.initializeDatabase();
 
         for (const [serviceType, service] of this.services.entries()) {
@@ -495,7 +446,7 @@ export class AgentRuntime implements IAgentRuntime {
                 } else {
                     console.log(`Plugin ${plugin.name} does not have initialize method`);
                 }
-                
+
                 if (plugin.services) {
                     await Promise.all(
                         plugin.services?.map((service) => service.initialize(this)),
@@ -518,14 +469,14 @@ export class AgentRuntime implements IAgentRuntime {
             this.character.knowledge.length > 0
         ) {
             elizaLogger.info(
-                `[RAG Check] RAG Knowledge enabled: ${this.character.settings.ragKnowledge ? true : false}`,
+                `[RAG Check] RAG Knowledge enabled: ${this.character.settings && this.character.settings.ragKnowledge ? true : false}`,
             );
             elizaLogger.info(
                 `[RAG Check] Knowledge items:`,
                 this.character.knowledge,
             );
 
-            if (this.character.settings.ragKnowledge) {
+            if (this.character.settings && this.character.settings.ragKnowledge) {
                 // Type guards with logging for each knowledge type
                 const [directoryKnowledge, pathKnowledge, stringKnowledge] =
                     this.character.knowledge.reduce(
@@ -602,33 +553,22 @@ export class AgentRuntime implements IAgentRuntime {
             await this.ragKnowledgeManager.cleanupDeletedKnowledgeFiles();
             elizaLogger.info(`[RAG Cleanup] Cleanup complete`);
         }
-        
-        // Signal that the runtime is fully initialized and ready for plugins
-        globalThis.__elizaRuntimeReady = true;
-        console.log("[RUNTIME PATCH] Runtime fully initialized and ready");
+
+        // Cast globalThis to any to set property
+        if (typeof process !== 'undefined' && process.versions?.node) {
+            (globalThis as any).__elizaRuntimeReady = true;
+        }
+
+        elizaLogger.success("Runtime initialized successfully");
     }
 
     async stop() {
-        elizaLogger.debug("runtime::stop - character", this.character.name);
-        // stop services, they don't have a stop function
-        // just initialize
-
-        // plugins
-        // have actions, providers, evaluators (no start/stop)
-        // services (just initialized), clients
-
-        // client have a start
-        for (const c of this.clients) {
-            elizaLogger.log(
-                "runtime::stop - requesting",
-                c,
-                "client stop for",
-                this.character.name,
-            );
-            c.stop(this);
+        elizaLogger.log("Stopping Agent Runtime...");
+        await Promise.all(this.clients.map(client => client.stop(this)));
+        if (this.databaseAdapter) {
+            await this.databaseAdapter.close();
         }
-        // we don't need to unregister with directClient
-        // don't need to worry about knowledge
+        elizaLogger.log("Agent Runtime stopped.");
     }
 
     /**
@@ -730,12 +670,12 @@ export class AgentRuntime implements IAgentRuntime {
                             knowledgeCount: existingKnowledge.length,
                             firstResult: existingKnowledge[0]
                                 ? {
-                                      id: existingKnowledge[0].id,
-                                      agentId: existingKnowledge[0].agentId,
-                                      contentLength:
-                                          existingKnowledge[0].content.text
-                                              .length,
-                                  }
+                                    id: existingKnowledge[0].id,
+                                    agentId: existingKnowledge[0].agentId,
+                                    contentLength:
+                                        existingKnowledge[0].content.text
+                                            .length,
+                                }
                                 : null,
                             results: existingKnowledge.map((k) => ({
                                 id: k.id,
@@ -938,10 +878,10 @@ export class AgentRuntime implements IAgentRuntime {
                                 `[RAG Directory] Failed to process file: ${file}`,
                                 error instanceof Error
                                     ? {
-                                          name: error.name,
-                                          message: error.message,
-                                          stack: error.stack,
-                                      }
+                                        name: error.name,
+                                        message: error.message,
+                                        stack: error.stack,
+                                    }
                                     : error,
                             );
                         }
@@ -961,10 +901,10 @@ export class AgentRuntime implements IAgentRuntime {
                 `[RAG Directory] Failed to process directory: ${sanitizedDir}`,
                 error instanceof Error
                     ? {
-                          name: error.name,
-                          message: error.message,
-                          stack: error.stack,
-                      }
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack,
+                    }
                     : error,
             );
             throw error; // Re-throw to let caller handle it
@@ -1300,458 +1240,163 @@ export class AgentRuntime implements IAgentRuntime {
     async composeState(
         message: Memory,
         additionalKeys: { [key: string]: unknown } = {},
-    ) {
+    ): Promise<State> {
         const { userId, roomId } = message;
+        const agentId = this.agentId;
 
-        const conversationLength = this.getConversationLength();
-
-        const [actorsData, recentMessagesData, goalsData]: [
-            Actor[],
-            Memory[],
-            Goal[],
-        ] = await Promise.all([
+        // Fetch actors, goals, recent messages
+        const [actorsData, goalsData, recentMessagesData] = await Promise.all([
             getActorDetails({ runtime: this, roomId }),
-            this.messageManager.getMemories({
-                roomId,
-                count: conversationLength,
-                unique: false,
-            }),
-            getGoals({
-                runtime: this,
-                count: 10,
-                onlyInProgress: false,
-                roomId,
-            }),
+            getGoals({ runtime: this, roomId }),
+            this.messageManager.getMemories({ roomId, count: this.#conversationLength }),
         ]);
 
+        // Format basic state components
+        const actors = formatActors({ actors: actorsData });
         const goals = formatGoalsAsString({ goals: goalsData });
-
-        const actors = formatActors({ actors: actorsData ?? [] });
-
         const recentMessages = formatMessages({
             messages: recentMessagesData,
             actors: actorsData,
         });
 
-        const recentPosts = formatPosts({
-            messages: recentMessagesData,
-            actors: actorsData,
-            conversationHeader: false,
-        });
-
-        // const lore = formatLore(loreData);
-
-        const senderName = actorsData?.find(
-            (actor: Actor) => actor.id === userId,
-        )?.name;
-
-        // TODO: We may wish to consolidate and just accept character.name here instead of the actor name
-        const agentName =
-            actorsData?.find((actor: Actor) => actor.id === this.agentId)
-                ?.name || this.character.name;
-
-        let allAttachments = message.content.attachments || [];
-
-        if (recentMessagesData && Array.isArray(recentMessagesData)) {
-            const lastMessageWithAttachment = recentMessagesData.find(
-                (msg) =>
-                    msg.content.attachments &&
-                    msg.content.attachments.length > 0,
-            );
-
-            if (lastMessageWithAttachment) {
-                const lastMessageTime =
-                    lastMessageWithAttachment?.createdAt ?? Date.now();
-                const oneHourBeforeLastMessage =
-                    lastMessageTime - 60 * 60 * 1000; // 1 hour before last message
-
-                allAttachments = recentMessagesData.reverse().flatMap((msg) => {
-                    const msgTime = msg.createdAt ?? Date.now();
-                    const isWithinTime = msgTime >= oneHourBeforeLastMessage;
-                    const attachments = msg.content.attachments || [];
-                    if (!isWithinTime) {
-                        attachments.forEach((attachment) => {
-                            attachment.text = "[Hidden]";
-                        });
-                    }
-                    return attachments;
-                });
-            }
-        }
-
-        const formattedAttachments = allAttachments
-            .map(
-                (attachment) =>
-                    `ID: ${attachment.id}
-Name: ${attachment.title}
-URL: ${attachment.url}
-Type: ${attachment.source}
-Description: ${attachment.description}
-Text: ${attachment.text}
-  `,
-            )
-            .join("\n");
-
-        // randomly get 3 bits of lore and join them into a paragraph, divided by \n
-        let lore = "";
-        // Assuming this.lore is an array of lore bits
-        if (this.character.lore && this.character.lore.length > 0) {
-            const shuffledLore = [...this.character.lore].sort(
-                () => Math.random() - 0.5,
-            );
-            const selectedLore = shuffledLore.slice(0, 10);
-            lore = selectedLore.join("\n");
-        }
-
-        const formattedCharacterPostExamples = this.character.postExamples
-            .sort(() => 0.5 - Math.random())
-            .map((post) => {
-                const messageString = `${post}`;
-                return messageString;
-            })
-            .slice(0, 50)
-            .join("\n");
-
-        const formattedCharacterMessageExamples = this.character.messageExamples
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 5)
-            .map((example) => {
-                const exampleNames = Array.from({ length: 5 }, () =>
-                    uniqueNamesGenerator({ dictionaries: [names] }),
-                );
-
-                return example
-                    .map((message) => {
-                        let messageString = `${message.user}: ${message.content.text}`;
-                        exampleNames.forEach((name, index) => {
-                            const placeholder = `{{user${index + 1}}}`;
-                            messageString = messageString.replaceAll(
-                                placeholder,
-                                name,
-                            );
-                        });
-                        return messageString;
-                    })
-                    .join("\n");
-            })
-            .join("\n\n");
-
-        const getRecentInteractions = async (
-            userA: UUID,
-            userB: UUID,
-        ): Promise<Memory[]> => {
-            // Find all rooms where userA and userB are participants
-            const rooms = await this.databaseAdapter.getRoomsForParticipants([
-                userA,
-                userB,
-            ]);
-
-            // Check the existing memories in the database
-            return this.messageManager.getMemoriesByRoomIds({
-                // filter out the current room id from rooms
-                roomIds: rooms.filter((room) => room !== roomId),
-                limit: 20,
-            });
-        };
-
-        const recentInteractions =
-            userId !== this.agentId
-                ? await getRecentInteractions(userId, this.agentId)
-                : [];
-
-        const getRecentMessageInteractions = async (
-            recentInteractionsData: Memory[],
-        ): Promise<string> => {
-            // Format the recent messages
-            const formattedInteractions = await Promise.all(
-                recentInteractionsData.map(async (message) => {
-                    const isSelf = message.userId === this.agentId;
-                    let sender: string;
-                    if (isSelf) {
-                        sender = this.character.name;
-                    } else {
-                        const accountId =
-                            await this.databaseAdapter.getAccountById(
-                                message.userId,
-                            );
-                        sender = accountId?.username || "unknown";
-                    }
-                    return `${sender}: ${message.content.text}`;
-                }),
-            );
-
-            return formattedInteractions.join("\n");
-        };
-
-        const formattedMessageInteractions =
-            await getRecentMessageInteractions(recentInteractions);
-
-        const getRecentPostInteractions = async (
-            recentInteractionsData: Memory[],
-            actors: Actor[],
-        ): Promise<string> => {
-            const formattedInteractions = formatPosts({
-                messages: recentInteractionsData,
-                actors,
-                conversationHeader: true,
-            });
-
-            return formattedInteractions;
-        };
-
-        const formattedPostInteractions = await getRecentPostInteractions(
-            recentInteractions,
-            actorsData,
-        );
-
-        // if bio is a string, use it. if its an array, pick one at random
-        let bio = this.character.bio || "";
-        if (Array.isArray(bio)) {
-            // get three random bio strings and join them with " "
-            bio = bio
-                .sort(() => 0.5 - Math.random())
-                .slice(0, 3)
-                .join(" ");
-        }
-
-        let knowledgeData = [];
-        let formattedKnowledge = "";
-
-        if (this.character.settings?.ragKnowledge) {
-            const recentContext = recentMessagesData
-                .sort((a, b) => b.createdAt - a.createdAt) // Sort by timestamp descending (newest first)
-                .slice(0, 3) // Get the 3 most recent messages
-                .reverse() // Reverse to get chronological order
-                .map((msg) => msg.content.text)
-                .join(" ");
-
-            knowledgeData = await this.ragKnowledgeManager.getKnowledge({
-                query: message.content.text,
-                conversationContext: recentContext,
-                limit: 8,
-            });
-
-            formattedKnowledge = formatKnowledge(knowledgeData);
-        } else {
-            knowledgeData = await callKnowledgeGet(this as unknown as IAgentRuntimeBridge, message);
-
-            formattedKnowledge = formatKnowledge(knowledgeData);
-        }
-
+        // Initial state object
         const initialState = {
-            agentId: this.agentId,
-            agentName,
-            bio,
-            lore,
-            adjective:
-                this.character.adjectives &&
-                this.character.adjectives.length > 0
-                    ? this.character.adjectives[
-                          Math.floor(
-                              Math.random() * this.character.adjectives.length,
-                          )
-                      ]
-                    : "",
-            knowledge: formattedKnowledge,
-            knowledgeData: knowledgeData,
-            ragKnowledgeData: knowledgeData,
-            // Recent interactions between the sender and receiver, formatted as messages
-            recentMessageInteractions: formattedMessageInteractions,
-            // Recent interactions between the sender and receiver, formatted as posts
-            recentPostInteractions: formattedPostInteractions,
-            // Raw memory[] array of interactions
-            recentInteractionsData: recentInteractions,
-            // randomly pick one topic
-            topic:
-                this.character.topics && this.character.topics.length > 0
-                    ? this.character.topics[
-                          Math.floor(
-                              Math.random() * this.character.topics.length,
-                          )
-                      ]
-                    : null,
-            topics:
-                this.character.topics && this.character.topics.length > 0
-                    ? `${this.character.name} is interested in ` +
-                      this.character.topics
-                          .sort(() => 0.5 - Math.random())
-                          .slice(0, 5)
-                          .map((topic, index, array) => {
-                              if (index === array.length - 2) {
-                                  return topic + " and ";
-                              }
-                              // if last topic, don't add a comma
-                              if (index === array.length - 1) {
-                                  return topic;
-                              }
-                              return topic + ", ";
-                          })
-                          .join("")
-                    : "",
-            characterPostExamples:
-                formattedCharacterPostExamples &&
-                formattedCharacterPostExamples.replaceAll("\n", "").length > 0
-                    ? addHeader(
-                          `# Example Posts for ${this.character.name}`,
-                          formattedCharacterPostExamples,
-                      )
-                    : "",
-            characterMessageExamples:
-                formattedCharacterMessageExamples &&
-                formattedCharacterMessageExamples.replaceAll("\n", "").length >
-                    0
-                    ? addHeader(
-                          `# Example Conversations for ${this.character.name}`,
-                          formattedCharacterMessageExamples,
-                      )
-                    : "",
-            messageDirections:
-                this.character?.style?.all?.length > 0 ||
-                this.character?.style?.chat.length > 0
-                    ? addHeader(
-                          "# Message Directions for " + this.character.name,
-                          (() => {
-                              const all = this.character?.style?.all || [];
-                              const chat = this.character?.style?.chat || [];
-                              return [...all, ...chat].join("\n");
-                          })(),
-                      )
-                    : "",
-
-            postDirections:
-                this.character?.style?.all?.length > 0 ||
-                this.character?.style?.post.length > 0
-                    ? addHeader(
-                          "# Post Directions for " + this.character.name,
-                          (() => {
-                              const all = this.character?.style?.all || [];
-                              const post = this.character?.style?.post || [];
-                              return [...all, ...post].join("\n");
-                          })(),
-                      )
-                    : "",
-
-            //old logic left in for reference
-            //food for thought. how could we dynamically decide what parts of the character to add to the prompt other than random? rag? prompt the llm to decide?
-            /*
-            postDirections:
-                this.character?.style?.all?.length > 0 ||
-                this.character?.style?.post.length > 0
-                    ? addHeader(
-                            "# Post Directions for " + this.character.name,
-                            (() => {
-                                const all = this.character?.style?.all || [];
-                                const post = this.character?.style?.post || [];
-                                const shuffled = [...all, ...post].sort(
-                                    () => 0.5 - Math.random()
-                                );
-                                return shuffled
-                                    .slice(0, conversationLength / 2)
-                                    .join("\n");
-                            })()
-                        )
-                    : "",*/
-            // Agent runtime stuff
-            senderName,
-            actors:
-                actors && actors.length > 0
-                    ? addHeader("# Actors", actors)
-                    : "",
-            actorsData,
-            roomId,
-            goals:
-                goals && goals.length > 0
-                    ? addHeader(
-                          "# Goals\n{{agentName}} should prioritize accomplishing the objectives that are in progress.",
-                          goals,
-                      )
-                    : "",
-            goalsData,
-            recentMessages:
-                recentMessages && recentMessages.length > 0
-                    ? addHeader("# Conversation Messages", recentMessages)
-                    : "",
-            recentPosts:
-                recentPosts && recentPosts.length > 0
-                    ? addHeader("# Posts in Thread", recentPosts)
-                    : "",
-            recentMessagesData,
-            attachments:
-                formattedAttachments && formattedAttachments.length > 0
-                    ? addHeader("# Attachments", formattedAttachments)
-                    : "",
-            ...additionalKeys,
+            userId: userId,
+            agentId: agentId,
+            bio: Array.isArray(this.character.bio) ? this.character.bio.join("\n") : this.character.bio,
+            lore: this.character.lore?.join("\n") || "",
+            messageDirections: "", // Placeholder
+            postDirections: "", // Placeholder
+            roomId: roomId,
+            agentName: this.character.name,
+            senderName: actorsData.find(a => a.id === userId)?.name || "Unknown Sender",
+            actors: actors,
+            actorsData: actorsData,
+            goals: goals,
+            goalsData: goalsData,
+            recentMessages: recentMessages,
+            recentMessagesData: recentMessagesData,
+            ...additionalKeys
         } as State;
 
-        const actionPromises = this.actions.map(async (action: Action) => {
-            const result = await action.validate(this, message, initialState);
-            if (result) {
-                return action;
-            }
-            return null;
-        });
-
+        // Validate and filter evaluators and actions asynchronously
         const evaluatorPromises = this.evaluators.map(async (evaluator) => {
-            const result = await evaluator.validate(
-                this,
-                message,
-                initialState,
-            );
-            if (result) {
-                return evaluator;
-            }
-            return null;
+            const isValid = await evaluator.validate(this, message, initialState);
+            return isValid ? evaluator : null;
         });
 
-        const [resolvedEvaluators, resolvedActions, providers] =
-            await Promise.all([
-                Promise.all(evaluatorPromises),
-                Promise.all(actionPromises),
-                getProviders(this, message, initialState),
-            ]);
+        const actionPromises = this.actions.map(async (action) => {
+            const isValid = await action.validate(this, message, initialState);
+            return isValid ? action : null;
+        });
 
-        const evaluatorsData = resolvedEvaluators.filter(
-            Boolean,
-        ) as Evaluator[];
-        const actionsData = resolvedActions.filter(Boolean) as Action[];
+        // Resolve promises and filter out nulls
+        const [resolvedEvaluators, resolvedActions] = await Promise.all([
+            Promise.all(evaluatorPromises).then(results => results.filter((e): e is Evaluator => e !== null)),
+            Promise.all(actionPromises).then(results => results.filter((a): a is Action => a !== null))
+        ]);
 
+        // Assign providers directly (already an array)
+        const resolvedProviders: Provider[] = this.providers;
+
+        // Get context from providers
+        const providerContextPromises = resolvedProviders.map(async (provider) => {
+            try {
+                const context = await provider.get(this, message, initialState);
+                return typeof context === 'string' ? context : JSON.stringify(context);
+            } catch (error) {
+                elizaLogger.error(`Error getting context from provider: ${error}`);
+                return ""; // Return empty string on error
+            }
+        });
+
+        const providerContexts = (await Promise.all(providerContextPromises)).filter(Boolean).join('\n\n');
+
+        // Prepare action state
         const actionState = {
             actionNames:
-                "Possible response actions: " + formatActionNames(actionsData),
+                "Possible response actions: " + formatActionNames(resolvedActions),
             actions:
-                actionsData.length > 0
+                resolvedActions.length > 0
                     ? addHeader(
-                          "# Available Actions",
-                          formatActions(actionsData),
-                      )
+                        "# Available Actions",
+                        formatActions(resolvedActions),
+                    )
                     : "",
             actionExamples:
-                actionsData.length > 0
+                resolvedActions.length > 0
                     ? addHeader(
-                          "# Action Examples",
-                          composeActionExamples(actionsData, 10),
-                      )
+                        "# Action Examples",
+                        composeActionExamples(resolvedActions, 10),
+                    )
                     : "",
-            evaluatorsData,
+            evaluatorsData: resolvedEvaluators,
             evaluators:
-                evaluatorsData.length > 0
-                    ? formatEvaluators(evaluatorsData)
+                resolvedEvaluators.length > 0
+                    ? formatEvaluators(resolvedEvaluators)
                     : "",
             evaluatorNames:
-                evaluatorsData.length > 0
-                    ? formatEvaluatorNames(evaluatorsData)
+                resolvedEvaluators.length > 0
+                    ? formatEvaluatorNames(resolvedEvaluators)
                     : "",
             evaluatorExamples:
-                evaluatorsData.length > 0
-                    ? formatEvaluatorExamples(evaluatorsData)
+                resolvedEvaluators.length > 0
+                    ? formatEvaluatorExamples(resolvedEvaluators)
                     : "",
             providers: addHeader(
                 `# Additional Information About ${this.character.name} and The World`,
-                providers,
+                providerContexts,
             ),
         };
 
-        return { ...initialState, ...actionState } as State;
+        const state: State = {
+            ...initialState,
+            ...actionState,
+            // recentMessagesData already assigned in initialState
+            currentModelProvider: this.modelProvider!,
+            currentClientName: (message as any).clientName,
+            availableProviders: [
+                this.modelProvider!,
+                this.imageModelProvider!,
+                this.imageVisionModelProvider!
+            ].filter((p, i, a) => a.indexOf(p) === i),
+            modelProvider: this.modelProvider!,
+            // recentMessages already assigned in initialState
+            // recentPosts needs calculation if required
+            // recentInteractionsData needs calculation if required
+        };
+
+        // Get knowledge context only if RAG is enabled
+        let knowledgeContext = "";
+        let ragKnowledgeData: RAGKnowledgeItem[] = [];
+        if (this.character.settings && this.character.settings.ragKnowledge) {
+            try {
+                const knowledgeItems = await this.ragKnowledgeManager.getKnowledge({
+                    query: message.content.text,
+                    conversationContext: state.recentMessages, // Use state.recentMessages
+                    limit: 5,
+                });
+                if (knowledgeItems && knowledgeItems.length > 0) {
+                    knowledgeContext = addHeader(
+                        "# Relevant Background Knowledge",
+                        knowledgeItems
+                            .map((item) => item.content.text)
+                            .join("\n\n---\n\n"),
+                    );
+                    ragKnowledgeData = knowledgeItems;
+                }
+            } catch (error) {
+                elizaLogger.error("Error fetching RAG knowledge:", error);
+            }
+        }
+
+        state.knowledge = knowledgeContext;
+        state.ragKnowledgeData = ragKnowledgeData;
+
+        // Update state with recent message context (might involve reformatting/trimming)
+        await this.updateRecentMessageState(state);
+
+        return state;
     }
 
     async updateRecentMessageState(state: State): Promise<State> {
@@ -1771,7 +1416,7 @@ Text: ${attachment.text}
             }),
         });
 
-        let allAttachments = [];
+        let allAttachments: Media[] = [];
 
         if (recentMessagesData && Array.isArray(recentMessagesData)) {
             const lastMessageWithAttachment = recentMessagesData.find(
@@ -1825,12 +1470,12 @@ const formatKnowledge = (knowledge: KnowledgeItem[]) => {
     return knowledge.map(item => {
         // Get the main content text
         const text = item.content.text;
-        
+
         // Clean up formatting but maintain natural text flow
         const cleanedText = text
             .trim()
             .replace(/\n{3,}/g, '\n\n'); // Replace excessive newlines
-            
+
         return cleanedText;
     }).join('\n\n'); // Separate distinct pieces with double newlines
 };

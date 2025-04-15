@@ -172,6 +172,11 @@ export class MemoryManager implements IMemoryManager {
     async createMemory(memory: Memory, unique = false): Promise<void> {
         // TODO: check memory.agentId == this.runtime.agentId
 
+        if (!memory.id) {
+            elizaLogger.warn("Attempted to check existence of memory without an ID.");
+            return; // Cannot check existence without an ID
+        }
+
         const existingMessage =
             await this.runtime.databaseAdapter.getMemoryById(memory.id);
 

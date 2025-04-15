@@ -10,7 +10,7 @@ class LocalEmbeddingModelManager {
     private initPromise: Promise<void> | null = null;
     private initializationLock = false;
 
-    private constructor() {}
+    private constructor() { }
 
     public static getInstance(): LocalEmbeddingModelManager {
         if (!LocalEmbeddingModelManager.instance) {
@@ -21,11 +21,23 @@ class LocalEmbeddingModelManager {
     }
 
     private async getRootPath(): Promise<string> {
-        const { filename: __filename, dirname: __dirname } = getModulePath();
-        const rootPath = path.resolve(__dirname, "..");
-        return rootPath.includes("/eliza/")
-            ? rootPath.split("/eliza/")[0] + "/eliza/"
-            : path.resolve(__dirname, "..");
+        const modulePaths = getModulePath();
+        const effectiveDirname = modulePaths.dirname; // Use dirname directly first
+
+        let resolvedPath: string;
+        if (effectiveDirname) {
+            resolvedPath = path.resolve(effectiveDirname, "..");
+        } else {
+            // Fallback if dirname from getModulePath is null
+            resolvedPath = path.resolve(process.cwd()); // Use current working directory
+            console.warn("Could not resolve dirname via getModulePath, falling back to process.cwd() for getRootPath.");
+        }
+
+        // The check for /eliza/ might be specific to the deployment environment
+        // Consider if this logic is still needed or can be simplified
+        return resolvedPath.includes("/eliza/")
+            ? resolvedPath.split("/eliza/")[0] + "/eliza/"
+            : resolvedPath;
     }
 
     public async initialize(): Promise<void> {
@@ -71,7 +83,8 @@ class LocalEmbeddingModelManager {
 
         try {
             const fs = await import("fs");
-            const cacheDir = (await this.getRootPath()) + "/cache/";
+            const rootPath = await this.getRootPath();
+            const cacheDir = rootPath + "/cache/";
 
             if (!fs.existsSync(cacheDir)) {
                 fs.mkdirSync(cacheDir, { recursive: true });

@@ -7,6 +7,8 @@ import {
     type Memory,
     ModelClass,
     type Evaluator,
+    type Objective,
+    type State,
 } from "@elizaos/core/public-api";
 
 export const formatFacts = (facts: Memory[]) => {

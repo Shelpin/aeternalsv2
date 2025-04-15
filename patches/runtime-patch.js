@@ -131,5 +131,26 @@ const runtime = {
 
 console.log('✅ Valhalla runtime patch applied');
 
+// Assign to global scope
+if (typeof globalThis !== 'undefined') {
+  console.log('🔧 Attempting assignment to globalThis.__elizaRuntime...');
+  globalThis.__elizaRuntime = runtime;
+  console.log(`✅ Runtime assigned to globalThis.__elizaRuntime. Type: ${typeof globalThis.__elizaRuntime}`);
+} else {
+  console.warn('⚠️ globalThis not available, cannot assign runtime globally.');
+}
+
 // Export the runtime
 export { runtime };
+
+// Add an applyPatch function if it's expected by the caller
+// This might be missing, causing the runtime variable in apply-patches.js to be undefined
+export async function applyPatch() {
+  console.log('🔧 runtime-patch.js: applyPatch() called');
+  // Ensure global assignment happens if needed
+  if (typeof globalThis !== 'undefined' && !globalThis.__elizaRuntime) {
+    globalThis.__elizaRuntime = runtime;
+    console.log('✅ Runtime assigned globally from applyPatch()');
+  }
+  return runtime; // Return the runtime instance
+}

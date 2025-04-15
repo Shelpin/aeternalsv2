@@ -12,6 +12,9 @@
     "paths": {
       "@elizaos/core/*": [
         "../core/src/*"
+      ],
+      "@elizaos/clients/telegram/*": [
+        "../clients/telegram/src/*"
       ]
     }
   },

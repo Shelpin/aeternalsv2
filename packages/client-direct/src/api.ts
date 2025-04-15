@@ -7,19 +7,20 @@ import fs from "fs";
 
 import {
     type AgentRuntime,
+    type IAgentRuntime,
     elizaLogger,
     getEnvVariable,
     type UUID,
     validateCharacterConfig,
     ServiceType,
     type Character,
-} from "@elizaos/core";
+    validateUuid
+} from "@elizaos/core/public-api";
 
 // import type { TeeLogQuery, TeeLogService } from "@elizaos/plugin-tee-log";
 // import { REST, Routes } from "discord.js";
 // Remove direct import from index to break circular dependency
 // import type { DirectClient } from ".";
-import { validateUuid } from "@elizaos/core";
 
 interface UUIDParams {
     agentId: UUID;

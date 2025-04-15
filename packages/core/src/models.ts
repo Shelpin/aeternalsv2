@@ -1227,25 +1227,18 @@ export function getModelSettings(
     provider: ModelProviderName,
     type: ModelClass
 ): ModelSettings | undefined {
-    return models[provider]?.model[type] as ModelSettings | undefined;
+    return models[provider as keyof typeof models]?.model[type] as ModelSettings | undefined;
 }
 
-export function getImageModelSettings(
-    provider: ModelProviderName
-): ImageModelSettings | undefined {
-    return models[provider]?.model[ModelClass.IMAGE] as
-        | ImageModelSettings
-        | undefined;
-}
 
 export function getEmbeddingModelSettings(
     provider: ModelProviderName
 ): EmbeddingModelSettings | undefined {
-    return models[provider]?.model[ModelClass.EMBEDDING] as
+    return models[provider as keyof typeof models]?.model[ModelClass.EMBEDDING] as
         | EmbeddingModelSettings
         | undefined;
 }
 
 export function getEndpoint(provider: ModelProviderName) {
-    return models[provider].endpoint;
+    return models[provider as keyof typeof models].endpoint;
 }

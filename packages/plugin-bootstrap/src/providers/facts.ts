@@ -5,7 +5,7 @@ import {
     type AgentRuntime as IAgentRuntime,
 } from "@elizaos/core/public-api";
 import type { Memory, Provider, State } from "@elizaos/core/public-api";
-import { formatFacts } from "../evaluators/fact";
+import { formatFacts } from "../evaluators/fact.js";
 
 const factsProvider: Provider = {
     get: async (runtime: IAgentRuntime, message: Memory, state?: State) => {

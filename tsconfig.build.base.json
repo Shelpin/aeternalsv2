@@ -1,12 +1,12 @@
 {
     "compilerOptions": {
         "target": "es2022",
-        "module": "NodeNext",
+        "module": "ESNext",
         "lib": [
             "es2022",
             "dom"
         ],
-        "moduleResolution": "NodeNext",
+        "moduleResolution": "Bundler",
         "declaration": true,
         "emitDeclarationOnly": true,
         "declarationMap": true,

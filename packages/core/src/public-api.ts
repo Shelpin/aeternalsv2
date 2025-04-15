@@ -25,40 +25,63 @@ export type {
   Adapter,
   Provider,
   State,
-  KnowledgeManager
+  KnowledgeManager,
+  // Types required by plugin-bootstrap
+  Action,
+  ActionExample,
+  HandlerCallback, // Renamed from Handler for clarity, assuming ./types
+  Objective,
+  Evaluator, // Added from ./types
+  IMemoryManager, // Export the interface
+  // ADDED missing types used by adapter-sqlite
+  Relationship,
+  ChunkRow
 } from "./types";
 
-// Re-export values that are needed by dependent packages
-export { ModelProviderName, CacheStore } from "./types";
+// Re-export specific value constants needed
+export { ModelProviderName, CacheStore, ModelClass } from "./types";
 
-// Temporary re-exports for backward compatibility
-// Note: These should be moved to appropriate public API modules in the future
-export { composeContext } from "./context";
-export { elizaLogger } from "./logger";
-export { generateMessageResponse, generateTrueOrFalse } from "./generation";
+// Export context utilities (correct path)
+export { composeContext } from './context';
+
+// Export logger (correct path)
+export { elizaLogger } from './logger';
+
+// Export footer and parsing utilities (correct path)
+export { booleanFooter, messageCompletionFooter, parseJsonArrayFromText, parseBooleanFromText } from './parsing';
+
+// Export provider/context functionality (correct paths)
+export { embed } from './embedding';
+export { formatMessages } from './messages';
+
+// Export generation functions (assuming path)
+export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from "./generation";
+
+// Existing value exports
 export { getGoals } from "./goals";
 export { AgentRuntime } from "./runtime";
-
-// Export common functions
+export { getModulePath } from "./utils/module-path";
 export { default as knowledge } from "./knowledge";
 
-// Export additional types for dependent packages
-export type { generateText } from './generation';
-export { parseJsonArrayFromText, parseBooleanFromText } from './parsing';
+// Export MemoryManager implementation (assuming from ./memory)
+export { MemoryManager } from './memory';
 
 // API types
 export type { IAgentRuntimeBridge } from './api/types';
-export type { IMemoryManager } from './api/types';
 export type { AgentLogLevel, IAgentLogger } from './api/types';
 
-// Add stubs for missing exports
-// These will be implemented properly in a future update
-export const CacheManager = {};
-export const DbCacheAdapter = {};
-export const FsCacheAdapter = {};
-export const settings = {};
-export const stringToUuid = (str: string) => str;
-export const validateCharacterConfig = (config: any) => true;
+// Stubs - Review if these are still needed or can be removed/implemented
+export const CacheManager = {}; // Placeholder
+export const DbCacheAdapter = {}; // Placeholder
+export const FsCacheAdapter = {}; // Placeholder
+export const settings = {}; // Placeholder
+export const stringToUuid = (str: string) => str; // Placeholder
+export const validateCharacterConfig = (config: any) => true; // Placeholder
 
-// Note: Removed duplicate exports of MemoryManager, generateText, and parseJsonArrayFromText
-// Note: Removed duplicate section with agent imports due to missing module 
+// ADDED DatabaseAdapter class export
+export { DatabaseAdapter } from './database';
+
+// Remove the duplicated/old export sections entirely
+// // --- REMOVE SECTION START ---
+// // ... (all code from the REMOVE SECTION START comment to REMOVE SECTION END comment)
+// // --- REMOVE SECTION END --- 

@@ -33,8 +33,7 @@ import Database from "better-sqlite3";
 
 export class SqliteDatabaseAdapter
     extends DatabaseAdapter<BetterSqlite3Database>
-    implements IDatabaseCacheAdapter
-{
+    implements IDatabaseCacheAdapter {
     async getRoom(roomId: UUID): Promise<UUID | null> {
         const sql = "SELECT id FROM rooms WHERE id = ?";
         const room = this.db.prepare(sql).get(roomId) as
@@ -86,7 +85,7 @@ export class SqliteDatabaseAdapter
     constructor(db: BetterSqlite3Database) {
         super();
         this.db = db;
-        load(db);
+        load(this.db);
     }
 
     async init() {
@@ -1067,10 +1066,10 @@ export class SqliteDatabaseAdapter
                 error:
                     error instanceof Error
                         ? {
-                              message: error.message,
-                              stack: error.stack,
-                              name: error.name,
-                          }
+                            message: error.message,
+                            stack: error.stack,
+                            name: error.name,
+                        }
                         : error,
             });
             throw error;

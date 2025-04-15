@@ -1,3 +1,3 @@
-export * from "./boredom";
-export * from "./time";
-export * from "./facts";
+export * from "./boredom.js";
+export * from "./time.js";
+export * from "./facts.js";
