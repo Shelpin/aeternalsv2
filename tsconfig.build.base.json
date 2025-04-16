@@ -1,32 +1,26 @@
 {
     "compilerOptions": {
-        "target": "ES2022",
-        "module": "NodeNext",
-        "moduleResolution": "NodeNext",
-        "esModuleInterop": true,
-        "forceConsistentCasingInFileNames": true,
-        "strict": true,
-        "skipLibCheck": true,
+        "target": "es2022",
+        "module": "ESNext",
+        "lib": [
+            "es2022",
+            "dom"
+        ],
+        "moduleResolution": "Bundler",
         "declaration": true,
+        "emitDeclarationOnly": true,
         "declarationMap": true,
         "sourceMap": true,
-        "composite": true,
-        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
         "allowSyntheticDefaultImports": true,
-        "types": [
-            "node",
-            "jest"
-        ],
-        "paths": {
-            "@elizaos/*": [
-                "./packages/*"
-            ]
-        }
+        "strict": true,
+        "isolatedModules": true,
+        "resolveJsonModule": true
     },
     "exclude": [
-        "**/dist",
+        "dist",
         "**/*.test.ts",
-        "**/__tests__/**",
-        "**/node_modules"
+        "node_modules"
     ]
 }

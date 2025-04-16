@@ -4,11 +4,11 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "declarationDir": "dist",
-    "composite": true,
-    "tsBuildInfoFile": "./dist/.tsbuildinfo",
+    "moduleResolution": "node",
+    "baseUrl": ".",
     "paths": {
       "@elizaos/core": [
-        "../core/src"
+        "../../core/dist"
       ]
     }
   },
@@ -16,9 +16,6 @@
     "src/**/*"
   ],
   "exclude": [
-    "dist",
-    "**/*.test.ts",
-    "**/__tests__/**",
     "node_modules"
   ]
 }

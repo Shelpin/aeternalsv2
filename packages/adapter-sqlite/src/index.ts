@@ -30,22 +30,10 @@ import { load } from "./sqlite_vec";
 import { sqliteTables } from "./sqliteTables";
 
 import Database from "better-sqlite3";
-import { initializeSqliteSchema } from './sqliteTables.js';
-import { load as loadVectorExtension } from './sqlite_vec.js';
 
 export class SqliteDatabaseAdapter
     extends DatabaseAdapter<BetterSqlite3Database>
     implements IDatabaseCacheAdapter {
-
-    public db: Database.Database;
-
-    constructor(dbPath: string) {
-        super();
-        this.db = new Database(dbPath);
-        initializeSqliteSchema(this.db);
-        loadVectorExtension(this.db);
-    }
-
     async getRoom(roomId: UUID): Promise<UUID | null> {
         const sql = "SELECT id FROM rooms WHERE id = ?";
         const room = this.db.prepare(sql).get(roomId) as
@@ -92,6 +80,12 @@ export class SqliteDatabaseAdapter
             "UPDATE participants SET userState = ? WHERE roomId = ? AND userId = ?"
         );
         stmt.run(state, roomId, userId);
+    }
+
+    constructor(db: BetterSqlite3Database) {
+        super();
+        this.db = db;
+        load(this.db);
     }
 
     async init() {
@@ -570,7 +564,7 @@ export class SqliteDatabaseAdapter
         count?: number;
     }): Promise<Goal[]> {
         let sql = "SELECT * FROM goals WHERE roomId = ?";
-        const queryParams: any[] = [params.roomId];
+        const queryParams = [params.roomId];
 
         if (params.userId) {
             sql += " AND userId = ?";
@@ -583,7 +577,8 @@ export class SqliteDatabaseAdapter
 
         if (params.count) {
             sql += " LIMIT ?";
-            queryParams.push(params.count);
+            // @ts-expect-error - queryParams is an array of strings
+            queryParams.push(params.count.toString());
         }
 
         const goals = this.db.prepare(sql).all(...queryParams) as Goal[];
@@ -1107,7 +1102,7 @@ const sqliteDatabaseAdapter: Adapter = {
 
         const filePath = runtime.getSetting("SQLITE_FILE") ?? path.resolve(dataDir, "db.sqlite");
         elizaLogger.info(`Initializing SQLite database at ${filePath}...`);
-        const db = new SqliteDatabaseAdapter(filePath);
+        const db = new SqliteDatabaseAdapter(new Database(filePath));
 
         // Test the connection
         db.init()

@@ -22,9 +22,10 @@
   },
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "pnpm exec tsup"
+    "build": "pnpm exec tsup --config tsup.config.ts && pnpm exec tsc -p tsconfig.declaration.json --emitDeclarationOnly"
   },
   "dependencies": {
+    "@elizaos/adapter-sqlite": "workspace:*",
     "@fal-ai/client": "1.3.0",
     "fastembed": "1.14.4",
     "js-tiktoken": "1.0.19",

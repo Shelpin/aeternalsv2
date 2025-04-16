@@ -3,4 +3,4 @@
  * This file re-exports the public API from the package
  */
 
-export * from './index.js'; 
+export * from './index'; 

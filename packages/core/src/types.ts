@@ -8,40 +8,6 @@ import type { Readable } from "stream";
 export type UUID = `${string}-${string}-${string}-${string}-${string}`;
 
 /**
- * Plugin interface for extending agent functionality
- */
-export interface Plugin {
-    /** Plugin name */
-    name: string;
-    /** Plugin description */
-    description: string;
-    /** Plugin npm name */
-    npmName?: string;
-    /** Plugin configuration */
-    config?: { [key: string]: any };
-    /** Optional default export */
-    default?: any;
-    /** Custom behaviors */
-    actions?: Action[];
-    /** Data providers */
-    providers?: Provider[];
-    /** Response assessment */
-    evaluators?: Evaluator[];
-    /** Background processes */
-    services?: Service[];
-    /** Platform integrations */
-    clients?: Client[];
-    /** Database/cache adapters */
-    adapters?: Adapter[];
-    /** Optional initialize method */
-    initialize?: () => Promise<void>;
-    /** Optional shutdown method */
-    shutdown?: () => Promise<void>;
-    /** Optional post character processor handler */
-    handlePostCharacterLoaded?: (char: Character) => Promise<Character>;
-}
-
-/**
  * Represents the content of a message or communication
  */
 export interface Content {
@@ -681,6 +647,53 @@ export type Client = {
 export type Adapter = {
     /** Initialize the adapter */
     init: (runtime: IAgentRuntime) => IDatabaseAdapter & IDatabaseCacheAdapter;
+};
+
+/**
+ * Plugin for extending agent functionality
+ */
+export type Plugin = {
+    /** Plugin name */
+    name: string;
+
+    /** Plugin npm name */
+    npmName?: string;
+
+    /** Plugin configuration */
+    config?: { [key: string]: any };
+
+    /** Plugin description */
+    description: string;
+
+    /** Optional default export */
+    default?: any;
+
+    /** Optional actions */
+    actions?: Action[];
+
+    /** Optional providers */
+    providers?: Provider[];
+
+    /** Optional evaluators */
+    evaluators?: Evaluator[];
+
+    /** Optional services */
+    services?: Service[];
+
+    /** Optional clients */
+    clients?: Client[];
+
+    /** Optional adapters */
+    adapters?: Adapter[];
+
+    /** Optional initialize method */
+    initialize?: () => Promise<void>;
+
+    /** Optional shutdown method */
+    shutdown?: () => Promise<void>;
+
+    /** Optional post charactor processor handler */
+    handlePostCharacterLoaded?: (char: Character) => Promise<Character>;
 };
 
 export interface IAgentConfig {
@@ -1624,64 +1637,3 @@ export interface ChunkRow {
 
 // Temporary re-export of API types for backward compatibility
 export * from "./api/types";
-
-export interface AgentConfig {
-    /** Unique identifier for the agent */
-    id: UUID;
-
-    /** Display name of the agent */
-    name: string;
-
-    /** Optional username/handle */
-    username?: string;
-
-    /** Optional email */
-    email?: string;
-
-    /** Optional system prompt */
-    system?: string;
-
-    /** Model provider to use */
-    modelProvider: ModelProviderName;
-
-    /** Optional model endpoint override */
-    modelEndpointOverride?: string;
-
-    /** Optional configuration */
-    settings?: {
-        secrets?: { [key: string]: string };
-        [key: string]: any;
-    };
-}
-
-export interface Agent {
-    /** Unique identifier */
-    id: UUID;
-
-    /** Display name */
-    name: string;
-
-    /** Optional username */
-    username?: string;
-
-    /** Optional email */
-    email?: string;
-
-    /** Optional system prompt */
-    system?: string;
-
-    /** Model provider to use */
-    modelProvider: ModelProviderName;
-
-    /** Optional model endpoint override */
-    modelEndpointOverride?: string;
-
-    /** Optional configuration */
-    settings?: {
-        secrets?: { [key: string]: string };
-        [key: string]: any;
-    };
-
-    /** Runtime instance */
-    runtime: IAgentRuntime;
-}
