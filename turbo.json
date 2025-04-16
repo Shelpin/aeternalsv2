@@ -1,34 +1,29 @@
 {
     "$schema": "https://turbo.build/schema.json",
+    "globalDependencies": [
+        "**/.env.*local"
+    ],
     "tasks": {
-        "check-types": {
-            "dependsOn": ["build"]
-        },
-        "@elizaos/agent#check-types": {
+        "build": {
             "dependsOn": [
-                "@elizaos/plugin-solana#build",
-                "@elizaos/plugin-direct#build"
+                "^build"
+            ],
+            "outputs": [
+                "dist/**"
             ]
         },
-        "build": {
-            "outputs": ["dist/**"],
-            "dependsOn": ["^@elizaos/core#build"]
+        "test": {
+            "dependsOn": [
+                "^build"
+            ],
+            "outputs": []
         },
-        "@elizaos/client-direct#build": {
-            "outputs": ["dist/**"],
-            "dependsOn": []
-        },
-        "@elizaos-plugins/clients#build": {
-            "outputs": ["dist/**"],
-            "dependsOn": ["@elizaos/client-telegram#build"]
-        },
-        "eliza-docs#build": {
-            "outputs": ["build/**"]
+        "lint": {
+            "outputs": []
         },
         "dev": {
-            "persistent": true,
-            "cache": true
-        },
-        "clean": {}
+            "cache": false,
+            "persistent": true
+        }
     }
 }

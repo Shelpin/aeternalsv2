@@ -3,12 +3,29 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "declarationDir": "dist"
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "paths": {
+      "@elizaos/core": [
+        "./src"
+      ]
+    },
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
   },
+  "references": [
+    {
+      "path": "../adapter-sqlite"
+    }
+  ],
   "include": [
     "src/**/*"
   ],
   "exclude": [
+    "dist",
+    "**/*.test.ts",
+    "**/__tests__/**",
     "node_modules"
   ]
 }

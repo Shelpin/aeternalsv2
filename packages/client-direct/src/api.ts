@@ -15,7 +15,7 @@ import {
     ServiceType,
     type Character,
     validateUuid
-} from "@elizaos/core/public-api";
+} from "@elizaos/core";
 
 // import type { TeeLogQuery, TeeLogService } from "@elizaos/plugin-tee-log";
 // import { REST, Routes } from "discord.js";
@@ -31,6 +31,8 @@ interface UUIDParams {
 interface IDirectClientMethods {
     unregisterAgent(agent: AgentRuntime): void;
     startAgent(character: any): Promise<AgentRuntime>;
+    jsonToCharacter(json: any): Character;
+    loadCharacterTryPath(path: string): Promise<Character>;
 }
 
 function validateUUIDParams(
@@ -97,7 +99,11 @@ export function createApiRouter(
             const files = await fs.promises.readdir(uploadDir);
             res.json({ files });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            if (error instanceof Error) {
+                res.status(500).json({ error: error.message });
+            } else {
+                res.status(500).json({ error: 'An unknown error occurred' });
+            }
         }
     });
 
@@ -165,12 +171,20 @@ export function createApiRouter(
         const character = req.body;
         try {
             validateCharacterConfig(character);
-        } catch (e) {
-            elizaLogger.error(`Error parsing character: ${e}`);
-            res.status(400).json({
-                success: false,
-                message: e.message,
-            });
+        } catch (error) {
+            if (error instanceof Error) {
+                elizaLogger.error(`Error parsing character: ${error.message}`);
+                res.status(400).json({
+                    success: false,
+                    message: error.message,
+                });
+            } else {
+                elizaLogger.error(`Error parsing character: Unknown error`);
+                res.status(400).json({
+                    success: false,
+                    message: 'Unknown error occurred while parsing character',
+                });
+            }
             return;
         }
 
@@ -178,12 +192,20 @@ export function createApiRouter(
         try {
             agent = await directClient.startAgent(character);
             elizaLogger.log(`${character.name} started`);
-        } catch (e) {
-            elizaLogger.error(`Error starting agent: ${e}`);
-            res.status(500).json({
-                success: false,
-                message: e.message,
-            });
+        } catch (error) {
+            if (error instanceof Error) {
+                elizaLogger.error(`Error starting agent: ${error.message}`);
+                res.status(500).json({
+                    success: false,
+                    message: error.message,
+                });
+            } else {
+                elizaLogger.error(`Error starting agent: Unknown error`);
+                res.status(500).json({
+                    success: false,
+                    message: 'Unknown error occurred while starting agent',
+                });
+            }
             return;
         }
 
@@ -209,9 +231,15 @@ export function createApiRouter(
                     `Character stored successfully at ${filepath}`
                 );
             } catch (error) {
-                elizaLogger.error(
-                    `Failed to store character: ${error.message}`
-                );
+                if (error instanceof Error) {
+                    elizaLogger.error(
+                        `Failed to store character: ${error.message}`
+                    );
+                } else {
+                    elizaLogger.error(
+                        'Failed to store character: Unknown error'
+                    );
+                }
             }
         }
 
@@ -420,13 +448,9 @@ export function createApiRouter(
         try {
             let character: Character;
             if (characterJson) {
-                character = await directClient.jsonToCharacter(
-                    characterPath,
-                    characterJson
-                );
+                character = await directClient.jsonToCharacter(characterJson);
             } else if (characterPath) {
-                character =
-                    await directClient.loadCharacterTryPath(characterPath);
+                character = await directClient.loadCharacterTryPath(characterPath);
             } else {
                 throw new Error("No character path or JSON provided");
             }

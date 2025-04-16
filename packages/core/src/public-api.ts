@@ -35,35 +35,63 @@ export type {
   IMemoryManager, // Export the interface
   // ADDED missing types used by adapter-sqlite
   Relationship,
-  ChunkRow
+  ChunkRow,
+  // ADDED Agent types
+  Agent,
+  AgentConfig
 } from "./types";
 
 // Re-export specific value constants needed
-export { ModelProviderName, CacheStore, ModelClass } from "./types";
+export { ModelProviderName, CacheStore, ModelClass, ServiceType } from "./types";
+
+// Export cache adapters
+export { CacheManager, FsCacheAdapter, DbCacheAdapter, type ICacheAdapter } from "./cache";
 
 // Export context utilities (correct path)
-export { composeContext } from './context';
+export { elizaLogger } from "./internal/logger-internal";
 
-// Export logger (correct path)
-export { elizaLogger } from './logger';
+// Export validation utilities
+export { validateCharacterConfig, validateUuid } from "./validation";
+
+// Export environment utilities
+export { getEnvVariable } from "./config";
+
+// Export runtime types and instances
+export { AgentRuntime } from "./runtime";
+
+// Export parsing utilities
+export { parseBooleanFromText, parseJsonArrayFromText, booleanFooter, messageCompletionFooter } from './parsing';
 
 // Export footer and parsing utilities (correct path)
-export { booleanFooter, messageCompletionFooter, parseJsonArrayFromText, parseBooleanFromText } from './parsing';
-
-// Export provider/context functionality (correct paths)
-export { embed } from './embedding';
+export { stringToUuid } from './uuid';
 export { formatMessages } from './messages';
 
-// Export generation functions (assuming path)
-export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from "./generation";
+// Export generation functions
+export {
+  generateMessageResponse,
+  generateTrueOrFalse,
+  generateText,
+  generateObjectArray,
+  generateCaption,
+  generateImage,
+  generateObject
+} from "./generation";
+
+// Export embedding functions
+export { getEmbeddingZeroVector } from "./embedding";
+
+// Export context composition
+export { composeContext } from './context';
+
+// Export embedding utilities
+export { embed } from './embedding';
 
 // Existing value exports
 export { getGoals } from "./goals";
-export { AgentRuntime } from "./runtime";
 export { getModulePath } from "./utils/module-path";
 export { default as knowledge } from "./knowledge";
 
-// Export MemoryManager implementation (assuming from ./memory)
+// Export MemoryManager implementation
 export { MemoryManager } from './memory';
 
 // API types
@@ -71,12 +99,7 @@ export type { IAgentRuntimeBridge } from './api/types';
 export type { AgentLogLevel, IAgentLogger } from './api/types';
 
 // Stubs - Review if these are still needed or can be removed/implemented
-export const CacheManager = {}; // Placeholder
-export const DbCacheAdapter = {}; // Placeholder
-export const FsCacheAdapter = {}; // Placeholder
 export const settings = {}; // Placeholder
-export const stringToUuid = (str: string) => str; // Placeholder
-export const validateCharacterConfig = (config: any) => true; // Placeholder
 
 // ADDED DatabaseAdapter class export
 export { DatabaseAdapter } from './database';

@@ -8,13 +8,23 @@
     "baseUrl": ".",
     "moduleResolution": "Bundler",
     "emitDeclarationOnly": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "composite": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "*": [
+        "src/*"
+      ]
+    }
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*"
   ],
   "exclude": [
     "**/*.test.ts",
-    "**/__tests__/**"
+    "**/__tests__/**",
+    "dist"
   ]
 }

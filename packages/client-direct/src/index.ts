@@ -8,7 +8,7 @@ import {
     getEmbeddingZeroVector,
     messageCompletionFooter,
     ModelClass,
-    settings,
+    settings as coreSettings,
     stringToUuid,
     type Client,
     type Content,
@@ -17,11 +17,9 @@ import {
     type Memory,
     type Plugin,
     type AgentRuntime,
-    type Character,
-    type ClientMessagePayload,
-    type ClientSettings,
-    type CommandSchema,
+    type Character
 } from "@elizaos/core";
+import type { ClientMessagePayload, ClientSettings, CommandSchema, IDirectClientMethods } from "./types";
 import bodyParser from "body-parser";
 import cors from "cors";
 import express, { type Request as ExpressRequest } from "express";
@@ -30,8 +28,8 @@ import multer from "multer";
 import OpenAI from "openai";
 import * as path from "path";
 import { z } from "zod";
-import { createApiRouter } from "./api";
-import { createVerifiableLogApiRouter } from "./verifiable-log-api";
+import { createApiRouter } from "./api.js";
+import { createVerifiableLogApiRouter } from "./verifiable-log-api.js";
 import handlebars from "handlebars";
 
 const storage = multer.diskStorage({
@@ -114,19 +112,40 @@ Response format should be formatted in a JSON block like this:
 \`\`\`
 `;
 
-export class DirectClient {
+const clientSettings: ClientSettings = {
+    serverPort: process.env.SERVER_PORT ? parseInt(process.env.SERVER_PORT, 10) : 3000,
+    apiKey: process.env.API_KEY
+};
+
+export class DirectClient implements IDirectClientMethods {
     public app: express.Application;
-    private agents: Map<string, IAgentRuntime>; // container management
-    private server: any; // Store server instance
-    public loadCharacterTryPath: Function; // Store loadCharacterTryPath functor
-    public jsonToCharacter: Function; // Store jsonToCharacter functor
+    private agents: Map<string, AgentRuntime>;
+    private server: any;
+    public loadCharacterTryPath: (path: string) => Promise<Character>;
+    public jsonToCharacter: (json: any) => Character;
 
     constructor() {
         elizaLogger.log("DirectClient constructor");
         this.app = express();
-        this.app.use(cors());
         this.agents = new Map();
+        this.server = null;
+        this.loadCharacterTryPath = async (path: string) => {
+            try {
+                const content = await fs.promises.readFile(path, 'utf-8');
+                return this.jsonToCharacter(JSON.parse(content));
+            } catch (error) {
+                elizaLogger.error('Failed to load character:', error);
+                throw error;
+            }
+        };
+        this.jsonToCharacter = (json: any) => {
+            if (!json.name || !json.bio || !json.lore || !json.modelProvider) {
+                throw new Error('Invalid character JSON: missing required fields');
+            }
+            return json as Character;
+        };
 
+        this.app.use(cors());
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -651,10 +670,17 @@ export class DirectClient {
                     const data = await response.json();
                     res.json(data);
                 } catch (error) {
-                    res.status(500).json({
-                        error: "Please create an account at bakery.bagel.net and get an API key. Then set the BAGEL_API_KEY environment variable.",
-                        details: error.message,
-                    });
+                    if (error instanceof Error) {
+                        res.status(500).json({
+                            error: "Please create an account at bakery.bagel.net and get an API key. Then set the BAGEL_API_KEY environment variable.",
+                            details: error.message,
+                        });
+                    } else {
+                        res.status(500).json({
+                            error: "Please create an account at bakery.bagel.net and get an API key. Then set the BAGEL_API_KEY environment variable.",
+                            details: "Unknown error occurred",
+                        });
+                    }
                 }
             }
         );
@@ -662,7 +688,6 @@ export class DirectClient {
             "/fine-tune/:assetId",
             async (req: express.Request, res: express.Response) => {
                 const assetId = req.params.assetId;
-
                 const ROOT_DIR = path.join(process.cwd(), "downloads");
                 const downloadDir = path.resolve(ROOT_DIR, assetId);
 
@@ -700,7 +725,7 @@ export class DirectClient {
                         fileResponse.headers
                             .get("content-disposition")
                             ?.split("filename=")[1]
-                            ?.replace(/"/g, /* " */ "") || "default_name.txt";
+                            ?.replace(/"/g, "") || "default_name.txt";
 
                     elizaLogger.log("Saving as:", fileName);
 
@@ -729,12 +754,20 @@ export class DirectClient {
                         fileSize: stats.size,
                     });
                 } catch (error) {
-                    elizaLogger.error("Detailed error:", error);
-                    res.status(500).json({
-                        error: "Failed to download files from BagelDB",
-                        details: error.message,
-                        stack: error.stack,
-                    });
+                    if (error instanceof Error) {
+                        elizaLogger.error("Detailed error:", error);
+                        res.status(500).json({
+                            error: "Failed to download files from BagelDB",
+                            details: error.message,
+                            stack: error.stack,
+                        });
+                    } else {
+                        elizaLogger.error("Unknown error occurred");
+                        res.status(500).json({
+                            error: "Failed to download files from BagelDB",
+                            details: "Unknown error occurred",
+                        });
+                    }
                 }
             }
         );
@@ -904,14 +937,24 @@ export class DirectClient {
 
                 res.send(Buffer.from(audioBuffer));
             } catch (error) {
-                elizaLogger.error(
-                    "Error processing message or generating speech:",
-                    error
-                );
-                res.status(500).json({
-                    error: "Error processing message or generating speech",
-                    details: error.message,
-                });
+                if (error instanceof Error) {
+                    elizaLogger.error(
+                        "Error processing message or generating speech:",
+                        error.message
+                    );
+                    res.status(500).json({
+                        error: "Error processing message or generating speech",
+                        details: error.message,
+                    });
+                } else {
+                    elizaLogger.error(
+                        "Unknown error processing message or generating speech"
+                    );
+                    res.status(500).json({
+                        error: "Error processing message or generating speech",
+                        details: "Unknown error occurred",
+                    });
+                }
             }
         });
 
@@ -977,37 +1020,40 @@ export class DirectClient {
 
                 res.send(Buffer.from(audioBuffer));
             } catch (error) {
-                elizaLogger.error(
-                    "Error processing message or generating speech:",
-                    error
-                );
-                res.status(500).json({
-                    error: "Error processing message or generating speech",
-                    details: error.message,
-                });
+                if (error instanceof Error) {
+                    elizaLogger.error(
+                        "Error processing message or generating speech:",
+                        error.message
+                    );
+                    res.status(500).json({
+                        error: "Error processing message or generating speech",
+                        details: error.message,
+                    });
+                } else {
+                    elizaLogger.error(
+                        "Unknown error processing message or generating speech"
+                    );
+                    res.status(500).json({
+                        error: "Error processing message or generating speech",
+                        details: "Unknown error occurred",
+                    });
+                }
             }
         });
     } // End of constructor
 
-    // Add startAgent method to satisfy IDirectClientMethods
-    public async startAgent(character: Character): Promise<IAgentRuntime> {
-        // Placeholder implementation - Actual logic might be injected or defined elsewhere
-        elizaLogger.warn(
-            "DirectClient.startAgent called, but not fully implemented. Returning rejected promise."
-        );
-        // If the actual startAgent function is assigned later, this might need adjustment
-        // For now, we reject to indicate it needs proper setup.
-        // A real implementation would create/add AgentRuntime and return it.
-        return Promise.reject(
-            new Error("startAgent not implemented or initialized.")
-        );
+    public async startAgent(character: Character): Promise<AgentRuntime> {
+        // Implementation would go here
+        // This should return a Promise<AgentRuntime>
+        throw new Error("Not implemented");
     }
 
-    // Add unregisterAgent method to satisfy IDirectClientMethods
-    public unregisterAgent(agent: IAgentRuntime): void {
-        elizaLogger.log(`Unregistering agent: ${agent.agentId}`);
+    public registerAgent(runtime: AgentRuntime): void {
+        this.agents.set(runtime.agentId, runtime);
+    }
+
+    public unregisterAgent(agent: AgentRuntime): void {
         this.agents.delete(agent.agentId);
-        // Potentially add agent.stop() here if not handled elsewhere
     }
 
     public async message(
@@ -1016,78 +1062,61 @@ export class DirectClient {
         roomId: string,
         agentId: string
     ): Promise<Content[]> {
-        // Implementation for message method
-        // This is a placeholder and should be replaced with actual logic
-        elizaLogger.warn(
-            "DirectClient.message called, but not fully implemented. Returning empty array."
-        );
+        const agent = this.agents.get(agentId);
+        if (!agent) {
+            throw new Error(`Agent ${agentId} not found`);
+        }
+        // Implementation would go here
         return [];
     }
 
-    public registerAgent(runtime: IAgentRuntime) {
-        // register any plugin endpoints?
-        // but once and only once
-        this.agents.set(runtime.agentId, runtime);
-    }
-
-    public start(port: number) {
-        this.server = this.app.listen(port, () => {
-            elizaLogger.success(
-                `REST API bound to 0.0.0.0:${port}. If running locally, access it at http://localhost:${port}.`
-            );
+    public start(port: number): void {
+        const serverPort = clientSettings.serverPort || port;
+        this.server = this.app.listen(serverPort, () => {
+            elizaLogger.info(`Server is running on port ${serverPort}`);
         });
-
-        // Handle graceful shutdown
-        const gracefulShutdown = () => {
-            elizaLogger.log("Received shutdown signal, closing server...");
-            this.server.close(() => {
-                elizaLogger.success("Server closed successfully");
-                process.exit(0);
-            });
-
-            // Force close after 5 seconds if server hasn't closed
-            setTimeout(() => {
-                elizaLogger.error(
-                    "Could not close connections in time, forcefully shutting down"
-                );
-                process.exit(1);
-            }, 5000);
-        };
-
-        // Handle different shutdown signals
-        process.on("SIGTERM", gracefulShutdown);
-        process.on("SIGINT", gracefulShutdown);
     }
 
-    public async stop() {
+    public async stop(): Promise<void> {
         if (this.server) {
-            this.server.close(() => {
-                elizaLogger.success("Server stopped");
+            await new Promise<void>((resolve, reject) => {
+                this.server.close((err: Error) => {
+                    if (err) {
+                        reject(err);
+                    } else {
+                        resolve();
+                    }
+                });
             });
         }
     }
+
+    private async handleError(error: unknown, res: express.Response): Promise<void> {
+        elizaLogger.error("Error:", error);
+        res.status(500).json({ error: "Internal server error" });
+    }
 }
 
-export const DirectClientInterface: Client = {
+export function startDirectClientInterface(): DirectClient {
+    elizaLogger.log("DirectClientInterface start");
+    const client = new DirectClient();
+    const serverPort = clientSettings.serverPort || 3000;
+    client.start(serverPort);
+    return client;
+}
+
+export const directClient: Client = {
     name: 'direct',
     config: {},
     start: async (_runtime: IAgentRuntime) => {
-        elizaLogger.log("DirectClientInterface start");
-        const client = new DirectClient();
-        const serverPort = Number.parseInt(settings.SERVER_PORT || "3000");
-        client.start(serverPort);
-        return client;
-    },
-    // stop: async (_runtime: IAgentRuntime, client?: Client) => {
-    //     if (client instanceof DirectClient) {
-    //         client.stop();
-    //     }
-    // },
+        return startDirectClientInterface();
+    }
 };
 
 const directPlugin: Plugin = {
-    name: "direct",
-    description: "Direct client",
-    clients: [DirectClientInterface],
+    name: 'direct',
+    description: 'Direct client plugin for local communication',
+    clients: [directClient]
 };
+
 export default directPlugin;

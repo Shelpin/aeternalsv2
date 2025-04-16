@@ -1,26 +1,26 @@
 // Root tsup.base.js
 const commonExternals = [
-    "fs", "path", "os", "util", "child_process", "crypto", "stream", "events",
-    "http", "https", "url", "zlib", "assert", "buffer", "querystring", "string_decoder",
-    "readline", "tty", "dgram", "dns", "net", "tls"
+    '@elizaos/core',
+    '@elizaos/adapter-sqlite',
+    '@elizaos/agent',
+    '@elizaos/client-direct',
+    '@elizaos/plugin-bootstrap',
+    '@elizaos/telegram-client',
+    '@elizaos/telegram-multiagent'
 ];
 
 const baseConfig = {
-    entry: ["src/index.ts", "src/public-api.ts"],
-    format: ["esm", "cjs"],
-    dts: true,
-    sourcemap: true,
-    clean: true,
-    target: "node18",
-    outDir: "dist",
     splitting: false,
-    bundle: true,
-    skipNodeModulesBundle: true,
-    shims: true,
+    clean: true,
+    format: ['esm', 'cjs'],
+    dts: false, // We use tsc for .d.ts generation
+    sourcemap: true,
     minify: false,
-    esbuildOptions(options) {
-        options.conditions = ["import", "node"];
-    }
+    keepNames: true,
+    treeshake: true
 };
 
-module.exports = { baseConfig, commonExternals }; 
+module.exports = {
+    baseConfig,
+    commonExternals
+}; 

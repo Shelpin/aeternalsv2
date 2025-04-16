@@ -1,26 +1,45 @@
 import { DirectClient } from "@elizaos/client-direct";
 import {
-    type Adapter,
-    AgentRuntime,
     CacheManager,
-    CacheStore,
-    type Plugin,
-    type Character,
-    type ClientInstance,
-    DbCacheAdapter,
-    elizaLogger,
     FsCacheAdapter,
-    type IAgentRuntime,
-    type IDatabaseAdapter,
+    DbCacheAdapter,
+    type UUID,
     type IDatabaseCacheAdapter,
+    type Character,
+    type Settings,
+    type Content,
+    type Memory,
+    type Goal,
+    type GoalStatus,
+    type Agent,
+    type AgentConfig,
+    type IAgentRuntime,
+    type Plugin,
+    type State,
+    type KnowledgeManager,
+    type IMemoryManager,
+    type Media,
+    type RAGKnowledgeItem,
     ModelProviderName,
-    parseBooleanFromText,
-    settings,
-    getModulePath,
+    CacheStore,
+    ModelClass,
+    ServiceType,
     stringToUuid,
+    elizaLogger,
     validateCharacterConfig,
-} from "@elizaos/core/public-api";
+    validateUuid,
+    getEnvVariable,
+    AgentRuntime,
+    MemoryManager,
+    type Adapter,
+    type ClientInstance,
+    type IDatabaseAdapter,
+    parseBooleanFromText,
+    getModulePath,
+    type ICacheAdapter
+} from "@elizaos/core";
 import { defaultCharacter } from "./defaultCharacter";
+import { Settings as SettingsType, FsCacheAdapter as FsCacheAdapterType, DbCacheAdapter as DbCacheAdapterType } from "./types";
 
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import JSON5 from 'json5';
@@ -31,6 +50,7 @@ import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import yargs from "yargs";
+import { v4 as uuidv4 } from 'uuid';
 
 const { filename: __filename, dirname: __dirname } = getModulePath(); // get the resolved path to the file
 // const __dirname = path.dirname(__filename); // Removed duplicate declaration
@@ -412,6 +432,7 @@ export function getTokenForProvider(
     provider: ModelProviderName,
     character: Character
 ): string | undefined {
+    const typedSettings = settings as SettingsType;
     switch (provider) {
         // no key needed for llama_local, ollama, lmstudio, gaianet or bedrock
         case ModelProviderName.LLAMALOCAL:
@@ -423,152 +444,152 @@ export function getTokenForProvider(
         case ModelProviderName.GAIANET:
             return (
                 character.settings?.secrets?.GAIA_API_KEY ||
-                settings.GAIA_API_KEY
+                typedSettings.GAIA_API_KEY
             );
         case ModelProviderName.BEDROCK:
             return "";
         case ModelProviderName.OPENAI:
             return (
                 character.settings?.secrets?.OPENAI_API_KEY ||
-                settings.OPENAI_API_KEY
+                typedSettings.OPENAI_API_KEY
             );
         case ModelProviderName.ETERNALAI:
             return (
                 character.settings?.secrets?.ETERNALAI_API_KEY ||
-                settings.ETERNALAI_API_KEY
+                typedSettings.ETERNALAI_API_KEY
             );
         case ModelProviderName.NINETEEN_AI:
             return (
                 character.settings?.secrets?.NINETEEN_AI_API_KEY ||
-                settings.NINETEEN_AI_API_KEY
+                typedSettings.NINETEEN_AI_API_KEY
             );
         case ModelProviderName.LLAMACLOUD:
         case ModelProviderName.TOGETHER:
             return (
                 character.settings?.secrets?.LLAMACLOUD_API_KEY ||
-                settings.LLAMACLOUD_API_KEY ||
+                typedSettings.LLAMACLOUD_API_KEY ||
                 character.settings?.secrets?.TOGETHER_API_KEY ||
-                settings.TOGETHER_API_KEY ||
+                typedSettings.TOGETHER_API_KEY ||
                 character.settings?.secrets?.OPENAI_API_KEY ||
-                settings.OPENAI_API_KEY
+                typedSettings.OPENAI_API_KEY
             );
         case ModelProviderName.CLAUDE_VERTEX:
         case ModelProviderName.ANTHROPIC:
             return (
                 character.settings?.secrets?.ANTHROPIC_API_KEY ||
                 character.settings?.secrets?.CLAUDE_API_KEY ||
-                settings.ANTHROPIC_API_KEY ||
-                settings.CLAUDE_API_KEY
+                typedSettings.ANTHROPIC_API_KEY ||
+                typedSettings.CLAUDE_API_KEY
             );
         case ModelProviderName.REDPILL:
             return (
                 character.settings?.secrets?.REDPILL_API_KEY ||
-                settings.REDPILL_API_KEY
+                typedSettings.REDPILL_API_KEY
             );
         case ModelProviderName.OPENROUTER:
             return (
                 character.settings?.secrets?.OPENROUTER_API_KEY ||
-                settings.OPENROUTER_API_KEY
+                typedSettings.OPENROUTER_API_KEY
             );
         case ModelProviderName.GROK:
             return (
                 character.settings?.secrets?.GROK_API_KEY ||
-                settings.GROK_API_KEY
+                typedSettings.GROK_API_KEY
             );
         case ModelProviderName.HEURIST:
             return (
                 character.settings?.secrets?.HEURIST_API_KEY ||
-                settings.HEURIST_API_KEY
+                typedSettings.HEURIST_API_KEY
             );
         case ModelProviderName.GROQ:
             return (
                 character.settings?.secrets?.GROQ_API_KEY ||
-                settings.GROQ_API_KEY
+                typedSettings.GROQ_API_KEY
             );
         case ModelProviderName.GALADRIEL:
             return (
                 character.settings?.secrets?.GALADRIEL_API_KEY ||
-                settings.GALADRIEL_API_KEY
+                typedSettings.GALADRIEL_API_KEY
             );
         case ModelProviderName.FAL:
             return (
-                character.settings?.secrets?.FAL_API_KEY || settings.FAL_API_KEY
+                character.settings?.secrets?.FAL_API_KEY ||
+                typedSettings.FAL_API_KEY
             );
         case ModelProviderName.ALI_BAILIAN:
             return (
                 character.settings?.secrets?.ALI_BAILIAN_API_KEY ||
-                settings.ALI_BAILIAN_API_KEY
+                typedSettings.ALI_BAILIAN_API_KEY
             );
         case ModelProviderName.VOLENGINE:
             return (
                 character.settings?.secrets?.VOLENGINE_API_KEY ||
-                settings.VOLENGINE_API_KEY
+                typedSettings.VOLENGINE_API_KEY
             );
         case ModelProviderName.NANOGPT:
             return (
                 character.settings?.secrets?.NANOGPT_API_KEY ||
-                settings.NANOGPT_API_KEY
+                typedSettings.NANOGPT_API_KEY
             );
         case ModelProviderName.HYPERBOLIC:
             return (
                 character.settings?.secrets?.HYPERBOLIC_API_KEY ||
-                settings.HYPERBOLIC_API_KEY
+                typedSettings.HYPERBOLIC_API_KEY
             );
-
         case ModelProviderName.VENICE:
             return (
                 character.settings?.secrets?.VENICE_API_KEY ||
-                settings.VENICE_API_KEY
+                typedSettings.VENICE_API_KEY
             );
         case ModelProviderName.ATOMA:
             return (
                 character.settings?.secrets?.ATOMASDK_BEARER_AUTH ||
-                settings.ATOMASDK_BEARER_AUTH
+                typedSettings.ATOMASDK_BEARER_AUTH
             );
         case ModelProviderName.NVIDIA:
             return (
                 character.settings?.secrets?.NVIDIA_API_KEY ||
-                settings.NVIDIA_API_KEY
+                typedSettings.NVIDIA_API_KEY
             );
         case ModelProviderName.AKASH_CHAT_API:
             return (
                 character.settings?.secrets?.AKASH_CHAT_API_KEY ||
-                settings.AKASH_CHAT_API_KEY
+                typedSettings.AKASH_CHAT_API_KEY
             );
         case ModelProviderName.GOOGLE:
             return (
                 character.settings?.secrets?.GOOGLE_GENERATIVE_AI_API_KEY ||
-                settings.GOOGLE_GENERATIVE_AI_API_KEY
+                typedSettings.GOOGLE_GENERATIVE_AI_API_KEY
             );
         case ModelProviderName.MISTRAL:
             return (
                 character.settings?.secrets?.MISTRAL_API_KEY ||
-                settings.MISTRAL_API_KEY
+                typedSettings.MISTRAL_API_KEY
             );
         case ModelProviderName.LETZAI:
             return (
                 character.settings?.secrets?.LETZAI_API_KEY ||
-                settings.LETZAI_API_KEY
+                typedSettings.LETZAI_API_KEY
             );
         case ModelProviderName.INFERA:
             return (
                 character.settings?.secrets?.INFERA_API_KEY ||
-                settings.INFERA_API_KEY
+                typedSettings.INFERA_API_KEY
             );
         case ModelProviderName.DEEPSEEK:
             return (
                 character.settings?.secrets?.DEEPSEEK_API_KEY ||
-                settings.DEEPSEEK_API_KEY
+                typedSettings.DEEPSEEK_API_KEY
             );
         case ModelProviderName.LIVEPEER:
             return (
                 character.settings?.secrets?.LIVEPEER_GATEWAY_URL ||
-                settings.LIVEPEER_GATEWAY_URL
+                typedSettings.LIVEPEER_GATEWAY_URL
             );
         case ModelProviderName.SECRETAI:
             return (
                 character.settings?.secrets?.SECRET_AI_API_KEY ||
-                settings.SECRET_AI_API_KEY
+                typedSettings.SECRET_AI_API_KEY
             );
         case ModelProviderName.NEARAI:
             try {
@@ -579,9 +600,8 @@ export function getTokenForProvider(
             }
             return (
                 character.settings?.secrets?.NEARAI_API_KEY ||
-                settings.NEARAI_API_KEY
+                typedSettings.NEARAI_API_KEY
             );
-
         default:
             const errorMessage = `Failed to get token - unsupported model provider: ${provider}`;
             elizaLogger.error(errorMessage);
@@ -640,26 +660,14 @@ export async function createAgent(
     });
 }
 
-function initializeFsCache(baseDir: string, character: Character) {
-    if (!character?.id) {
-        throw new Error(
-            "initializeFsCache requires id to be set in character definition"
-        );
-    }
-    const cacheDir = path.resolve(baseDir, character.id, "cache");
-
-    const cache = new CacheManager(new FsCacheAdapter(cacheDir));
-    return cache;
+export function initializeFsCache(cacheDir: string): CacheManager {
+    const adapter = new FsCacheAdapter(cacheDir);
+    return new CacheManager(adapter);
 }
 
-function initializeDbCache(character: Character, db: IDatabaseCacheAdapter) {
-    if (!character?.id) {
-        throw new Error(
-            "initializeFsCache requires id to be set in character definition"
-        );
-    }
-    const cache = new CacheManager(new DbCacheAdapter(db, character.id));
-    return cache;
+export function initializeDbCache(db: IDatabaseCacheAdapter, agentId: UUID): CacheManager {
+    const dbCacheAdapter = new DbCacheAdapter(db, agentId);
+    return new CacheManager(dbCacheAdapter);
 }
 
 function initializeCache(
@@ -688,7 +696,7 @@ function initializeCache(
         case CacheStore.DATABASE:
             if (db) {
                 elizaLogger.info("Using Database Cache...");
-                return initializeDbCache(character, db);
+                return initializeDbCache(db, character.id);
             } else {
                 throw new Error(
                     "Database adapter is not provided for CacheStore.Database."
@@ -702,7 +710,7 @@ function initializeCache(
                     "baseDir must be provided for CacheStore.FILESYSTEM."
                 );
             }
-            return initializeFsCache(baseDir, character);
+            return initializeFsCache(baseDir);
 
         default:
             throw new Error(
@@ -737,7 +745,11 @@ async function startAgent(
 ): Promise<AgentRuntime> {
     let db: IDatabaseAdapter & IDatabaseCacheAdapter;
     try {
-        character.id ??= stringToUuid(character.name);
+        const characterId = stringToUuid(character.id);
+        if (!characterId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+            throw new Error('Invalid UUID format for character ID');
+        }
+        character.id = characterId as UUID;
         character.username ??= character.name;
 
         const token = getTokenForProvider(character.modelProvider, character);
@@ -833,7 +845,8 @@ const handlePostCharacterLoaded = async (character: Character): Promise<Characte
 
 const startAgents = async () => {
     const directClient = new DirectClient();
-    let serverPort = Number.parseInt(settings.SERVER_PORT || "3000");
+    const typedSettings = settings as SettingsType;
+    let serverPort = Number.parseInt(typedSettings.SERVER_PORT || "3000");
     const args = parseArguments();
     const charactersArg = args.characters || args.character;
     let characters = [defaultCharacter];
@@ -883,7 +896,7 @@ const startAgents = async () => {
 
     directClient.start(serverPort);
 
-    if (serverPort !== Number.parseInt(settings.SERVER_PORT || "3000")) {
+    if (serverPort !== Number.parseInt(typedSettings.SERVER_PORT || "3000")) {
         elizaLogger.warn(`Server started on alternate port ${serverPort}`);
     }
 
@@ -911,4 +924,9 @@ if (
     process.on("unhandledRejection", (err) => {
         console.error("unhandledRejection", err);
     });
+}
+
+function isValidUUID(uuid: string): uuid is UUID {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
 }

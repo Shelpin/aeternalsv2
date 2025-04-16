@@ -1,12 +1,11 @@
 import { defineConfig } from "tsup";
-const { baseConfig, commonExternals } = require("../../tsup.base");
 
 export default defineConfig({
-    ...baseConfig,
-    external: [
-        ...commonExternals,
-        // Client-direct specific externals
-        "express", "cors", "ws",
-        /^@elizaos\/core/
-    ]
+    entry: ["src/index.ts", "src/public-api.ts"],
+    format: ["esm", "cjs"],
+    dts: true,
+    splitting: false,
+    sourcemap: true,
+    clean: true,
+    target: "node18",
 }); 

@@ -8,7 +8,7 @@ import {
     type IAgentRuntime,
     elizaLogger,
     ServiceType
-} from "@elizaos/core/public-api";
+} from "@elizaos/core";
 // import type {
 //     VerifiableLogService,
 //     VerifiableLogQuery,
@@ -43,12 +43,20 @@ export function createVerifiableLogApiRouter(
                     data: pageQuery,
                 });
             } catch (error) {
-                elizaLogger.error("Detailed error:", error);
-                res.status(500).json({
-                    error: "failed to get agents registered ",
-                    details: error.message,
-                    stack: error.stack,
-                });
+                if (error instanceof Error) {
+                    elizaLogger.error("Detailed error:", error.message);
+                    res.status(500).json({
+                        error: "failed to get agents registered",
+                        details: error.message,
+                        stack: error.stack,
+                    });
+                } else {
+                    elizaLogger.error("Unknown error occurred");
+                    res.status(500).json({
+                        error: "failed to get agents registered",
+                        details: "Unknown error occurred",
+                    });
+                }
             }
         }
     );
@@ -78,12 +86,20 @@ export function createVerifiableLogApiRouter(
                     data: pageQuery,
                 });
             } catch (error) {
-                elizaLogger.error("Detailed error:", error);
-                res.status(500).json({
-                    error: "Failed to Get Attestation",
-                    details: error.message,
-                    stack: error.stack,
-                });
+                if (error instanceof Error) {
+                    elizaLogger.error("Detailed error:", error.message);
+                    res.status(500).json({
+                        error: "Failed to Get Attestation",
+                        details: error.message,
+                        stack: error.stack,
+                    });
+                } else {
+                    elizaLogger.error("Unknown error occurred");
+                    res.status(500).json({
+                        error: "Failed to Get Attestation",
+                        details: "Unknown error occurred",
+                    });
+                }
             }
         }
     );
@@ -121,12 +137,20 @@ export function createVerifiableLogApiRouter(
                     data: pageQuery,
                 });
             } catch (error) {
-                elizaLogger.error("Detailed error:", error);
-                res.status(500).json({
-                    error: "Failed to Get Verifiable Logs",
-                    details: error.message,
-                    stack: error.stack,
-                });
+                if (error instanceof Error) {
+                    elizaLogger.error("Detailed error:", error.message);
+                    res.status(500).json({
+                        error: "Failed to Get Verifiable Logs",
+                        details: error.message,
+                        stack: error.stack,
+                    });
+                } else {
+                    elizaLogger.error("Unknown error occurred");
+                    res.status(500).json({
+                        error: "Failed to Get Verifiable Logs",
+                        details: "Unknown error occurred",
+                    });
+                }
             }
         }
     );
