@@ -1,0 +1,73 @@
+{
+  "@elizaos/adapter-sqlite": [
+    "packages/adapter-sqlite/dist/sqliteTables.js",
+    "packages/adapter-sqlite/dist/sqlite_vec.js"
+  ],
+  "@elizaos/agent": [],
+  "cli": [
+    "No dist directory found"
+  ],
+  "@elizaos/client-direct": [],
+  "@elizaos-plugins/clients": [
+    "No dist directory found"
+  ],
+  "@elizaos/core": [],
+  "@elizaos/dynamic-imports": [],
+  "@elizaos/plugin-bootstrap": [
+    "packages/plugin-bootstrap/dist/actions/continue.d.ts",
+    "packages/plugin-bootstrap/dist/actions/continue.d.ts.map",
+    "packages/plugin-bootstrap/dist/actions/followRoom.d.ts",
+    "packages/plugin-bootstrap/dist/actions/followRoom.d.ts.map",
+    "packages/plugin-bootstrap/dist/actions/ignore.d.ts",
+    "packages/plugin-bootstrap/dist/actions/ignore.d.ts.map",
+    "packages/plugin-bootstrap/dist/actions/index.d.ts",
+    "packages/plugin-bootstrap/dist/actions/index.d.ts.map",
+    "packages/plugin-bootstrap/dist/actions/muteRoom.d.ts",
+    "packages/plugin-bootstrap/dist/actions/muteRoom.d.ts.map",
+    "packages/plugin-bootstrap/dist/actions/none.d.ts",
+    "packages/plugin-bootstrap/dist/actions/none.d.ts.map",
+    "packages/plugin-bootstrap/dist/actions/unfollowRoom.d.ts",
+    "packages/plugin-bootstrap/dist/actions/unfollowRoom.d.ts.map",
+    "packages/plugin-bootstrap/dist/actions/unmuteRoom.d.ts",
+    "packages/plugin-bootstrap/dist/actions/unmuteRoom.d.ts.map",
+    "packages/plugin-bootstrap/dist/evaluators/fact.d.ts",
+    "packages/plugin-bootstrap/dist/evaluators/fact.d.ts.map",
+    "packages/plugin-bootstrap/dist/evaluators/goal.d.ts",
+    "packages/plugin-bootstrap/dist/evaluators/goal.d.ts.map",
+    "packages/plugin-bootstrap/dist/evaluators/index.d.ts",
+    "packages/plugin-bootstrap/dist/evaluators/index.d.ts.map",
+    "packages/plugin-bootstrap/dist/index.d.ts",
+    "packages/plugin-bootstrap/dist/index.d.ts.map",
+    "packages/plugin-bootstrap/dist/providers/boredom.d.ts",
+    "packages/plugin-bootstrap/dist/providers/boredom.d.ts.map",
+    "packages/plugin-bootstrap/dist/providers/facts.d.ts",
+    "packages/plugin-bootstrap/dist/providers/facts.d.ts.map",
+    "packages/plugin-bootstrap/dist/providers/index.d.ts",
+    "packages/plugin-bootstrap/dist/providers/index.d.ts.map",
+    "packages/plugin-bootstrap/dist/providers/time.d.ts",
+    "packages/plugin-bootstrap/dist/providers/time.d.ts.map",
+    "packages/plugin-bootstrap/dist/public-api.d.ts",
+    "packages/plugin-bootstrap/dist/public-api.d.ts.map"
+  ],
+  "@elizaos/telegram-multiagent": [
+    "packages/telegram-multiagent/dist/agentIdVerifier.js",
+    "packages/telegram-multiagent/dist/config.js",
+    "packages/telegram-multiagent/dist/ConversationFlow.js",
+    "packages/telegram-multiagent/dist/ConversationKickstarter.js",
+    "packages/telegram-multiagent/dist/ConversationManager.js",
+    "packages/telegram-multiagent/dist/FallbackMemoryManager.js",
+    "packages/telegram-multiagent/dist/index.js",
+    "packages/telegram-multiagent/dist/PersonalityEnhancer.js",
+    "packages/telegram-multiagent/dist/PluginComponent.js",
+    "packages/telegram-multiagent/dist/public-api.js",
+    "packages/telegram-multiagent/dist/schema.js",
+    "packages/telegram-multiagent/dist/SqliteAdapterProxy.js",
+    "packages/telegram-multiagent/dist/TelegramCoordinationAdapter.js",
+    "packages/telegram-multiagent/dist/TelegramMultiAgentPlugin.js",
+    "packages/telegram-multiagent/dist/TelegramRelay.js",
+    "packages/telegram-multiagent/dist/__tests__/ConversationKickstarter.test.js",
+    "packages/telegram-multiagent/dist/types.js",
+    "packages/telegram-multiagent/dist/TypingSimulator.js",
+    "packages/telegram-multiagent/dist/utils.js"
+  ]
+}
