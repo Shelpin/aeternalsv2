@@ -12,6 +12,6 @@
   },
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "tsup --config tsup.config.ts && ../../node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly"
+    "build": "tsc -p tsconfig.build.json"
   }
 }

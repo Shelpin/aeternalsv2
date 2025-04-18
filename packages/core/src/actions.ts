@@ -1,5 +1,5 @@
 import { names, uniqueNamesGenerator } from "unique-names-generator";
-import type { Action, ActionExample } from "./types";
+import type { Action, ActionExample } from "./types.js";
 
 /**
  * Composes a set of example conversations based on provided actions and a specified count.
@@ -40,10 +40,7 @@ export const composeActionExamples = (actionsData: Action[], count: number) => {
             .map((message) => {
                 let messageString = `${message.user}: ${message.content.text}${message.content.action ? ` (${message.content.action})` : ""}`;
                 for (let i = 0; i < exampleNames.length; i++) {
-                    messageString = messageString.replaceAll(
-                        `{{user${i + 1}}}`,
-                        exampleNames[i]
-                    );
+                    messageString = safeReplaceAll(messageString, `{{user${i + 1}}}`, exampleNames[i]);
                 }
                 return messageString;
             })
@@ -52,6 +49,11 @@ export const composeActionExamples = (actionsData: Action[], count: number) => {
 
     return formattedExamples.join("\n");
 };
+
+// Polyfill for replaceAll (always use split/join for compatibility)
+function safeReplaceAll(str: string, search: string, replacement: string): string {
+    return str.split(search).join(replacement);
+}
 
 /**
  * Formats the names of the provided actions into a comma-separated string.

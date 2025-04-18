@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { getModulePath } from './utils/module-path';
+import { getModulePath } from './utils/module-path.js';
 import { existsSync } from 'fs';
 
 const modulePaths = getModulePath();

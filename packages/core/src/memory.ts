@@ -1,11 +1,11 @@
-import { embed, getEmbeddingZeroVector } from "./embedding";
-import elizaLogger from "./logger";
+import { embed, getEmbeddingZeroVector } from "./embedding.js";
+import elizaLogger from "./logger.js";
 import type {
     IAgentRuntime,
     IMemoryManager,
     Memory,
     UUID,
-} from "./types";
+} from "./types.js";
 
 const defaultMatchThreshold = 0.1;
 const defaultMatchCount = 10;

@@ -1,14 +1,33 @@
 {
-  "extends": "../../tsconfig.build.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
-    "declarationDir": "dist"
+    "target": "ES2021",
+    "lib": [
+      "es2021",
+      "dom"
+    ],
+    "module": "nodenext",
+    "declaration": true,
+    "baseUrl": ".",
+    "moduleResolution": "nodenext",
+    "skipLibCheck": true,
+    "composite": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "*": [
+        "src/*"
+      ]
+    }
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
+    "dist",
     "node_modules"
   ]
 }

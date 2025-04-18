@@ -1,4 +1,4 @@
-import { ElizaLogger } from './types';
+import { ElizaLogger } from './types.js';
 
 /**
  * TypingSimulator simulates human-like typing behavior for natural interactions

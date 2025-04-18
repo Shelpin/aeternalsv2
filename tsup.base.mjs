@@ -1,11 +1,11 @@
 // Root tsup.base.js
-const commonExternals = [
+export const commonExternals = [
     "fs", "path", "os", "util", "child_process", "crypto", "stream", "events",
     "http", "https", "url", "zlib", "assert", "buffer", "querystring", "string_decoder",
     "readline", "tty", "dgram", "dns", "net", "tls"
 ];
 
-const baseConfig = {
+export const baseConfig = {
     entry: ["src/index.ts", "src/public-api.ts"],
     format: ["esm", "cjs"],
     dts: true,
@@ -21,6 +21,4 @@ const baseConfig = {
     esbuildOptions(options) {
         options.conditions = ["import", "node"];
     }
-};
-
-module.exports = { baseConfig, commonExternals }; 
+}; 

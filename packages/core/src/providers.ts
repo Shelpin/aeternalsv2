@@ -1,4 +1,4 @@
-import type { IAgentRuntime, State, Memory } from "./types";
+import type { IAgentRuntime, State, Memory } from "./types.js";
 
 /**
  * Formats provider outputs into a string which can be injected into the context.

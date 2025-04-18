@@ -1,4 +1,4 @@
-import "./config"; // Add this line first
+import "./config.js"; // Add this line first
 
 // Re-export everything defined in the public API
-export * from "./public-api";
+export * from "./public-api.js";

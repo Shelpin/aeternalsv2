@@ -2,7 +2,12 @@
 
 ## @elizaos/adapter-sqlite
 
-No .d.ts files found in dist directory.
+Found 4 .d.ts files in dist directory.
+
+Declaration map files: 0
+
+index.d.ts exists: Yes
+public-api.d.ts exists: Yes
 
 ## @elizaos/agent
 
@@ -22,11 +27,21 @@ No dist directory found.
 
 ## @elizaos/core
 
-No .d.ts files found in dist directory.
+Found 40 .d.ts files in dist directory.
+
+Declaration map files: 0
+
+index.d.ts exists: Yes
+public-api.d.ts exists: Yes
 
 ## @elizaos/dynamic-imports
 
-No .d.ts files found in dist directory.
+Found 2 .d.ts files in dist directory.
+
+Declaration map files: 0
+
+index.d.ts exists: Yes
+public-api.d.ts exists: Yes
 
 ## @elizaos/plugin-bootstrap
 

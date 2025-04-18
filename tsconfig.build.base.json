@@ -1,14 +1,13 @@
 {
     "compilerOptions": {
-        "target": "es2022",
-        "module": "ESNext",
+        "target": "ES2021",
+        "module": "nodenext",
         "lib": [
-            "es2022",
+            "es2021",
             "dom"
         ],
-        "moduleResolution": "Bundler",
+        "moduleResolution": "nodenext",
         "declaration": true,
-        "emitDeclarationOnly": true,
         "declarationMap": true,
         "sourceMap": true,
         "esModuleInterop": true,
@@ -16,7 +15,9 @@
         "allowSyntheticDefaultImports": true,
         "strict": true,
         "isolatedModules": true,
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "outDir": "./dist",
+        "rootDir": "./src"
     },
     "exclude": [
         "dist",

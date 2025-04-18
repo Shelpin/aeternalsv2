@@ -4,11 +4,11 @@
 
 // Logger interface
 export interface ElizaLogger {
-  trace(message: string, ...args: any[]): void;
-  debug(message: string, ...args: any[]): void;
-  info(message: string, ...args: any[]): void;
-  warn(message: string, ...args: any[]): void;
-  error(message: string, ...args: any[]): void;
+  trace(message: string, ...args: unknown[]): void;
+  debug(message: string, ...args: unknown[]): void;
+  info(message: string, ...args: unknown[]): void;
+  warn(message: string, ...args: unknown[]): void;
+  error(message: string, ...args: unknown[]): void;
 }
 
 /**
@@ -18,27 +18,27 @@ export interface IAgentRuntime {
   // Core Agent properties
   agent?: {
     name?: string;
-    [key: string]: any;
+    [key: string]: unknown;
   };
-  registerPlugin?: (plugin: any) => boolean;
+  registerPlugin?: (plugin: Plugin) => boolean;
   getAgentId(): string;
-  getService(name: string): any;
-  registerService?(name: string, service: any): void;
-  getCharacter?(): Character;
+  getService(name: string): unknown;
+  registerService?: (name: string, service: unknown) => void;
+  getCharacter?: () => Character;
   
   // Memory management
   memoryManager?: {
-    createMemory: (data: MemoryData) => Promise<any>;
+    createMemory: (data: MemoryData) => Promise<unknown>;
     getMemories: (options: MemoryQuery) => Promise<Memory[]>;
     addEmbeddingToMemory?: (memoryId: string, embedding: number[]) => Promise<void>;
   };
   
   // Response handling
-  handleMessage?: (message: any) => Promise<any>;
-  composeState?: (options: any) => Promise<any>;
+  handleMessage?: (message: unknown) => Promise<unknown>;
+  composeState?: (options: unknown) => Promise<unknown>;
   
   // Allow for additional properties
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 /**
@@ -50,16 +50,17 @@ export interface MemoryData {
   userId: string;
   content: {
     text: string;
-    facts?: any[];
+    facts?: unknown[];
     goal?: string;
     metadata?: {
       conversationType?: string;
       agentId?: string;
       groupId?: string;
-      [key: string]: any;
+      [key: string]: unknown;
     };
   };
   type?: string;
+  createdAt?: Date;
 }
 
 /**
@@ -82,9 +83,9 @@ export interface Memory {
   userId: string;
   content: {
     text: string;
-    facts?: any[];
+    facts?: unknown[];
     goal?: string;
-    metadata?: any;
+    metadata?: unknown;
   };
   createdAt: Date;
   type?: string;
@@ -242,11 +243,11 @@ export interface Character {
     emojis?: string[];
   };
   adjectives: string[];
-  clients?: any;
-  plugins?: any;
-  modelProvider?: any;
-  secrets?: any;
-  settings?: any;
+  clients?: unknown;
+  plugins?: unknown;
+  modelProvider?: unknown;
+  secrets?: unknown;
+  settings?: unknown;
   system?: string;
 }
 
@@ -268,8 +269,8 @@ export interface Topic {
  */
 export interface Runtime {
   registerPlugin(name: string, plugin: Plugin): void;
-  registerService(name: string, service: any): void;
-  getService(name: string): any;
+  registerService(name: string, service: unknown): void;
+  getService(name: string): unknown;
   start(): Promise<void>;
   memory: {
     query: (query: MemoryQuery) => Promise<MemoryData[]>;
@@ -279,10 +280,20 @@ export interface Runtime {
   };
 }
 
+// Personality style
+export interface PersonalityStyle {
+  formality: number;
+  enthusiasm: number;
+  conversational: number;
+  technical: number;
+  humor: number;
+  traits: string[];
+}
+
 export const EmptyLogger: ElizaLogger = {
-  trace: () => {},
-  debug: () => {},
-  info: () => {},
-  warn: () => {},
-  error: () => {}
+  trace: (): void => {},
+  debug: (): void => {},
+  info: (): void => {},
+  warn: (): void => {},
+  error: (): void => {}
 }; 

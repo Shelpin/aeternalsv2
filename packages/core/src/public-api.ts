@@ -36,39 +36,39 @@ export type {
   // ADDED missing types used by adapter-sqlite
   Relationship,
   ChunkRow
-} from "./types";
+} from "./types.js";
 
 // Re-export specific value constants needed
-export { ModelProviderName, CacheStore, ModelClass } from "./types";
+export { ModelProviderName, CacheStore, ModelClass } from "./types.js";
 
 // Export context utilities (correct path)
-export { composeContext } from './context';
+export { composeContext } from './context.js';
 
 // Export logger (correct path)
-export { elizaLogger } from './logger';
+export { elizaLogger } from './logger.js';
 
 // Export footer and parsing utilities (correct path)
-export { booleanFooter, messageCompletionFooter, parseJsonArrayFromText, parseBooleanFromText } from './parsing';
+export { booleanFooter, messageCompletionFooter, parseJsonArrayFromText, parseBooleanFromText } from './parsing.js';
 
 // Export provider/context functionality (correct paths)
-export { embed } from './embedding';
-export { formatMessages } from './messages';
+export { embed } from './embedding.js';
+export { formatMessages } from './messages.js';
 
 // Export generation functions (assuming path)
-export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from "./generation";
+export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from "./generation.js";
 
 // Existing value exports
-export { getGoals } from "./goals";
-export { AgentRuntime } from "./runtime";
-export { getModulePath } from "./utils/module-path";
-export { default as knowledge } from "./knowledge";
+export { getGoals } from "./goals.js";
+export { AgentRuntime } from "./runtime.js";
+export { getModulePath } from "./utils/module-path.js";
+export { default as knowledge } from "./knowledge.js";
 
 // Export MemoryManager implementation (assuming from ./memory)
-export { MemoryManager } from './memory';
+export { MemoryManager } from './memory.js';
 
 // API types
-export type { IAgentRuntimeBridge } from './api/types';
-export type { AgentLogLevel, IAgentLogger } from './api/types';
+export type { IAgentRuntimeBridge } from './api/types.js';
+export type { AgentLogLevel, IAgentLogger } from './api/types.js';
 
 // Stubs - Review if these are still needed or can be removed/implemented
 export const CacheManager = {}; // Placeholder
@@ -79,7 +79,7 @@ export const stringToUuid = (str: string) => str; // Placeholder
 export const validateCharacterConfig = (config: any) => true; // Placeholder
 
 // ADDED DatabaseAdapter class export
-export { DatabaseAdapter } from './database';
+export { DatabaseAdapter } from './database.js';
 
 // Remove the duplicated/old export sections entirely
 // // --- REMOVE SECTION START ---

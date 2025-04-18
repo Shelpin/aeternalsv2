@@ -17,8 +17,8 @@ import fs from 'fs';
 import { FallbackMemoryManager } from './FallbackMemoryManager.js';
 import { SqliteAdapterProxy } from './SqliteAdapterProxy.js';
 import { generateUUID } from './utils.js';
-import { createRequire } from 'node:module';
-import { config as initConfig } from 'dotenv';
+import { createRequire } from 'module';
+import { config as initConfig } from './config.js';
 
 // Extend the Character interface to include additional properties
 declare module './types.js' {
@@ -57,10 +57,10 @@ const DEFAULT_AGENT_ID = 'unknown_agent';
 
 /**
  * Creates a minimal representation of a message object for logging
- * @param {any} msg - The message object to minimize
- * @return {object} - A minimal representation with just essential properties
+ * @param {RelayMessage | undefined | null} msg - The message object to minimize
+ * @return {object | string} - A minimal representation with just essential properties
  */
-function logMinimalMsg(msg: any): any {
+function logMinimalMsg(msg: RelayMessage | undefined | null): { id: number | undefined; from: string | undefined; text: string | undefined; chatId: number | undefined } | string {
   if (!msg) return 'null';
   return {
     id: msg?.message_id,
@@ -107,6 +107,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private memoryManager: any = null;
   private telegramClient: any = null;
   private _eventHandlers: Record<string, Function[]> = {};
+  private personality: PersonalityEnhancer | null = null;
 
   /**
    * Create a new TelegramMultiAgentPlugin
@@ -176,8 +177,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       }
 
       return this;
-    } catch (error) {
-      this.logger.error(`[REGISTER] ${this.name}: Registration failed: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[REGISTER] ${this.name}: Registration failed: ${error.message}`);
+      } else {
+        this.logger.error(`[REGISTER] ${this.name}: Registration failed: ${JSON.stringify(error)}`);
+      }
       return false;
     }
   }
@@ -203,7 +208,14 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       // VALHALLA FIX: Normalize agent ID consistently
       const envAgentId = process.env.AGENT_ID;
-      const runtimeAgentId = runtime?.client?.telegram?.botInfo?.username;
+      // Patch: Add type guard for runtime?.client?.telegram
+      let runtimeAgentId: string | undefined = undefined;
+      if (runtime && typeof runtime === 'object' && 'client' in runtime && runtime.client && typeof runtime.client === 'object') {
+        const client = (runtime as any).client;
+        if ('telegram' in client && client.telegram && typeof client.telegram === 'object' && 'botInfo' in client.telegram && client.telegram.botInfo && typeof client.telegram.botInfo === 'object') {
+          runtimeAgentId = client.telegram.botInfo.username;
+        }
+      }
       const fallbackAgentId = wrappedRuntime.getAgentId();
 
       this.agentId = this.normalizeAgentId(
@@ -224,8 +236,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       // Continue initialization
       await this.initialize();
-    } catch (error) {
-      this.logger.error(`[PLUGIN] Initialization error: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[PLUGIN] Initialization error: ${error.message}`);
+      } else {
+        this.logger.error(`[PLUGIN] Initialization error: ${JSON.stringify(error)}`);
+      }
     }
   }
 
@@ -319,8 +335,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           }
 
           this.logger.info(`${this.name}: Configuration loaded successfully`);
-        } catch (error) {
-          this.logger.error(`${this.name}: Error parsing config file: ${error}`);
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            this.logger.error(`${this.name}: Error parsing config file: ${error.message}`);
+          } else {
+            this.logger.error(`${this.name}: Error parsing config file: ${JSON.stringify(error)}`);
+          }
           // Continue with defaults and env vars
         }
       } else {
@@ -331,8 +351,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.logger.info(`${this.name}: Using relay server URL: ${this.config.relayServerUrl}`);
       const authTokenLength = this.config.authToken ? this.config.authToken.length : 0;
       this.logger.debug(`${this.name}: Using auth token, length: ${authTokenLength}`);
-    } catch (error) {
-      this.logger.error(`${this.name}: Error loading configuration: ${error}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`${this.name}: Error loading configuration: ${error.message}`);
+      } else {
+        this.logger.error(`${this.name}: Error loading configuration: ${JSON.stringify(error)}`);
+      }
     }
   }
 
@@ -348,8 +372,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         // Try to get runtime one more time with a longer timeout
         try {
           this.runtime = await this.waitForRuntime(20000);
-        } catch (runtimeError) {
-          throw new Error(`Runtime not available: ${runtimeError.message}`);
+        } catch (runtimeError: unknown) {
+          if (runtimeError instanceof Error) {
+            throw new Error(`Runtime not available: ${runtimeError.message}`);
+          } else {
+            throw new Error(`Runtime not available: ${JSON.stringify(runtimeError)}`);
+          }
         }
       }
 
@@ -359,14 +387,14 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       // Get the agent ID
       const agentId = this.runtime.agentId || process.env.AGENT_ID || DEFAULT_AGENT_ID;
-      this.agentId = agentId;
-      this.config.agentId = agentId;
+      this.agentId = agentId as string;
+      this.config.agentId = agentId as string;
 
       // VALHALLA FIX: Get token using character username from runtime
       this.botToken =
         this.config.botToken ||
         process.env.TELEGRAM_BOT_TOKEN ||
-        process.env[`TELEGRAM_BOT_TOKEN_${this.runtime.character.username}`];
+        process.env[`TELEGRAM_BOT_TOKEN_${(this.runtime as any).character?.username}`];
 
       if (!this.botToken) {
         this.logger.error('❌ No bot token found for agent: ' + this.agentId);
@@ -393,8 +421,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             loadedFrom = '@elizaos/client-telegram (direct import)';
             this.logger.info(`[PLUGIN] Successfully loaded TelegramClient via direct import`);
           }
-        } catch (directImportError) {
-          this.logger.debug(`[PLUGIN] Direct import failed: ${directImportError.message}`);
+        } catch (directImportError: unknown) {
+          if (directImportError instanceof Error) {
+            this.logger.debug(`[PLUGIN] Direct import failed: ${directImportError.message}`);
+          } else {
+            this.logger.debug(`[PLUGIN] Direct import failed: ${JSON.stringify(directImportError)}`);
+          }
 
           // If direct import fails, fallback to path resolution
           const possiblePaths = [
@@ -443,8 +475,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
                   }
                 }
               }
-            } catch (err) {
-              this.logger.debug(`[PLUGIN] Failed to load from ${modulePath}: ${err.message}`);
+            } catch (err: unknown) {
+              if (err instanceof Error) {
+                this.logger.debug(`[PLUGIN] Failed to load from ${modulePath}: ${err.message}`);
+              } else {
+                this.logger.debug(`[PLUGIN] Failed to load from ${modulePath}: ${JSON.stringify(err)}`);
+              }
               // Continue to the next path
             }
           }
@@ -462,8 +498,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           });
 
           // Add simulateMessage method to telegramClient
-          this.telegramClient.simulateMessage = (message) => {
-            this.logger.info(`[PLUGIN][VALHALLA] Simulating message: ${message.text}`);
+          this.telegramClient.simulateMessage = (message: RelayMessage): void => {
+            if (message && typeof message === 'object' && 'text' in message && message.text) {
+              this.logger.info(`[PLUGIN][VALHALLA] Simulating message: ${message.text}`);
+            } else {
+              this.logger.info(`[PLUGIN][VALHALLA] Simulating message without text content`);
+            }
             // Handle the message through our standard flow
             this.handleIncomingMessage(message);
           };
@@ -471,7 +511,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           // Ensure runtime.clients exists and attach the client
           if (this.runtime) {
             this.runtime.clients ??= {};
-            this.runtime.clients.telegram = this.telegramClient;
+            (this.runtime.clients as Record<string, unknown>).telegram = this.telegramClient;
             this.logger.info(`[PLUGIN] Telegram client initialized and attached to runtime.clients.telegram`);
 
             // STEP 5 - Test with Simulated Message
@@ -489,8 +529,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         } else {
           throw new Error('TelegramClient not found in any of the expected locations');
         }
-      } catch (error) {
-        this.logger.error(`[PLUGIN] Failed to initialize Telegram client: ${error.message}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.error(`[PLUGIN] Failed to initialize Telegram client: ${error.message}`);
+        } else {
+          this.logger.error(`[PLUGIN] Failed to initialize Telegram client: ${JSON.stringify(error)}`);
+        }
         this.logger.error(`[PLUGIN] Will try to create minimal client`);
 
         // Create minimal client
@@ -525,25 +569,26 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       }
 
       // Log character config 
-      if (this.runtime.character) {
-        this.logger.info(`[VALHALLA] Character name: ${this.runtime.character.name}`, '', '');
-        this.logger.info(`[VALHALLA] Character plugins: ${JSON.stringify(this.runtime.character.plugins || [])}`, '', '');
+      if (this.runtime.character && typeof (this.runtime.character as { name?: string }).name === 'string') {
+        this.logger.info(`[VALHALLA] Character name: ${(this.runtime.character as { name: string }).name}`, '', '');
+        this.logger.info(`[VALHALLA] Character plugins: ${JSON.stringify((this.runtime.character as { plugins?: unknown[] }).plugins || [])}`, '', '');
       } else {
         this.logger.warn('[VALHALLA] runtime.character not available', '', '');
       }
 
       // VALHALLA ACTION CHECK: Log available actions
-      if (this.runtime.actions) {
-        this.logger.info(`[VALHALLA] Available runtime.actions: ${JSON.stringify(this.runtime.actions.map(a => a.name))}`, '', '');
+      if (Array.isArray((this.runtime.actions as unknown[]))) {
+        this.logger.info(`[VALHALLA] Available runtime.actions: ${JSON.stringify(((this.runtime.actions as { name?: string }[]).map((a: { name?: string }) => a.name)))}
+        `, '', '');
 
         // Check for specific action handlers
-        const actionNames = this.runtime.actions.map(a => a.name);
+        const actionNames = (this.runtime.actions as { name?: string }[]).map((a: { name?: string }) => a.name);
         this.logger.info(`[VALHALLA] Inspecting ${actionNames.length} actions for handlers...`, '', '');
 
         // Inspect the structure of actions
         for (let i = 0; i < Math.min(actionNames.length, 5); i++) {
           const actionName = actionNames[i];
-          const action = this.runtime.actions.find(a => a.name === actionName);
+          const action = (this.runtime.actions as { name?: string; description?: string; handler?: Function }[]).find((a: { name?: string }) => a.name === actionName);
           this.logger.info(`[VALHALLA] Action ${i} details:`, '', '');
 
           if (action) {
@@ -559,7 +604,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         }
 
         // Try to find a message handling action
-        const messageHandlers = this.runtime.actions.filter(action =>
+        const messageHandlers = (this.runtime.actions as { name?: string }[]).filter((action: { name?: string }) =>
           action &&
           (action.name === 'handleMessage' ||
             action.name === 'processMessage' ||
@@ -570,7 +615,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
         if (messageHandlers.length > 0) {
           this.logger.info(`[VALHALLA] Found ${messageHandlers.length} potential message handler actions`, '', '');
-          messageHandlers.forEach(action => {
+          messageHandlers.forEach((action: { name?: string }) => {
             this.logger.info(`[VALHALLA] Message handler action found: ${action.name}`, '', '');
           });
         } else {
@@ -597,8 +642,20 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             userId,
             context
           };
-          const response = await runtime.agent.respond(formattedMessage);
-          return response;
+
+          if (this.runtime?.agent &&
+            typeof this.runtime.agent === 'object' &&
+            this.runtime.agent !== null &&
+            'respond' in this.runtime.agent &&
+            typeof (this.runtime.agent as any).respond === 'function') {
+            const response = await (this.runtime.agent as any).respond(formattedMessage);
+            return response;
+          }
+
+          return {
+            text: await this.generateFallbackResponse(),
+            content: { action: "SAY" }
+          };
         };
         this.logger.info('[VALHALLA] Expert-recommended handleMessage implementation added successfully');
       }
@@ -618,8 +675,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       // Log completion of initialization
       this.logger.info('[PLUGIN] Plugin fully initialized');
-    } catch (error) {
-      this.logger.error(`${this.name}: Initialization failed: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`${this.name}: Initialization failed: ${error.message}`);
+      } else {
+        this.logger.error(`${this.name}: Initialization failed: ${JSON.stringify(error)}`);
+      }
       throw error;
     }
   }
@@ -646,8 +707,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           this.logger.warn(`${this.name}: Reconnect attempt failed, scheduling another attempt`);
           this.scheduleReconnect();
         }
-      } catch (error) {
-        this.logger.error(`${this.name}: Error during reconnection attempt: ${error}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.error(`${this.name}: Error during reconnection attempt: ${error.message}`);
+        } else {
+          this.logger.error(`${this.name}: Error during reconnection attempt: ${JSON.stringify(error)}`);
+        }
         this.scheduleReconnect();
       }
     }, reconnectDelay);
@@ -663,8 +728,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         const enhancer = new PersonalityEnhancer(this.getAgentIdSafe(), this.runtime, this.logger);
         return enhancer;
       }
-    } catch (error) {
-      this.logger.warn(`${this.name}: Could not create full PersonalityEnhancer: ${error}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`${this.name}: Could not create full PersonalityEnhancer: ${error.message}`);
+      } else {
+        this.logger.warn(`${this.name}: Could not create full PersonalityEnhancer: ${JSON.stringify(error)}`);
+      }
     }
 
     // Fallback to a simplified personality enhancer
@@ -708,8 +777,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     // Set up interval for checking conversation opportunities
     const intervalMs = this.config.conversationCheckIntervalMs || 60000;
     this.checkIntervalId = setInterval(() => {
-      this.checkConversations().catch(error => {
-        this.logger.error(`${this.name}: Error in conversation check: ${error}`);
+      this.checkConversations().catch((error: unknown) => {
+        if (error instanceof Error) {
+          this.logger.error(`${this.name}: Error in conversation check: ${error.message}`);
+        } else {
+          this.logger.error(`${this.name}: Error in conversation check: ${JSON.stringify(error)}`);
+        }
       });
     }, intervalMs);
 
@@ -739,7 +812,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         this.logger.warn(`${this.name}: Runtime not fully ready for conversation check - missing getAgentId`);
         return; // Skip this check cycle
       }
-    } catch (error) {
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`${this.name}: Error waiting for runtime: ${error.message}`);
+      } else {
+        this.logger.warn(`${this.name}: Error waiting for runtime: ${JSON.stringify(error)}`);
+      }
     }
 
     this.logger.debug(`${this.name}: Checking conversations...`);
@@ -766,8 +844,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             kickstarter.start();
           }
         }
-      } catch (error) {
-        this.logger.error(`${this.name}: Error checking conversation for group ${groupId}: ${error}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.error(`${this.name}: Error checking conversation for group ${groupId}: ${error.message}`);
+        } else {
+          this.logger.error(`${this.name}: Error checking conversation for group ${groupId}: ${JSON.stringify(error)}`);
+        }
       }
     }
   }
@@ -811,15 +893,16 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
         // VALHALLA FIX: Log detailed response information
         if (response) {
+          const responseObj = response as { text?: string; content?: { action?: string } };
           this.logger.info(`[PLUGIN][VALHALLA][FLOW] Runtime.handleMessage returned in ${duration}ms:
-            Has text: ${Boolean(response.text)}
-            Text length: ${response.text?.length || 0}
-            Action: ${response.content?.action || 'none'}
-            Content: ${JSON.stringify(response.content || {}).substring(0, 100)}...
+            Has text: ${Boolean(responseObj.text)}
+            Text length: ${responseObj.text?.length || 0}
+            Action: ${responseObj.content?.action || 'none'} 
+            Content: ${JSON.stringify(responseObj.content || {}).substring(0, 100)}...
           `, '', '');
 
-          if (response.text) {
-            this.logger.info(`[PLUGIN][VALHALLA][FLOW] Response text (first 150 chars): ${response.text?.substring(0, 150)}...`, '', '');
+          if (responseObj.text) {
+            this.logger.info(`[PLUGIN][VALHALLA][FLOW] Response text (first 150 chars): ${responseObj.text?.substring(0, 150)}...`, '', '');
           }
         } else {
           this.logger.warn(`[PLUGIN][VALHALLA][FLOW] Runtime.handleMessage returned null or undefined after ${duration}ms`, '', '');
@@ -845,9 +928,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           userId: message.from?.id
         };
       }
-    } catch (err) {
-      this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error calling runtime.handleMessage: ${err.message}`, '', '');
-      this.logger.error(`[PLUGIN][VALHALLA][FLOW] Stack trace: ${err.stack}`, '', '');
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error calling runtime.handleMessage: ${err.message}`, '', '');
+        this.logger.error(`[PLUGIN][VALHALLA][FLOW] Stack trace: ${err.stack}`, '', '');
+      } else {
+        this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error calling runtime.handleMessage: ${JSON.stringify(err)}`, '', '');
+      }
 
       // VALHALLA FIX: Return an error response with SAY action to ensure it's displayed
       return {
@@ -856,7 +943,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           action: "SAY", // Explicitly use SAY to bypass filtering
           text: `Sorry, I encountered an error processing your message. Please try again.`
         },
-        userId: message.from?.id,
+        userId: (message && typeof message === 'object' && 'from' in message && message.from && typeof message.from === 'object' && 'id' in message.from) ? message.from.id : undefined,
         error: true
       };
     }
@@ -873,22 +960,36 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       }
 
       // VALHALLA FIX: Add clear logging for debugging message flow
-      this.logger.info(`[PLUGIN][VALHALLA][FLOW] handleIncomingMessage triggered for message ID: ${message.message_id}, from ${message.from?.username || 'unknown'}`, '', '');
+      this.logger.info(
+        `[PLUGIN][VALHALLA][FLOW] handleIncomingMessage triggered for message ID: ${message.message_id ? String(message.message_id) : 'unknown'
+        }, from ${message.from && typeof message.from === 'object' && 'username' in message.from
+          ? String(message.from.username)
+          : 'unknown'
+        }`,
+        '',
+        ''
+      );
 
       // Enhanced logging for message debugging
       this.logger.info(`[DEBUG] Incoming message: ${logMinimalMsg(message)}`);
 
       // Better sender extraction
       const from = message.from;
-      const senderId = from?.username || from?.id || 'unknown';
-      const senderName = from?.first_name || from?.username || 'Anonymous';
+      const senderId = from && typeof from === 'object'
+        ? ('username' in from && from.username ? String(from.username) :
+          'id' in from && from.id ? String(from.id) : 'unknown')
+        : 'unknown';
+      const senderName = from && typeof from === 'object'
+        ? ('first_name' in from && from.first_name ? String(from.first_name) :
+          'username' in from && from.username ? String(from.username) : 'Anonymous')
+        : 'Anonymous';
 
       // Validate necessary fields
       if (!message.text) {
         this.logger.warn(`[PLUGIN][VALHALLA][FLOW] Message has no text content`, '', '');
       }
 
-      if (!message.chat?.id) {
+      if (!message.chat || typeof message.chat !== 'object' || !('id' in message.chat) || !message.chat.id) {
         this.logger.warn(`[PLUGIN][VALHALLA][FLOW] Message has no chat.id`, '', '');
       }
 
@@ -907,18 +1008,26 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           // VALHALLA FIX: Simplify memory creation to avoid type errors
           await this.fallbackMemory.createMemory({
             content: {
-              text: message.text || ''
+              text: message.text ? String(message.text) : ''
               // No additional fields to avoid type errors
             },
             type: 'message',
-            userId: String(message.from?.id || 'user'),
-            roomId: String(message.chat?.id || 'default')
+            userId: from && typeof from === 'object' && 'id' in from && from.id
+              ? String(from.id)
+              : 'user',
+            roomId: message.chat && typeof message.chat === 'object' && 'id' in message.chat && message.chat.id
+              ? String(message.chat.id)
+              : 'default'
             // No metadata to avoid type errors
           });
 
           this.logger.info(`[PLUGIN][VALHALLA][FLOW] Memory created successfully`, '', '');
-        } catch (memoryError) {
-          this.logger.error(`[PLUGIN][VALHALLA][FLOW] Memory creation error: ${memoryError.message}`, '', '');
+        } catch (memoryError: unknown) {
+          if (memoryError instanceof Error) {
+            this.logger.error(`[PLUGIN][VALHALLA][FLOW] Memory creation error: ${memoryError.message}`, '', '');
+          } else {
+            this.logger.error(`[PLUGIN][VALHALLA][FLOW] Memory creation error: ${JSON.stringify(memoryError)}`, '', '');
+          }
         }
       } else {
         this.logger.warn(`[PLUGIN][VALHALLA][FLOW] No memory manager available for message storage`, '', '');
@@ -993,13 +1102,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
                   this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message forwarded to relay for other bots`, '', '');
                 }
                 return;
-              } catch (telegramError) {
-                this.logger.error(`[PLUGIN] Error sending with telegramClient: ${telegramError.message}`);
+              } catch (telegramError: unknown) {
+                if (telegramError instanceof Error) {
+                  this.logger.error(`[PLUGIN] Error sending with telegramClient: ${telegramError.message}`);
+                } else {
+                  this.logger.error(`[PLUGIN] Error sending with telegramClient: ${JSON.stringify(telegramError)}`);
+                }
               }
             }
 
             // If we have the Telegram client from ElizaOS, use it
-            if (this.runtime?.client?.telegram) {
+            // Patch: Add type guard for this.runtime?.client?.telegram
+            if (this.runtime && typeof this.runtime === 'object' && 'client' in this.runtime && this.runtime.client && typeof this.runtime.client === 'object' && 'telegram' in this.runtime.client && this.runtime.client.telegram && typeof this.runtime.client.telegram === 'object' && 'sendMessage' in this.runtime.client.telegram && typeof this.runtime.client.telegram.sendMessage === 'function') {
               try {
                 // Send via ElizaOS client
                 await this.runtime.client.telegram.sendMessage(groupId, cleanedText);
@@ -1010,9 +1124,9 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
                   await this.relay.sendMessage(groupId, cleanedText);
                   this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message forwarded to relay for other bots`, '', '');
                 }
-              } catch (telegramError) {
-                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error sending message via ElizaOS client: ${telegramError.message}`, '', '');
-                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Stack trace: ${telegramError.stack}`, '', '');
+              } catch (telegramError: unknown) {
+                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error sending message via ElizaOS client: ${telegramError instanceof Error ? telegramError.message : JSON.stringify(telegramError)}`, '', '');
+                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Stack trace: ${telegramError instanceof Error ? telegramError.stack : ''}`, '', '');
 
                 // Fallback to direct Telegram API if ElizaOS client failed
                 try {
@@ -1023,8 +1137,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
                   } else {
                     this.logger.error(`[PLUGIN][VALHALLA][FLOW] No bot token available for direct API fallback`, '', '');
                   }
-                } catch (fallbackError) {
-                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] Fallback also failed: ${fallbackError.message}`, '', '');
+                } catch (fallbackError: unknown) {
+                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] Fallback also failed: ${fallbackError instanceof Error ? fallbackError.message : JSON.stringify(fallbackError)}`, '', '');
                 }
               }
             } else {
@@ -1040,8 +1154,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
                 } else {
                   this.logger.error(`[PLUGIN][VALHALLA][FLOW] No bot token available for direct API`, '', '');
                 }
-              } catch (directError) {
-                this.logger.error(`[PLUGIN][VALHALLA][FLOW] Direct Telegram API failed: ${directError.message}`, '', '');
+              } catch (directError: unknown) {
+                if (directError instanceof Error) {
+                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] Direct Telegram API failed: ${directError.message}`, '', '');
+                } else {
+                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] Direct Telegram API failed: ${JSON.stringify(directError)}`, '', '');
+                }
               }
 
               // Still forward to relay for other bots
@@ -1049,8 +1167,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
                 try {
                   await this.relay.sendMessage(groupId, cleanedText);
                   this.logger.info(`[PLUGIN][VALHALLA][FLOW] Message forwarded to relay despite Telegram client missing`, '', '');
-                } catch (relayError) {
-                  this.logger.error(`[PLUGIN][VALHALLA][FLOW] Relay forwarding failed: ${relayError.message}`, '', '');
+                } catch (relayError: unknown) {
+                  if (relayError instanceof Error) {
+                    this.logger.error(`[PLUGIN][VALHALLA][FLOW] Relay forwarding failed: ${relayError.message}`, '', '');
+                  } else {
+                    this.logger.error(`[PLUGIN][VALHALLA][FLOW] Relay forwarding failed: ${JSON.stringify(relayError)}`, '', '');
+                  }
                 }
               }
             }
@@ -1063,9 +1185,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       } else {
         this.logger.warn(`[PLUGIN][VALHALLA][FLOW] No response returned from runtime.handleMessage()`, '', '');
       }
-    } catch (error) {
-      this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error in handleIncomingMessage: ${error.message}`, '', '');
-      this.logger.error(`Stack trace: ${error.stack}`, '', '');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error in handleIncomingMessage: ${error.message}`, '', '');
+        this.logger.error(`Stack trace: ${error.stack}`, '', '');
+      } else {
+        this.logger.error(`[PLUGIN][VALHALLA][FLOW] Error in handleIncomingMessage: ${JSON.stringify(error)}`, '', '');
+      }
     }
   }
 
@@ -1096,8 +1222,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       }
 
       this.logger.debug('[PLUGIN] Heartbeat sent successfully', '', '');
-    } catch (error) {
-      this.logger.error(`[PLUGIN] Heartbeat error: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[PLUGIN] Heartbeat error: ${error.message}`);
+      } else {
+        this.logger.error(`[PLUGIN] Heartbeat error: ${JSON.stringify(error)}`);
+      }
       throw error;
     }
   }
@@ -1137,8 +1267,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       await this.handleIncomingMessage(testMessage);
 
       this.logger.info(`[TEST] Test message sent and processed`);
-    } catch (error) {
-      this.logger.error(`[TEST] Error sending test message: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[TEST] Error sending test message: ${error.message}`);
+      } else {
+        this.logger.error(`[TEST] Error sending test message: ${JSON.stringify(error)}`);
+      }
     }
   }
 
@@ -1178,12 +1312,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             userId: 'test_user'
           });
           this.logger.info(`[VERIFY] Direct runtime.handleMessage call successful: ${!!testResult}`);
-          this.logger.info(`[VERIFY] Response contains text: ${!!testResult?.text}`);
+          // Cast testResult to any to avoid TypeScript error about unknown type
+          const response = testResult as any;
+          this.logger.info(`[VERIFY] Response contains text: ${typeof response?.text === 'string'}`);
         } else {
           this.logger.warn(`[VERIFY] Cannot test runtime.handleMessage directly - not defined`);
         }
-      } catch (error) {
-        this.logger.error(`[VERIFY] Direct runtime.handleMessage test failed: ${error.message}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.error(`[VERIFY] Direct runtime.handleMessage test failed: ${error.message}`);
+        } else {
+          this.logger.error(`[VERIFY] Direct runtime.handleMessage test failed: ${JSON.stringify(error)}`);
+        }
       }
 
       // 7. Test callRuntimeHandleMessage helper
@@ -1194,8 +1334,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         });
         this.logger.info(`[VERIFY] callRuntimeHandleMessage helper call successful: ${!!helperResult}`);
         this.logger.info(`[VERIFY] Helper returned response: ${JSON.stringify(helperResult || {})}`);
-      } catch (error) {
-        this.logger.error(`[VERIFY] callRuntimeHandleMessage helper test failed: ${error.message}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.error(`[VERIFY] callRuntimeHandleMessage helper test failed: ${error.message}`);
+        } else {
+          this.logger.error(`[VERIFY] callRuntimeHandleMessage helper test failed: ${JSON.stringify(error)}`);
+        }
       }
 
       // 8. Test generateFallbackResponse
@@ -1204,8 +1348,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       this.logger.info('======= VERIFICATION COMPLETE =======');
       this.logger.info(`Next step: Run a test message with plugin.testMessage()`);
-    } catch (error) {
-      this.logger.error(`[VERIFY] Error during verification: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[VERIFY] Error during verification: ${error.message}`);
+      } else {
+        this.logger.error(`[VERIFY] Error during verification: ${JSON.stringify(error)}`);
+      }
     }
   }
 
@@ -1220,8 +1368,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     try {
       await relay.sendMessage(agentId, text);
       this.logger.info(`[RELAY] Message sent to relay for agent ${agentId}`, '', '');
-    } catch (error) {
-      this.logger.error(`[RELAY] Error sending message: ${error.message}`, '', '');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[RELAY] Error sending message: ${error.message}`, '', '');
+      } else {
+        this.logger.error(`[RELAY] Error sending message: ${JSON.stringify(error)}`, '', '');
+      }
     }
   }
 
@@ -1257,11 +1409,19 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         } else {
           this.logger.info(`[TELEGRAM] Message sent successfully to chat ${chatId}`, '', '');
         }
-      }).catch(error => {
-        this.logger.error(`[TELEGRAM] Error sending message: ${error.message}`, '', '');
+      }).catch((error: unknown) => {
+        if (error instanceof Error) {
+          this.logger.error(`[TELEGRAM] Error sending message: ${error.message}`, '', '');
+        } else {
+          this.logger.error(`[TELEGRAM] Error sending message: ${JSON.stringify(error)}`, '', '');
+        }
       });
-    } catch (error) {
-      this.logger.error(`[TELEGRAM] Error in sendMessageToTelegram: ${error.message}`, '', '');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[TELEGRAM] Error in sendMessageToTelegram: ${error.message}`, '', '');
+      } else {
+        this.logger.error(`[TELEGRAM] Error in sendMessageToTelegram: ${JSON.stringify(error)}`, '', '');
+      }
     }
   }
 
@@ -1286,9 +1446,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           } else {
             this.logger.info('[MEMORY] SQLite adapter created successfully', '', '');
           }
-        } catch (error) {
-          this.logger.error(`[MEMORY] Error initializing SQLite adapter: ${error.message}`, '', '');
-          this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            this.logger.error(`[MEMORY] Error initializing SQLite adapter: ${error.message}`, '', '');
+            this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+          } else {
+            this.logger.error(`[MEMORY] Error initializing SQLite adapter: ${JSON.stringify(error)}`, '', '');
+          }
           this.dbAdapter = null;
         }
       } else {
@@ -1311,10 +1475,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           // The memory manager will handle the fallback automatically
         }
       }
-    } catch (error) {
-      this.logger.error(`[MEMORY] Error initializing memory manager: ${error.message}`, '', '');
-      this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
-
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[MEMORY] Error initializing memory manager: ${error.message}`, '', '');
+        this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+      } else {
+        this.logger.error(`[MEMORY] Error initializing memory manager: ${JSON.stringify(error)}`, '', '');
+      }
       // Create a fallback memory manager without SQLite in case of errors
       this.memoryManager = new FallbackMemoryManager(this.agentId, null, this.logger);
       this.logger.warn('[MEMORY] Created fallback memory manager without SQLite due to initialization error', '', '');
@@ -1346,7 +1513,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         async query(sql: string, params: any[] = []): Promise<any[]> {
           try {
             return await db.all(sql, params);
-          } catch (error) {
+          } catch (error: unknown) {
             throw error;
           }
         },
@@ -1354,7 +1521,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         async execute(sql: string, params: any[] = []): Promise<void> {
           try {
             await db.run(sql, params);
-          } catch (error) {
+          } catch (error: unknown) {
             throw error;
           }
         },
@@ -1362,14 +1529,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         async close(): Promise<void> {
           try {
             await db.close();
-          } catch (error) {
+          } catch (error: unknown) {
             throw error;
           }
         }
       };
-    } catch (error) {
-      this.logger.error(`[MEMORY] Failed to create SQLite adapter: ${error.message}`, '', '');
-      this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[MEMORY] Failed to create SQLite adapter: ${error.message}`, '', '');
+        this.logger.error(`[MEMORY] Stack trace: ${error.stack || 'No stack trace available'}`, '', '');
+      } else {
+        this.logger.error(`[MEMORY] Failed to create SQLite adapter: ${JSON.stringify(error)}`, '', '');
+      }
       return null;
     }
   }
@@ -1395,8 +1566,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         // Log memory usage after GC
         const memUsage = process.memoryUsage();
         this.logger.debug(`[MEMORY] Usage after GC: ${Math.round(memUsage.heapUsed / 1024 / 1024)} MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)} MB`);
-      } catch (e) {
-        this.logger.error(`[MEMORY] Error forcing garbage collection: ${e.message}`);
+      } catch (e: unknown) {
+        if (e instanceof Error) {
+          this.logger.error(`[MEMORY] Error forcing garbage collection: ${e.message}`);
+        } else {
+          this.logger.error(`[MEMORY] Error forcing garbage collection: ${JSON.stringify(e)}`);
+        }
       }
     }
   }
@@ -1441,8 +1616,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
               await this.handleIncomingMessage(message);
             }
           }
-        } catch (error) {
-          this.logger.error(`[RELAY] Error in message polling: ${error.message}`);
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            this.logger.error(`[RELAY] Error in message polling: ${error.message}`);
+          } else {
+            this.logger.error(`[RELAY] Error in message polling: ${JSON.stringify(error)}`);
+          }
         }
       }, pollingIntervalMs);
       this.logger.info(`[RELAY] Polling interval set to ${pollingIntervalMs}ms`);
@@ -1469,12 +1648,12 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         },
 
         // Add simulateMessage method for testing
-        simulateMessage: (message: any) => {
+        simulateMessage: (message: RelayMessage): void => {
           this.logger.info(`[VALHALLA][TELEGRAM] Simulating message from minimal client: ${message.text}`);
           this.handleIncomingMessage(message);
         },
 
-        on: (event: string, handler: Function) => {
+        on: (event: string, handler: (...args: unknown[]) => void): typeof minimalTelegramClient => {
           this.logger.info(`[VALHALLA][TELEGRAM] Registered handler for ${event} event`);
           // Store the handler to allow emit to work
           if (!this._eventHandlers) {
@@ -1488,14 +1667,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         },
 
         // Add emit method to simulate events
-        emit: (event: string, ...args: any[]) => {
+        emit: (event: string, ...args: unknown[]): boolean => {
           this.logger.info(`[VALHALLA][TELEGRAM] Emitting event: ${event}`);
           if ((this as any)._eventHandlers && (this as any)._eventHandlers[event]) {
             for (const handler of (this as any)._eventHandlers[event]) {
               try {
                 handler(...args);
-              } catch (err) {
-                this.logger.error(`[VALHALLA][TELEGRAM] Error in event handler: ${err.message}`);
+              } catch (err: unknown) {
+                if (err instanceof Error) {
+                  this.logger.error(`[VALHALLA][TELEGRAM] Error in event handler: ${err.message}`);
+                } else {
+                  this.logger.error(`[VALHALLA][TELEGRAM] Error in event handler: ${JSON.stringify(err)}`);
+                }
               }
             }
           } else {
@@ -1517,14 +1700,23 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       // Attach to runtime and save locally
       if (this.runtime && this.runtime.clients) {
-        this.runtime.clients.telegram = minimalTelegramClient;
-        this.telegramClient = minimalTelegramClient;
-        this.logger.info('[VALHALLA] Created and attached minimal Telegram client to runtime.clients.telegram');
+        // Patch: Add type guard for this.runtime.clients.telegram
+        if (typeof this.runtime.clients === 'object' && 'telegram' in this.runtime.clients) {
+          this.runtime.clients.telegram = minimalTelegramClient;
+          this.telegramClient = minimalTelegramClient;
+          this.logger.info('[VALHALLA] Created and attached minimal Telegram client to runtime.clients.telegram');
+        } else {
+          this.logger.error('[VALHALLA] Could not attach minimal client - runtime.clients object is missing telegram property');
+        }
       } else {
         this.logger.error('[VALHALLA] Could not attach minimal client - runtime or clients object is undefined');
       }
-    } catch (error) {
-      this.logger.error(`[VALHALLA] Failed to create minimal Telegram client: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[VALHALLA] Failed to create minimal Telegram client: ${error.message}`);
+      } else {
+        this.logger.error(`[VALHALLA] Failed to create minimal Telegram client: ${JSON.stringify(error)}`);
+      }
     }
   }
 
@@ -1586,7 +1778,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
           try {
             // Handle the message directly and wait for response
-            const response = await this.runtime.handleMessage(testMessage);
+            const response = await this.runtime.handleMessage(testMessage) as { text: string };
 
             this.logger.info(`[VALHALLA] DIRECT TEST: Response ${i + 1}: ${JSON.stringify(response?.text)}`);
 
@@ -1597,12 +1789,20 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
                 // Send message directly to Telegram API
                 this.sendMessageToTelegram(this.config.botToken, chatId, response.text);
-              } catch (sendError) {
-                this.logger.error(`[VALHALLA] DIRECT TEST: Error sending Telegram response ${i + 1}: ${sendError.message}`);
+              } catch (sendError: unknown) {
+                if (sendError instanceof Error) {
+                  this.logger.error(`[VALHALLA] DIRECT TEST: Error sending Telegram response ${i + 1}: ${sendError.message}`);
+                } else {
+                  this.logger.error(`[VALHALLA] DIRECT TEST: Error sending Telegram response ${i + 1}: ${JSON.stringify(sendError)}`);
+                }
               }
             }
-          } catch (testError) {
-            this.logger.error(`[VALHALLA] DIRECT TEST: Error testing message ${i + 1}: ${testError.message}`);
+          } catch (testError: unknown) {
+            if (testError instanceof Error) {
+              this.logger.error(`[VALHALLA] DIRECT TEST: Error testing message ${i + 1}: ${testError.message}`);
+            } else {
+              this.logger.error(`[VALHALLA] DIRECT TEST: Error testing message ${i + 1}: ${JSON.stringify(testError)}`);
+            }
           }
 
           // Add a small delay between tests
@@ -1616,10 +1816,14 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       }
 
       this.logger.info(`[VALHALLA] DIRECT TEST: Manual test complete for all messages`);
-    } catch (error) {
-      this.logger.error(`[VALHALLA] DIRECT TEST: Error in direct test: ${error.message}`);
-      if (error.stack) {
-        this.logger.error(`[VALHALLA] DIRECT TEST: Stack trace: ${error.stack}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[VALHALLA] DIRECT TEST: Error in direct test: ${error.message}`);
+        if (error.stack) {
+          this.logger.error(`[VALHALLA] DIRECT TEST: Stack trace: ${error.stack}`);
+        }
+      } else {
+        this.logger.error(`[VALHALLA] DIRECT TEST: Error in direct test: ${JSON.stringify(error)}`);
       }
     }
   }
@@ -1630,8 +1834,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private getCharacterName(): string {
     try {
       // Try to get character name from runtime
-      if (this.runtime && this.runtime.character && this.runtime.character.name) {
-        const name = this.runtime.character.name;
+      if (this.runtime?.character && typeof this.runtime.character === 'object' && 'name' in this.runtime.character) {
+        const name = String(this.runtime.character.name);
         return name.replace(/\s+/g, '');
       }
 
@@ -1652,8 +1856,134 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
       // Fallback
       return "unknown";
-    } catch (error) {
+    } catch (error: unknown) {
       return "unknown";
+    }
+  }
+
+  async handlePersonalityMessage(message: RelayMessage): Promise<void> {
+    try {
+      if (!message) {
+        this.logger.warn(`[PLUGIN] handlePersonalityMessage called with empty message`, '', '');
+        return;
+      }
+
+      // Skip if we have no personality enhancer
+      if (!this.personality) {
+        this.logger.info(`[PLUGIN][PERSONALITY] No personality module available`, '', '');
+        return;
+      }
+
+      const messageText = message.text ? String(message.text) : '';
+
+      // Type assertion for the chat object
+      const roomId = (message.chat && typeof message.chat === 'object' && 'id' in message.chat && message.chat.id)
+        ? String(message.chat.id)
+        : '';
+
+      if (!roomId) {
+        this.logger.warn(`[PLUGIN][PERSONALITY] Message has no room ID, skipping personality processing`, '', '');
+        return;
+      }
+
+      // Type assertion for from object
+      const fromUser = (message.from && typeof message.from === 'object') ? message.from : null;
+      const username = fromUser && 'username' in fromUser ? String(fromUser.username) : '';
+
+      this.logger.info(`[PLUGIN][PERSONALITY] Processing message: ${messageText.substring(0, 50)}...`, '', '');
+
+      // Only process messages from other users/agents
+      if (message.sender_agent_id === this.agentId) {
+        this.logger.info(`[PLUGIN][PERSONALITY] Ignoring message from self`, '', '');
+        return;
+      }
+      // VALHALLA FIX: Skip personality processing for system messages
+      if ('telegram' in message && typeof message.telegram === 'object' &&
+        'entities' in message.telegram &&
+        Array.isArray(message.telegram.entities) &&
+        message.telegram.entities.some(entity =>
+          typeof entity === 'object' &&
+          'type' in entity &&
+          entity.type === 'bot_command')) {
+        this.logger.info(`[PLUGIN][PERSONALITY] Skipping personality for command message`, '', '');
+        return;
+      }
+
+      // Get the conversation context
+      const memories = this.fallbackMemory ? await this.fallbackMemory.getMemories({
+        roomId,
+        type: 'message',
+        limit: 30
+      }) : [];
+
+      // Format conversation history for the personality module
+      const conversation = memories.map(memory => {
+        // Type guard to ensure memory.content is an object with text property
+        const content = memory?.content && typeof memory.content === 'object' ? memory.content : null;
+        const text = content && 'text' in content && typeof content.text === 'string' ? content.text : '';
+
+        return {
+          sender: memory?.userId || 'unknown',
+          text: text
+        };
+      }).filter(msg => msg.text.trim() !== '');
+
+      // Process through personality enhancer and determine if we should respond
+      if (conversation.length > 0) {
+        this.logger.info(`[PLUGIN][PERSONALITY] Checking if should interrupt...`, '', '');
+
+        // Add current message if not already in conversation
+        if (messageText && !conversation.some(msg => msg.text === messageText)) {
+          conversation.push({
+            sender: username || 'user',
+            text: messageText
+          });
+        }
+        // Check if we should respond
+        const shouldInterrupt = await this.personality.shouldInterrupt({
+          messages: conversation
+        });
+
+        if (shouldInterrupt) {
+          this.logger.info(`[PLUGIN][PERSONALITY] Personality decided to respond!`, '', '');
+          // Check if we should change topic
+          const shouldChangeTopic = await this.personality.shouldChangeTopic({
+            messages: conversation
+          });
+
+          if (shouldChangeTopic) {
+            this.logger.info(`[PLUGIN][PERSONALITY] Personality decided to change topic!`, '', '');
+            // Implement topic change logic here if needed
+          }
+          // Calculate a reasonable delay before responding
+          const delay = this.personality.calculateResponseDelay({
+            messages: conversation
+          });
+
+          // Schedule the response
+          setTimeout(async () => {
+            try {
+              this.logger.info(`[PLUGIN][PERSONALITY] Generating personality response after ${delay}ms delay`, '', '');
+              // We should process this message through our normal response pipeline
+              await this.handleMessage(message);
+            } catch (responseError: unknown) {
+              if (responseError instanceof Error) {
+                this.logger.error(`[PLUGIN][PERSONALITY] Error during delayed response: ${responseError.message}`, '', '');
+              } else {
+                this.logger.error(`[PLUGIN][PERSONALITY] Error during delayed response: ${JSON.stringify(responseError)}`, '', '');
+              }
+            }
+          }, delay);
+        } else {
+          this.logger.info(`[PLUGIN][PERSONALITY] Personality decided NOT to respond`, '', '');
+        }
+      }
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[PLUGIN][PERSONALITY] Error in personality processing: ${error.message}`, '', '');
+      } else {
+        this.logger.error(`[PLUGIN][PERSONALITY] Error in personality processing: ${JSON.stringify(error)}`, '', '');
+      }
     }
   }
 }

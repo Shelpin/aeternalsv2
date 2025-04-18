@@ -1,6 +1,6 @@
 import { names, uniqueNamesGenerator } from "unique-names-generator";
-import type { ActionExample, Evaluator } from "./types";
-import { stringArrayFooter } from "./parsing";
+import type { ActionExample, Evaluator } from "./types.js";
+import { stringArrayFooter } from "./parsing.js";
 
 /**
  * Template used for the evaluation generateText.
@@ -47,6 +47,11 @@ export function formatEvaluators(evaluators: Evaluator[]) {
         .join(",\n");
 }
 
+// Polyfill for replaceAll (always use split/join for compatibility)
+function safeReplaceAll(str: string, search: string, replacement: string): string {
+    return str.split(search).join(replacement);
+}
+
 /**
  * Formats evaluator examples into a readable string, replacing placeholders with generated names.
  * @param evaluators - An array of evaluator objects, each containing examples to format.
@@ -66,11 +71,13 @@ export function formatEvaluatorExamples(evaluators: Evaluator[]) {
 
                     exampleNames.forEach((name, index) => {
                         const placeholder = `{{user${index + 1}}}`;
-                        formattedContext = formattedContext.replaceAll(
+                        formattedContext = safeReplaceAll(
+                            formattedContext,
                             placeholder,
                             name
                         );
-                        formattedOutcome = formattedOutcome.replaceAll(
+                        formattedOutcome = safeReplaceAll(
+                            formattedOutcome,
                             placeholder,
                             name
                         );
@@ -81,7 +88,8 @@ export function formatEvaluatorExamples(evaluators: Evaluator[]) {
                             let messageString = `${message.user}: ${message.content.text}`;
                             exampleNames.forEach((name, index) => {
                                 const placeholder = `{{user${index + 1}}}`;
-                                messageString = messageString.replaceAll(
+                                messageString = safeReplaceAll(
+                                    messageString,
                                     placeholder,
                                     name
                                 );

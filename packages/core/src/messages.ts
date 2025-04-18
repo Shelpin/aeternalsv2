@@ -4,7 +4,7 @@ import type {
     Content,
     Memory,
     UUID,
-} from "./types";
+} from "./types.js";
 
 /**
  * Get details for a list of actors.

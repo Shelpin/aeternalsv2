@@ -25,10 +25,7 @@ This should be refactored to eliminate the dependency cycle.
 ### 3. TypeScript Build Errors
 
 Several packages have TypeScript build errors:
-- cli
-- adapter-sqlite
 - telegram-multiagent
-- plugin-bootstrap
 - client-direct
 - agent
 
@@ -37,6 +34,11 @@ These errors should be addressed to ensure type safety and correct build output.
 ### 4. Missing Declaration Files
 
 Some packages don't have the expected .d.ts files in their dist directories. This can cause TypeScript integration issues when these packages are consumed by other packages or applications.
+
+Packages with missing .d.ts files:
+- telegram-multiagent
+- client-direct
+- agent
 
 ### 5. Configuration Inconsistencies
 
@@ -64,7 +66,7 @@ Based on the analysis, the recommended build sequence (assuming circular depende
 ## Next Steps
 
 1. Resolve the circular dependency between core and adapter-sqlite (highest priority)
-2. Fix TypeScript build errors across packages
+2. Fix TypeScript build errors across packages, particularly in telegram-multiagent
 3. Standardize the tsconfig.build.json configurations
-4. Address missing declaration files
+4. Address missing declaration files in agent and client-direct packages
 5. Fix file-level circular dependency in telegram-multiagent package 

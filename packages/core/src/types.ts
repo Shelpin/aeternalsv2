@@ -1,4 +1,4 @@
-export * from './api/types';
+export * from './api/types.js';
 
 import type { Readable } from "stream";
 
@@ -1636,4 +1636,4 @@ export interface ChunkRow {
 }
 
 // Temporary re-export of API types for backward compatibility
-export * from "./api/types";
+export * from "./api/types.js";

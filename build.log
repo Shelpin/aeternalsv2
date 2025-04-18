@@ -1,0 +1,125 @@
+
+> eliza@ build /root/eliza
+> pnpm -r run build
+
+Scope: 10 of 11 workspace projects
+packages/clients build$ echo 'No build required.'
+packages/clients/telegram prebuild$ rimraf dist && mkdir -p dist
+packages/dynamic-imports prebuild$ rimraf dist && mkdir -p dist
+packages/cli build$ echo 'No build required.'
+packages/clients build: No build required.
+packages/clients build: Done
+packages/cli build: No build required.
+packages/cli build: Done
+packages/dynamic-imports prebuild: Done
+packages/dynamic-imports build$ tsc -p tsconfig.build.json
+packages/clients/telegram prebuild: Done
+packages/clients/telegram build$ tsup --config tsup.config.cjs --dts
+packages/clients/telegram build: CLI Building entry: src/index.ts
+packages/clients/telegram build: CLI Using tsconfig: tsconfig.json
+packages/clients/telegram build: CLI tsup v8.3.5
+packages/clients/telegram build: CLI Using tsup config: /root/eliza/packages/clients/telegram/tsup.config.cjs
+packages/clients/telegram build: CLI Target: node18
+packages/clients/telegram build: CLI Cleaning output folder
+packages/clients/telegram build: ESM Build start
+packages/clients/telegram build: CJS Build start
+packages/clients/telegram build: DTS Build start
+packages/clients/telegram build: CJS dist/index.cjs     2.06 MB
+packages/clients/telegram build: CJS dist/index.cjs.map 3.25 MB
+packages/clients/telegram build: CJS ⚡️ Build success in 2507ms
+packages/clients/telegram build: ESM dist/index.js     2.06 MB
+packages/clients/telegram build: ESM dist/index.js.map 3.25 MB
+packages/clients/telegram build: ESM ⚡️ Build success in 2509ms
+packages/dynamic-imports build: Done
+packages/clients/telegram build: DTS ⚡️ Build success in 5601ms
+packages/clients/telegram build: DTS dist/index.d.ts  1.17 KB
+packages/clients/telegram build: DTS dist/index.d.cts 1.17 KB
+packages/clients/telegram build: Done
+packages/telegram-multiagent prebuild$ rm -rf dist && mkdir -p dist
+packages/telegram-multiagent prebuild: Done
+packages/telegram-multiagent build$ tsc -p tsconfig.build.json
+packages/telegram-multiagent build: src/ConversationManager.ts(229,55): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+packages/telegram-multiagent build: src/ConversationManager.ts(420,54): error TS2339: Property 'generateText' does not exist on type '{}'.
+packages/telegram-multiagent build: src/PersonalityEnhancer.ts(70,30): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+packages/telegram-multiagent build: src/PersonalityEnhancer.ts(861,30): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+packages/telegram-multiagent build: src/PluginComponent.ts(32,5): error TS2739: Type '{}' is missing the following properties from type 'IAgentRuntime': getAgentId, getService
+packages/telegram-multiagent build: src/SqliteAdapterProxy.ts(9,10): error TS2724: '"./types.js"' has no exported member named 'elizaLogger'. Did you mean 'ElizaLogger'?
+packages/telegram-multiagent build: src/SqliteAdapterProxy.ts(164,102): error TS7006: Parameter 't' implicitly has an 'any' type.
+packages/telegram-multiagent build: src/TelegramCoordinationAdapter.ts(1130,25): error TS2532: Object is possibly 'undefined'.
+packages/telegram-multiagent build: src/TelegramCoordinationAdapter.ts(1130,25): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(21,38): error TS2307: Cannot find module './config.js' or its corresponding type declarations.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(389,7): error TS2322: Type '{}' is not assignable to type 'string'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(390,7): error TS2322: Type '{}' is not assignable to type 'string'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(396,43): error TS2571: Object is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(500,50): error TS7006: Parameter 'message' implicitly has an 'any' type.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(509,13): error TS2571: Object is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(640,34): error TS18048: 'runtime.agent' is possibly 'undefined'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(640,34): error TS18046: 'runtime.agent.respond' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(809,27): error TS2532: Object is possibly 'undefined'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(880,42): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(881,37): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(882,32): error TS2339: Property 'content' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(883,48): error TS2339: Property 'content' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(886,24): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(887,100): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(974,64): error TS2774: This condition will always return true since this function is always defined. Did you mean to call it instead?
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1205,23): error TS2532: Object is possibly 'undefined'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1274,36): error TS2722: Cannot invoke an object which is possibly 'undefined'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1274,36): error TS18048: 'runtime.handleMessage' is possibly 'undefined'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1279,78): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1601,13): error TS7022: 'minimalTelegramClient' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1745,101): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1748,38): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1753,83): error TS2339: Property 'text' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1799,76): error TS2339: Property 'name' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramMultiAgentPlugin.ts(1800,45): error TS2339: Property 'name' does not exist on type '{}'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(124,13): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(125,85): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(125,109): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(129,112): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(132,13): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(133,59): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(136,15): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(137,96): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(141,13): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(142,73): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(147,75): error TS18046: 'parseError' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(213,54): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(372,12): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(373,54): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(380,60): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(440,12): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(441,47): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(448,53): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(482,12): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(483,66): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(487,14): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(489,65): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(582,11): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(582,38): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(583,24): error TS18046: 'data' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(589,61): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/TelegramRelay.ts(690,64): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(1,60): error TS2307: Cannot find module './ConversationKickstarter.js' or its corresponding type declarations.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(2,43): error TS2307: Cannot find module './types.js' or its corresponding type declarations.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(3,31): error TS2307: Cannot find module './TelegramRelay.js' or its corresponding type declarations.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(4,37): error TS2307: Cannot find module './PersonalityEnhancer.js' or its corresponding type declarations.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(5,37): error TS2307: Cannot find module './ConversationManager.js' or its corresponding type declarations.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(6,29): error TS2307: Cannot find module './types.js' or its corresponding type declarations.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(16,32): error TS2304: Cannot find name 'TelegramCoordinationAdapter'.
+packages/telegram-multiagent build: src/__tests__/ConversationKickstarter.test.ts(47,33): error TS2304: Cannot find name 'TelegramCoordinationAdapter'.
+packages/telegram-multiagent build: src/agentIdVerifier.ts(33,7): error TS2322: Type '"Runtime is null"' is not assignable to type 'undefined'.
+packages/telegram-multiagent build: src/agentIdVerifier.ts(41,7): error TS2322: Type '"getAgentId is not a function"' is not assignable to type 'undefined'.
+packages/telegram-multiagent build: src/agentIdVerifier.ts(50,7): error TS2322: Type 'string' is not assignable to type 'undefined'.
+packages/telegram-multiagent build: src/agentIdVerifier.ts(54,9): error TS2322: Type '"Agent ID is empty or undefined"' is not assignable to type 'undefined'.
+packages/telegram-multiagent build: src/agentIdVerifier.ts(57,7): error TS2322: Type 'string' is not assignable to type 'undefined'.
+packages/telegram-multiagent build: src/agentIdVerifier.ts(57,49): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/agentIdVerifier.ts(126,50): error TS18046: 'error' is of type 'unknown'.
+packages/telegram-multiagent build: src/index.ts(21,23): error TS7006: Parameter 'runtime' implicitly has an 'any' type.
+packages/telegram-multiagent build: src/public-api.ts(15,1): error TS2308: Module './types.js' has already exported a member named 'Topic'. Consider explicitly re-exporting to resolve the ambiguity.
+packages/telegram-multiagent build: src/public-api.ts(16,1): error TS2308: Module './types.js' has already exported a member named 'FollowUpType'. Consider explicitly re-exporting to resolve the ambiguity.
+packages/telegram-multiagent build: Failed
+/root/eliza/packages/telegram-multiagent:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @elizaos/telegram-multiagent@ build: `tsc -p tsconfig.build.json`
+Exit status 2
+ ELIFECYCLE  Command failed with exit code 2.

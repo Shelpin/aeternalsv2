@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ModelProviderName } from "./types";
-import elizaLogger from "./logger";
+import { ModelProviderName } from "./types.js";
+import elizaLogger from "./logger.js";
 
 // TODO: TO COMPLETE
 export const envSchema = z.object({
@@ -110,9 +110,9 @@ export const CharacterSchema = z.object({
                 maxOutputTokens: z.number().optional(),
                 temperature: z.number().optional(),
                 frequency_penalty: z.number().optional(),
-                presence_penalty:z.number().optional()
+                presence_penalty: z.number().optional()
             })
-            .optional(),
+                .optional(),
             embeddingModel: z.string().optional(),
         })
         .optional(),

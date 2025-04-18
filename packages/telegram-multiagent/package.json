@@ -12,7 +12,7 @@
   },
   "scripts": {
     "prebuild": "rm -rf dist && mkdir -p dist",
-    "build": "tsup --config tsup.config.ts --dts"
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@elizaos/telegram-client": "workspace:*"

@@ -6,25 +6,25 @@ import {
     composeActionExamples,
     formatActionNames,
     formatActions,
-} from "./actions";
-import { addHeader, composeContext } from "./context";
+} from "./actions.js";
+import { addHeader, composeContext } from "./context.js";
 import {
     evaluationTemplate,
     formatEvaluatorExamples,
     formatEvaluatorNames,
     formatEvaluators,
-} from "./evaluators";
-import { generateText } from "./generation";
-import { formatGoalsAsString, getGoals } from "./goals";
-import { elizaLogger } from "./internal/logger-internal";
-import { callKnowledgeSet, callKnowledgeGet } from "./knowledge-bridge";
-import { MemoryManager } from "./memory";
-import { formatActors, formatMessages, getActorDetails } from "./messages";
-import { parseJsonArrayFromText } from "./parsing";
-import { formatPosts } from "./posts";
-import { getProviders } from "./providers";
-import { RAGKnowledgeManager } from "./ragknowledge";
-import settings from "./settings";
+} from "./evaluators.js";
+import { generateText } from "./generation.js";
+import { formatGoalsAsString, getGoals } from "./goals.js";
+import { elizaLogger } from "./internal/logger-internal.js";
+import { callKnowledgeSet, callKnowledgeGet } from "./knowledge-bridge.js";
+import { MemoryManager } from "./memory.js";
+import { formatActors, formatMessages, getActorDetails } from "./messages.js";
+import { parseJsonArrayFromText } from "./parsing.js";
+import { formatPosts } from "./posts.js";
+import { getProviders } from "./providers.js";
+import { RAGKnowledgeManager } from "./ragknowledge.js";
+import settings from "./settings.js";
 import {
     type Character,
     type Goal,
@@ -54,8 +54,8 @@ import {
     type Memory,
     type DirectoryItem,
     type ClientInstance,
-} from "./types";
-import { stringToUuid } from "./uuid";
+} from "./types.js";
+import { stringToUuid } from "./uuid.js";
 import { glob } from "glob";
 import { existsSync } from "fs";
 /**

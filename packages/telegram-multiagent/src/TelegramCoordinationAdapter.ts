@@ -1,7 +1,7 @@
-import { IAgentRuntime, ElizaLogger } from './types';
-import { PersonalityEnhancer } from './PersonalityEnhancer';
-import { SqliteDatabaseAdapter } from './SqliteAdapterProxy';
-import { telegramMultiAgentSchema } from './schema';
+import { IAgentRuntime, ElizaLogger } from './types.js';
+import { PersonalityEnhancer } from './PersonalityEnhancer.js';
+import { SqliteDatabaseAdapter } from './SqliteAdapterProxy.js';
+import { telegramMultiAgentSchema } from './schema.js';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -148,16 +148,17 @@ export class TelegramCoordinationAdapter {
    * @param params Parameters for the SQL query
    * @returns Query result
    */
-  private execSQL<T>(sql: string, params: any[] = []): T | undefined {
+  private execSQL<T>(sql: string, params: unknown[] = []): T | undefined {
     if (!this.db) return undefined;
-    
     try {
       const stmt = (this.db as any).db.prepare(sql);
-      // We'll use a typed function that accepts a spread of parameters
-      // This avoids the "Expected 1 arguments, but got 2" error
       return stmt.get(...params) as T;
-    } catch (error) {
-      this.logger.error(`SQL Error: ${error.toString()}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`SQL Error: ${error.message}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      } else {
+        this.logger.error(`SQL Error: ${JSON.stringify(error)}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      }
       return undefined;
     }
   }
@@ -168,15 +169,17 @@ export class TelegramCoordinationAdapter {
    * @param params Parameters for the SQL query
    * @returns Array of query results
    */
-  private execSQLAll<T>(sql: string, params: any[] = []): T[] {
+  private execSQLAll<T>(sql: string, params: unknown[] = []): T[] {
     if (!this.db) return [];
-    
     try {
       const stmt = (this.db as any).db.prepare(sql);
-      // We'll use a typed function that accepts a spread of parameters
       return stmt.all(...params) as T[];
-    } catch (error) {
-      this.logger.error(`SQL Error: ${error.toString()}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`SQL Error: ${error.message}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      } else {
+        this.logger.error(`SQL Error: ${JSON.stringify(error)}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      }
       return [];
     }
   }
@@ -187,15 +190,17 @@ export class TelegramCoordinationAdapter {
    * @param params Parameters for the SQL query
    * @returns Query result
    */
-  private execSQLRun(sql: string, params: any[] = []): { changes: number } {
+  private execSQLRun(sql: string, params: unknown[] = []): { changes: number } {
     if (!this.db) return { changes: 0 };
-    
     try {
       const stmt = (this.db as any).db.prepare(sql);
-      // We'll use a typed function that accepts a spread of parameters
       return stmt.run(...params);
-    } catch (error) {
-      this.logger.error(`SQL Error: ${error.toString()}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`SQL Error: ${error.message}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      } else {
+        this.logger.error(`SQL Error: ${JSON.stringify(error)}, SQL: ${sql}, Params: ${JSON.stringify(params)}`);
+      }
       return { changes: 0 };
     }
   }
@@ -206,11 +211,14 @@ export class TelegramCoordinationAdapter {
   public async initialize(): Promise<void> {
     if (this.db) {
       try {
-        // Initialize the database with Telegram-specific schema
         (this.db as any).db.exec(telegramMultiAgentSchema);
         this.logger.info('TelegramCoordinationAdapter: Database initialized successfully');
-      } catch (error) {
-        this.logger.error('TelegramCoordinationAdapter: Failed to initialize database', error);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.error('TelegramCoordinationAdapter: Failed to initialize database', error.message);
+        } else {
+          this.logger.error('TelegramCoordinationAdapter: Failed to initialize database', JSON.stringify(error));
+        }
         throw error;
       }
     } else {
@@ -272,8 +280,12 @@ export class TelegramCoordinationAdapter {
       
       this.logger.info(`TelegramCoordinationAdapter: Created conversation with topic ID ${topicId}`);
       return conversationId;
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to create conversation', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to create conversation', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to create conversation', JSON.stringify(error));
+      }
       return conversation.id;
     }
   }
@@ -328,8 +340,12 @@ export class TelegramCoordinationAdapter {
       ]);
       
       this.logger.info(`TelegramCoordinationAdapter: Added participant ${participant.agentId} to conversation ${conversationId}`);
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to add participant', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to add participant', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to add participant', JSON.stringify(error));
+      }
     }
   }
   
@@ -421,8 +437,12 @@ export class TelegramCoordinationAdapter {
       ]);
       
       this.logger.info(`TelegramCoordinationAdapter: Recorded message ${message.id} in conversation ${message.conversationId}`);
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to record message', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to record message', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to record message', JSON.stringify(error));
+      }
     }
   }
   
@@ -456,8 +476,12 @@ export class TelegramCoordinationAdapter {
       } else {
         this.logger.info(`TelegramCoordinationAdapter: Ended conversation ${conversationId}`);
       }
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to end conversation', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to end conversation', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to end conversation', JSON.stringify(error));
+      }
     }
   }
   
@@ -531,8 +555,12 @@ export class TelegramCoordinationAdapter {
       };
       
       return conversation;
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to get conversation', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to get conversation', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to get conversation', JSON.stringify(error));
+      }
       return null;
     }
   }
@@ -611,8 +639,12 @@ export class TelegramCoordinationAdapter {
       }
       
       return conversations;
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to get active conversations', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to get active conversations', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to get active conversations', JSON.stringify(error));
+      }
       return [];
     }
   }
@@ -672,8 +704,12 @@ export class TelegramCoordinationAdapter {
         isFollowUp: m.has_replies > 0,
         replyToId: m.reply_to_message_id
       })).reverse(); // Return in chronological order
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to get recent messages', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to get recent messages', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to get recent messages', JSON.stringify(error));
+      }
       return [];
     }
   }
@@ -745,8 +781,12 @@ export class TelegramCoordinationAdapter {
         
         this.logger.info(`TelegramCoordinationAdapter: Created new topic ${topicId}`);
       }
-    } catch (error) {
-      this.logger.error('TelegramCoordinationAdapter: Failed to upsert topic', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error('TelegramCoordinationAdapter: Failed to upsert topic', error.message);
+      } else {
+        this.logger.error('TelegramCoordinationAdapter: Failed to upsert topic', JSON.stringify(error));
+      }
     }
   }
   
@@ -850,7 +890,7 @@ export class TelegramCoordinationAdapter {
       const relevanceScores: Record<string, number> = {};
       
       // Calculate relevance for known agents
-      Object.keys(this.knownAgents).forEach(agentId => {
+      Object.keys(this.knownAgents).forEach((agentId: string) => {
         if (this.agentId === agentId && this.personalityEnhancer) {
           // For our own agent, we can calculate precise relevance
           relevanceScores[agentId] = this.personalityEnhancer.calculateTopicRelevance(topic);
@@ -909,7 +949,7 @@ export class TelegramCoordinationAdapter {
         const preferredWords = preferredLower.split(/\s+/);
         
         for (const word of topicWords) {
-          if (word.length > 3 && preferredWords.some(pw => pw.includes(word) || word.includes(pw))) {
+          if (word.length > 3 && preferredWords.some((pw: string) => pw.includes(word) || word.includes(pw))) {
             maxRelevance = Math.max(maxRelevance, 0.6);
           }
         }
@@ -933,11 +973,11 @@ export class TelegramCoordinationAdapter {
     // In a real implementation, would query the coordination service
     // For now, just use the local cache
     return Object.values(this.knownAgents)
-      .filter(agent => 
+      .filter((agent: AgentAvailability) => 
         agent.available && 
         !excludeAgentIds.includes(agent.agentId)
       )
-      .map(agent => agent.agentId);
+      .map((agent: AgentAvailability) => agent.agentId);
   }
   
   /**
@@ -949,7 +989,7 @@ export class TelegramCoordinationAdapter {
    */
   async estimateTopicRelevance(agentId: string, topic: string): Promise<number> {
     // Check for cached relevance scores first
-    const existingTopic = this.recentTopics.find(t => 
+    const existingTopic = this.recentTopics.find((t: TopicMetadata) => 
       t.topic.toLowerCase() === topic.toLowerCase()
     );
     
@@ -1068,7 +1108,7 @@ export class TelegramCoordinationAdapter {
     const cutoff = now - this.availabilityCutoffMs;
     
     // Remove agents that haven't been active recently
-    Object.keys(this.knownAgents).forEach(agentId => {
+    Object.keys(this.knownAgents).forEach((agentId: string) => {
       if (this.knownAgents[agentId].lastActive < cutoff) {
         // Mark as unavailable rather than removing
         this.knownAgents[agentId].available = false;

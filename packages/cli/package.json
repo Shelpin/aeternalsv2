@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "tsup --config tsup.config.ts && ../../node_modules/.bin/tsc -p tsconfig.build.json --emitDeclarationOnly"
+    "build": "echo 'No build required.'"
   },
   "bin": {
     "elizaos": "index.js"

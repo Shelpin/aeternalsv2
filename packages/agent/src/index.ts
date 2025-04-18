@@ -20,7 +20,7 @@ import {
     stringToUuid,
     validateCharacterConfig,
 } from "@elizaos/core/public-api";
-import { defaultCharacter } from "./defaultCharacter";
+import { defaultCharacter } from "./defaultCharacter.js";
 
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import JSON5 from 'json5';
@@ -430,7 +430,7 @@ export function getTokenForProvider(
         case ModelProviderName.OPENAI:
             return (
                 character.settings?.secrets?.OPENAI_API_KEY ||
-                settings.OPENAI_API_KEY
+                settings?.OPENAI_API_KEY
             );
         case ModelProviderName.ETERNALAI:
             return (
@@ -438,10 +438,7 @@ export function getTokenForProvider(
                 settings.ETERNALAI_API_KEY
             );
         case ModelProviderName.NINETEEN_AI:
-            return (
-                character.settings?.secrets?.NINETEEN_AI_API_KEY ||
-                settings.NINETEEN_AI_API_KEY
-            );
+            return "";
         case ModelProviderName.LLAMACLOUD:
         case ModelProviderName.TOGETHER:
             return (
@@ -473,7 +470,7 @@ export function getTokenForProvider(
         case ModelProviderName.GROK:
             return (
                 character.settings?.secrets?.GROK_API_KEY ||
-                settings.GROK_API_KEY
+                settings?.GROK_API_KEY
             );
         case ModelProviderName.HEURIST:
             return (
@@ -533,7 +530,9 @@ export function getTokenForProvider(
         case ModelProviderName.AKASH_CHAT_API:
             return (
                 character.settings?.secrets?.AKASH_CHAT_API_KEY ||
-                settings.AKASH_CHAT_API_KEY
+                character.settings?.secrets?.AKASH_API_KEY ||
+                settings.AKASH_CHAT_API_KEY ||
+                settings.AKASH_API_KEY
             );
         case ModelProviderName.GOOGLE:
             return (

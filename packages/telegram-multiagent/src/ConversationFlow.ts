@@ -1,6 +1,6 @@
-import { ElizaLogger } from './types';
-import { TypingSimulator } from './TypingSimulator';
-import { PersonalityEnhancer } from './PersonalityEnhancer';
+import { ElizaLogger } from './types.js';
+import { TypingSimulator } from './TypingSimulator.js';
+import { PersonalityEnhancer } from './PersonalityEnhancer.js';
 
 /**
  * Types of follow-up messages that can be generated

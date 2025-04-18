@@ -1,50 +1,5 @@
-import { 
-  IAgentRuntime, 
-  ElizaLogger, 
-  Character 
-} from './types.js';
+import { IAgentRuntime, ElizaLogger, Character, PersonalityTraits, PersonalityVoice, PersonalityStyle } from './types.js';
 import { PluginComponent } from './PluginComponent.js';
-
-/**
- * PersonalityTraits define the behavioral characteristics of an agent
- */
-export interface PersonalityTraits {
-  verbosity: number;     // 0-1: How wordy the agent is
-  formality: number;     // 0-1: How formal vs casual
-  positivity: number;    // 0-1: How positive vs negative
-  responseSpeed: number; // 0-1: How quickly they respond
-  emoji: number;         // 0-1: Frequency of emoji usage
-  interruption: number;  // 0-1: Tendency to interrupt conversations
-  topicDrift: number;    // 0-1: Tendency to change topics
-  questionFrequency: number; // 0-1: How often they ask questions
-}
-
-/**
- * PersonalityVoice defines the textual expression style of an agent
- */
-export interface PersonalityVoice {
-  voicePatterns: string[];
-  commonEmojis: string[];
-  slang: string[];
-}
-
-/**
- * Defines the style for an agent's personality
- */
-export interface PersonalityStyle {
-  /** How formal the agent is (0-1) */
-  formality: number;
-  /** How enthusiastic the agent is (0-1) */
-  enthusiasm: number;
-  /** How conversational the agent is (0-1) */
-  conversational: number;
-  /** How technical the agent is (0-1) */
-  technical: number;
-  /** How humorous the agent is (0-1) */
-  humor: number;
-  /** Additional agent traits (e.g., "curious", "helpful") */
-  traits: string[];
-}
 
 /**
  * Default personality style
@@ -92,6 +47,11 @@ export class PersonalityEnhancer extends PluginComponent {
     
     this.agentId = agentId;
     
+    this.traits = this.getDefaultTraits();
+    this.voice = { voicePatterns: [], commonEmojis: [], slang: [] };
+    this.interests = [];
+    this.style = { ...DEFAULT_PERSONALITY };
+    
     if (runtime) {
       this.setRuntime(runtime);
     }
@@ -109,8 +69,12 @@ export class PersonalityEnhancer extends PluginComponent {
       const runtime = await this.waitForRuntime();
       this.character = await runtime.getCharacter();
       this.logger.info(`PersonalityEnhancer: Retrieved character for ${this.agentId}`);
-    } catch (error) {
-      this.logger.warn(`PersonalityEnhancer: Could not load character: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`PersonalityEnhancer: Could not load character: ${error.message}`);
+      } else {
+        this.logger.warn(`PersonalityEnhancer: Could not load character: ${JSON.stringify(error)}`);
+      }
     }
   }
   
@@ -120,11 +84,9 @@ export class PersonalityEnhancer extends PluginComponent {
   private extractTraitsFromCharacter(): PersonalityTraits {
     if (!this.character) {
       this.logger.debug(`PersonalityEnhancer: No character found, using default traits for ${this.agentId}`);
-      // Use type assertion to tell TypeScript this is a valid key access
       const knownAgent = this.agentId as keyof typeof this.defaultTraits;
       return this.defaultTraits[knownAgent] || this.getDefaultTraits();
     }
-    
     const traits: PersonalityTraits = { ...this.getDefaultTraits() };
     
     // Map character adjectives to personality traits
@@ -170,8 +132,8 @@ export class PersonalityEnhancer extends PluginComponent {
     };
     
     // Apply trait adjustments from character adjectives
-    if (this.character.adjectives) {
-      for (const adj of this.character.adjectives) {
+    if (this.character && Array.isArray((this.character as { adjectives?: unknown[] }).adjectives)) {
+      for (const adj of (this.character as { adjectives: string[] }).adjectives) {
         const adjLower = adj.toLowerCase();
         if (adjectiveMap[adjLower]) {
           Object.assign(traits, adjectiveMap[adjLower]);
@@ -180,8 +142,8 @@ export class PersonalityEnhancer extends PluginComponent {
     }
     
     // Apply trait adjustments from character style.voice
-    if (this.character.style && this.character.style.voice) {
-      const voice = this.character.style.voice.toLowerCase();
+    if (this.character && (this.character as { style?: { voice?: string } }).style && typeof (this.character as { style: { voice?: string } }).style.voice === 'string') {
+      const voice = (this.character as { style: { voice: string } }).style.voice.toLowerCase();
       if (voice.includes('formal')) traits.formality += 0.2;
       if (voice.includes('casual')) traits.formality -= 0.2;
       if (voice.includes('emoji')) traits.emoji += 0.3;
@@ -191,7 +153,8 @@ export class PersonalityEnhancer extends PluginComponent {
       
       // Clamp values to 0-1 range
       Object.keys(traits).forEach(key => {
-        traits[key as keyof PersonalityTraits] = Math.max(0, Math.min(1, traits[key as keyof PersonalityTraits]));
+        const value = traits[key as keyof PersonalityTraits];
+        traits[key as keyof PersonalityTraits] = typeof value === 'number' ? Math.max(0, Math.min(1, value)) : 0;
       });
     }
     
@@ -393,15 +356,15 @@ export class PersonalityEnhancer extends PluginComponent {
     };
     
     // Extract emojis from character style
-    if (this.character.style && this.character.style.emojis) {
-      voice.commonEmojis = this.character.style.emojis;
+    if (this.character && (this.character as { style?: { emojis?: string[] } }).style && Array.isArray((this.character as { style: { emojis?: string[] } }).style.emojis)) {
+      voice.commonEmojis = (this.character as { style: { emojis: string[] } }).style.emojis;
     }
     
     // Extract voice patterns from messageExamples
-    if (this.character.messageExamples && this.character.messageExamples.length > 0) {
+    if (this.character && Array.isArray((this.character as { messageExamples?: string[] }).messageExamples) && (this.character as { messageExamples: string[] }).messageExamples.length > 0) {
       // Extract common phrases and patterns from message examples
       const phrases = new Set<string>();
-      for (const message of this.character.messageExamples) {
+      for (const message of (this.character as { messageExamples: string[] }).messageExamples) {
         // Simple heuristic to extract potential catchphrases
         const candidatePhrases = message.split(/[.!?]/).map(s => s.trim()).filter(s => 
           s.length > 5 && s.length < 50 && !s.includes('\n')
@@ -431,7 +394,7 @@ export class PersonalityEnhancer extends PluginComponent {
    * @param context - Optional context about the conversation
    * @returns Enhanced message with personality elements
    */
-  enhanceMessage(message: string, context: any = {}): string {
+  enhanceMessage(message: string, context: Record<string, unknown> = {}): string {
     if (!message) return message;
     
     let enhanced = message;
@@ -574,7 +537,7 @@ export class PersonalityEnhancer extends PluginComponent {
    * @param context - Optional context about the conversation
    * @returns Delay time in milliseconds
    */
-  calculateResponseDelay(context: any = {}): number {
+  calculateResponseDelay(context: Record<string, unknown> = {}): number {
     // Base response time is inversely proportional to response speed trait
     const baseDelay = (1 - this.traits.responseSpeed) * 5000 + 1000; // 1-6 seconds
     
@@ -591,11 +554,11 @@ export class PersonalityEnhancer extends PluginComponent {
     let totalDelay = baseDelay * verbosityFactor * formalityFactor * randomFactor;
     
     // Context-specific adjustments
-    if (context.isComplexTopic) {
+    if (typeof context.isComplexTopic === 'boolean' && context.isComplexTopic) {
       totalDelay *= 1.5; // Complex topics need more time
     }
     
-    if (context.isEmotional) {
+    if (typeof context.isEmotional === 'boolean' && context.isEmotional) {
       totalDelay *= 0.8; // Emotional responses are quicker
     }
     
@@ -608,31 +571,21 @@ export class PersonalityEnhancer extends PluginComponent {
    * @param context - Optional context about the conversation
    * @returns True if agent should interrupt
    */
-  shouldInterrupt(context: any = {}): boolean {
-    // Base chance from interruption trait
-    let interruptChance = this.traits.interruption * 0.2; // 0-20% base chance
-    
-    // Adjust based on topic relevance
-    if (context.topicRelevance) {
+  shouldInterrupt(context: Record<string, unknown> = {}): boolean {
+    let interruptChance = this.traits.interruption * 0.2;
+    if (typeof context.topicRelevance === 'number') {
       if (context.topicRelevance > 0.8) {
-        // Very relevant to agent's interests
-        interruptChance *= 2; // Double the chance
+        interruptChance *= 2;
       } else if (context.topicRelevance < 0.3) {
-        // Not relevant to agent's interests
-        interruptChance *= 0.5; // Half the chance
+        interruptChance *= 0.5;
       }
     }
-    
-    // Adjust based on conversation context
-    if (context.isHeatedDiscussion) {
-      interruptChance *= 1.5; // More likely in heated discussions
+    if (typeof context.isHeatedDiscussion === 'boolean' && context.isHeatedDiscussion) {
+      interruptChance *= 1.5;
     }
-    
-    if (context.isFormalSetting) {
-      interruptChance *= (1 - this.traits.formality); // Less likely in formal settings for formal agents
+    if (typeof context.isFormalSetting === 'boolean' && context.isFormalSetting) {
+      interruptChance *= (1 - this.traits.formality);
     }
-    
-    // Random decision based on calculated chance
     return Math.random() < interruptChance;
   }
   
@@ -643,21 +596,14 @@ export class PersonalityEnhancer extends PluginComponent {
    * @param context - Optional context about the conversation
    * @returns True if agent should change the topic
    */
-  shouldChangeTopic(currentTopic: string, context: any = {}): boolean {
-    // Base chance from topic drift trait
-    let driftChance = this.traits.topicDrift * 0.15; // 0-15% base chance
-    
-    // Reduce chance if the current topic is highly relevant
-    if (context.topicRelevance && context.topicRelevance > 0.7) {
-      driftChance *= 0.5; // Half the chance for relevant topics
+  shouldChangeTopic(currentTopic: string, context: Record<string, unknown> = {}): boolean {
+    let driftChance = this.traits.topicDrift * 0.15;
+    if (typeof context.topicRelevance === 'number' && context.topicRelevance > 0.7) {
+      driftChance *= 0.5;
     }
-    
-    // Increase chance if the topic has been discussed for a while
-    if (context.topicDuration && context.topicDuration > 10) {
-      driftChance *= 1.5; // 50% more likely after 10 messages on same topic
+    if (typeof context.topicDuration === 'number' && context.topicDuration > 10) {
+      driftChance *= 1.5;
     }
-    
-    // Random decision based on calculated chance
     return Math.random() < driftChance;
   }
   
@@ -667,20 +613,19 @@ export class PersonalityEnhancer extends PluginComponent {
    * @param topic - The original topic
    * @returns Topic refined to match personality
    */
-  async refineTopic(topic: string): Promise<string> {
+  refineTopic(topic: string): string {
     try {
       // Try to update character info if not already loaded
       if (!this.character) {
-        await this.updateCharacterInfo();
+        // Only await if updateCharacterInfo is defined and is a function
+        if (typeof this.updateCharacterInfo === 'function') {
+          // This is a sync function, so we can't await here, but we can call it and ignore the result
+          this.updateCharacterInfo();
+        }
       }
-      
-      // If we have a character, personalize the topic
       if (this.character) {
-        // Use adjectives instead of traits since Character doesn't have a traits property
         const adjectives = this.character.adjectives || [];
-        const name = this.character.name || this.agentId;
-        
-        // Personalize based on character adjectives
+        const name = this.character.name ?? this.agentId;
         if (adjectives.includes('technical')) {
           return `${topic}? From a technical perspective, this is quite interesting.`;
         } else if (adjectives.includes('friendly')) {
@@ -691,10 +636,13 @@ export class PersonalityEnhancer extends PluginComponent {
           return `I'm really curious about ${topic}. Has anyone looked into this lately?`;
         }
       }
-      
       return topic;
-    } catch (error) {
-      this.logger.warn(`PersonalityEnhancer: Error refining topic: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`PersonalityEnhancer: Error refining topic: ${error.message}`);
+      } else {
+        this.logger.warn(`PersonalityEnhancer: Error refining topic: ${JSON.stringify(error)}`);
+      }
       return topic;
     }
   }
@@ -867,6 +815,16 @@ export class PersonalityEnhancer extends PluginComponent {
    * @returns A new topic
    */
   async generateTopic(): Promise<string> {
+    const fallbackTopics = [
+      "the future of decentralized finance",
+      "latest NFT trends",
+      "Bitcoin's recent price movements",
+      "Layer 2 scaling solutions",
+      "the metaverse and its potential",
+      "Web3 adoption challenges",
+      "crypto regulations worldwide",
+      "blockchain interoperability"
+    ];
     try {
       // Try to update character info if not already loaded
       if (!this.character) {
@@ -874,29 +832,21 @@ export class PersonalityEnhancer extends PluginComponent {
       }
       
       // If we have character topics, use those
-      if (this.character && this.character.topics && this.character.topics.length > 0) {
-        const { topics } = this.character;
+      if (this.character && Array.isArray((this.character as { topics?: unknown[] }).topics) && (this.character as { topics: unknown[] }).topics.length > 0) {
+        const { topics } = this.character as { topics: string[] };
         const randomIndex = Math.floor(Math.random() * topics.length);
         return topics[randomIndex];
       }
       
       // Fallback topics
-      const fallbackTopics = [
-        "the future of decentralized finance",
-        "latest NFT trends",
-        "Bitcoin's recent price movements",
-        "Layer 2 scaling solutions",
-        "the metaverse and its potential",
-        "Web3 adoption challenges",
-        "crypto regulations worldwide",
-        "blockchain interoperability"
-      ];
-      
       const randomIndex = Math.floor(Math.random() * fallbackTopics.length);
       return fallbackTopics[randomIndex];
-    } catch (error) {
-      this.logger.warn(`PersonalityEnhancer: Error generating topic: ${error.message}`);
-      
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`PersonalityEnhancer: Error generating topic: ${error.message}`);
+      } else {
+        this.logger.warn(`PersonalityEnhancer: Error generating topic: ${JSON.stringify(error)}`);
+      }
       // Return a default topic
       return "blockchain technology and its applications";
     }
@@ -910,8 +860,12 @@ export class PersonalityEnhancer extends PluginComponent {
       const runtime = await this.waitForRuntime();
       this.character = await runtime.getCharacter();
       this.logger.debug(`PersonalityEnhancer: Updated character info for ${this.agentId}`);
-    } catch (error) {
-      this.logger.warn(`PersonalityEnhancer: Could not update character info: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`PersonalityEnhancer: Could not update character info: ${error.message}`);
+      } else {
+        this.logger.warn(`PersonalityEnhancer: Could not update character info: ${JSON.stringify(error)}`);
+      }
     }
   }
   

@@ -21,7 +21,13 @@ export class AgentIdVerifier {
     agentId?: string;
     error?: string;
   } {
-    const result = {
+    const result: {
+      hasRuntime: boolean;
+      hasAgentId: boolean;
+      hasGetAgentId: boolean;
+      agentId?: string;
+      error?: string;
+    } = {
       hasRuntime: false,
       hasAgentId: false,
       hasGetAgentId: false,
@@ -53,8 +59,12 @@ export class AgentIdVerifier {
       if (!agentId) {
         result.error = 'Agent ID is empty or undefined';
       }
-    } catch (error) {
-      result.error = `Error getting agent ID: ${error.message}`;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        result.error = `Error getting agent ID: ${error.message}`;
+      } else {
+        result.error = `Error getting agent ID: ${JSON.stringify(error)}`;
+      }
     }
     
     return result;
@@ -122,8 +132,12 @@ export class AgentIdVerifier {
       } else {
         messages.push('❌ Agent ID is empty or undefined');
       }
-    } catch (error) {
-      messages.push(`❌ Error getting agent ID: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        messages.push(`❌ Error getting agent ID: ${error.message}`);
+      } else {
+        messages.push(`❌ Error getting agent ID: ${JSON.stringify(error)}`);
+      }
     }
     
     return messages;

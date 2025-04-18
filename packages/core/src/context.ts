@@ -1,5 +1,5 @@
 import handlebars from "handlebars";
-import type { State, TemplateType } from "./types";
+import type { State, TemplateType } from "./types.js";
 import { names, uniqueNamesGenerator } from "unique-names-generator";
 
 /**
@@ -108,8 +108,13 @@ export const composeRandomUser = (template: string, length: number) => {
     );
     let result = template;
     for (let i = 0; i < exampleNames.length; i++) {
-        result = result.replaceAll(`{{user${i + 1}}}`, exampleNames[i]);
+        result = safeReplaceAll(result, `{{user${i + 1}}}`, exampleNames[i]);
     }
 
     return result;
 };
+
+// Polyfill for replaceAll (always use split/join for compatibility)
+function safeReplaceAll(str: string, search: string, replacement: string): string {
+    return str.split(search).join(replacement);
+}

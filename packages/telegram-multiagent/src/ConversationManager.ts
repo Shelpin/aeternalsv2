@@ -1,13 +1,15 @@
 import { generateUUID } from './utils.js';
-import { 
-  IAgentRuntime, 
-  ElizaLogger, 
+import {
+  IAgentRuntime,
+  ElizaLogger,
   ConversationStateTracking,
   MemoryData,
   MemoryQuery
 } from './types.js';
 import { PluginComponent } from './PluginComponent.js';
 import { FallbackMemoryManager } from './FallbackMemoryManager.js';
+import { TelegramMultiAgentPlugin } from "./TelegramMultiAgentPlugin.js";
+import { IMemoryManager } from "./types.js";
 
 // Conversation states
 enum ConversationState {
@@ -24,7 +26,7 @@ export class ConversationManager extends PluginComponent {
   private memoryNamespace = 'telegram-multiagent';
   private fallbackMemory: FallbackMemoryManager | null = null;
   private memoryManager: any | null = null;
-  
+
   /**
    * Create a new ConversationManager
    * 
@@ -32,23 +34,23 @@ export class ConversationManager extends PluginComponent {
    */
   constructor(logger: ElizaLogger) {
     super(logger);
-    
+
     this.logger.info('ConversationManager: Created');
-    
+
     // Create fallback memory manager
     this.fallbackMemory = new FallbackMemoryManager();
     this.logger.info('ConversationManager: Fallback memory manager created');
-    
+
     // VALHALLA FIX: Add more detailed debug log about memory manager status
     this.logger.debug("[MEMORY] Using fallback memory manager since runtime memory manager is not available yet");
   }
-  
+
   /**
    * Initialize the conversation manager
    */
   async initialize(): Promise<void> {
     this.logger.info('ConversationManager: Initializing');
-    
+
     try {
       // VALHALLA FIX: Add specific logging for memory manager status
       if (this.runtime) {
@@ -62,15 +64,18 @@ export class ConversationManager extends PluginComponent {
       } else {
         this.logger.warn("[MEMORY] No runtime available, using fallback memory manager");
       }
-      
+
       await this.ensureMemoryNamespaceExists();
       this.logger.info('ConversationManager: Memory namespace initialized');
-    } catch (error) {
-      // Just log the error, don't throw - we'll retry later with waitForRuntime
-      this.logger.warn(`ConversationManager: Error initializing memory namespace: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`ConversationManager: Error initializing memory namespace: ${error.message}`);
+      } else {
+        this.logger.warn(`ConversationManager: Error initializing memory namespace: ${JSON.stringify(error)}`);
+      }
     }
   }
-  
+
   /**
    * Get the current state of a conversation in a group
    * 
@@ -81,41 +86,45 @@ export class ConversationManager extends PluginComponent {
     try {
       // Use waitForRuntime to ensure runtime is available
       const runtime = await this.waitForRuntime();
-      
+
       await this.ensureMemoryNamespaceExists();
-      
+
       const memoryKey = this.getMemoryKey(groupId);
-      
+
       // Query the memory system
       const query: MemoryQuery = {
         roomId: this.memoryNamespace,
         type: memoryKey
       };
-      
+
       // Get memory manager - use fallback if runtime memory manager is unavailable
       const memoryManager = this.getMemoryManager();
       const memories = await memoryManager.getMemories(query);
-      
+
       if (memories && memories.length > 0) {
         // Get the most recent state
-        const latestMemory = memories.reduce((prev, current) => {
+        const latestMemory = memories.reduce((prev: any, current: any) => {
           const prevDate = prev.createdAt instanceof Date ? prev.createdAt : new Date(prev.createdAt);
           const currDate = current.createdAt instanceof Date ? current.createdAt : new Date(current.createdAt);
           return prevDate > currDate ? prev : current;
         });
-        
+
         // Extract conversation state from memory metadata
         this.logger.debug(`[MEMORY] Retrieved conversation state for group ${groupId}`);
-        return latestMemory.content.metadata as ConversationStateTracking;
+        return (latestMemory.content as { metadata?: unknown }).metadata as ConversationStateTracking;
       }
-      
+
       return null;
-    } catch (error) {
-      this.logger.error(`ConversationManager: Error getting conversation state for group ${groupId}: ${error}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`ConversationManager: Error getting conversation state for group ${groupId}: ${error.message}`);
+      } else {
+        this.logger.error(`ConversationManager: Error getting conversation state for group ${groupId}: ${JSON.stringify(error)}`);
+      }
       return null;
     }
   }
-  
+
   /**
    * Store the state of a conversation in a group
    * 
@@ -126,9 +135,9 @@ export class ConversationManager extends PluginComponent {
   async storeConversationState(groupId: string | number, state: ConversationStateTracking): Promise<boolean> {
     try {
       await this.ensureMemoryNamespaceExists();
-      
+
       const memoryKey = this.getMemoryKey(groupId);
-      
+
       // Create memory data in the correct format
       const memoryData: MemoryData = {
         roomId: this.memoryNamespace,
@@ -142,15 +151,19 @@ export class ConversationManager extends PluginComponent {
         },
         type: memoryKey
       };
-      
+
       // Get memory manager - use fallback if runtime memory manager is unavailable
       const memoryManager = this.getMemoryManager();
       await memoryManager.createMemory(memoryData);
       this.logger.debug(`[MEMORY] Stored conversation state for group ${groupId}`);
-      
+
       return true;
-    } catch (error) {
-      this.logger.error(`ConversationManager: Error storing conversation state for group ${groupId}: ${error}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`ConversationManager: Error storing conversation state for group ${groupId}: ${error.message}`);
+      } else {
+        this.logger.error(`ConversationManager: Error storing conversation state for group ${groupId}: ${JSON.stringify(error)}`);
+      }
       return false;
     }
   }
@@ -161,14 +174,14 @@ export class ConversationManager extends PluginComponent {
   private async ensureMemoryNamespaceExists(): Promise<void> {
     // Get memory manager - use fallback if runtime memory manager is unavailable
     const memoryManager = this.getMemoryManager();
-    
+
     // Just write a dummy record if needed to create the namespace
     // Using count instead of limit for the query as per MemoryQuery type
     const existingMemory = await memoryManager.getMemories({
       roomId: this.memoryNamespace,
       count: 1
     });
-    
+
     if (!existingMemory || existingMemory.length === 0) {
       const initData: MemoryData = {
         roomId: this.memoryNamespace,
@@ -182,12 +195,12 @@ export class ConversationManager extends PluginComponent {
         },
         type: 'namespace_init'
       };
-      
+
       await memoryManager.createMemory(initData);
       this.logger.info(`[MEMORY] Created memory namespace: ${this.memoryNamespace}`);
     }
   }
-  
+
   /**
    * Get the memory key for a conversation
    * 
@@ -197,13 +210,13 @@ export class ConversationManager extends PluginComponent {
   private getMemoryKey(groupId: string | number): string {
     return `conversation-state-${groupId}`;
   }
-  
+
   /**
    * Get the memory manager to use - either runtime's or fallback
    * 
    * @returns Memory manager to use
    */
-  private getMemoryManager(): any {
+  private getMemoryManager(): IMemoryManager {
     try {
       // Check if runtime exists
       if (!this.runtime) {
@@ -213,31 +226,31 @@ export class ConversationManager extends PluginComponent {
         }
         return this.fallbackMemory;
       }
-      
+
       // Check if runtime.memoryManager exists and has required methods
       if (this.runtime.memoryManager?.createMemory && this.runtime.memoryManager.getMemories) {
-        return this.runtime.memoryManager;
+        return this.runtime.memoryManager as IMemoryManager;
       }
-      
+
       // Fall back to our in-memory implementation
       if (!this.fallbackMemory) {
         this.logger.warn("Memory manager unavailable, creating fallback memory manager");
         this.fallbackMemory = new FallbackMemoryManager();
       }
-      
+
       this.logger.debug("Using fallback memory manager");
       return this.fallbackMemory;
-    } catch (error) {
+    } catch (error: unknown) {
       // In case of any error, use fallback
       if (!this.fallbackMemory) {
         this.fallbackMemory = new FallbackMemoryManager();
       }
-      
-      this.logger.warn(`Error accessing memory manager: ${error.message}, using fallback`);
+
+      this.logger.warn(`Error accessing memory manager: ${error instanceof Error ? error.message : JSON.stringify(error)}, using fallback`);
       return this.fallbackMemory;
     }
   }
-  
+
   /**
    * Record a message in the conversation state
    * 
@@ -252,53 +265,47 @@ export class ConversationManager extends PluginComponent {
     messageText: string
   ): Promise<ConversationStateTracking | null> {
     try {
-      // Get current conversation state
       let state = await this.getConversationState(groupId);
-      
       if (!state) {
-        // Initialize new state
         state = {
           status: 'active',
           lastMessageTimestamp: Date.now(),
-          lastSpeakerId: agentId,
+          lastSpeakerId: agentId || '',
           messageCount: 1,
           participants: agentId ? [agentId] : [],
-          currentTopic: null,
+          currentTopic: '',
           lastUpdated: Date.now()
         };
       } else {
-        // Add agent to participants if not already present
         let participants = state.participants || [];
         if (agentId && !participants.includes(agentId)) {
           participants = [...participants, agentId];
         }
-        
         state = {
           ...state,
           status: 'active',
           lastMessageTimestamp: Date.now(),
-          lastSpeakerId: agentId,
+          lastSpeakerId: agentId || '',
           participants,
           messageCount: (state.messageCount || 0) + 1,
           lastUpdated: Date.now()
         };
       }
-      
-      // Store updated state
       const success = await this.storeConversationState(groupId, state);
-      
-      // Also store the message content in memory for context
       if (success && agentId) {
         await this.storeMessage(groupId, agentId, messageText);
       }
-      
       return success ? state : null;
-    } catch (error) {
-      this.logger.error(`ConversationManager: Error recording message: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[CONVO_MANAGER] Error recording message: ${error.message}`);
+      } else {
+        this.logger.error(`[CONVO_MANAGER] Error recording message: ${JSON.stringify(error)}`);
+      }
       return null;
     }
   }
-  
+
   /**
    * Store a message in memory for future context
    * 
@@ -307,8 +314,8 @@ export class ConversationManager extends PluginComponent {
    * @param messageText - Message text
    */
   private async storeMessage(
-    groupId: string | number, 
-    agentId: string, 
+    groupId: string | number,
+    agentId: string,
     messageText: string
   ): Promise<void> {
     try {
@@ -324,16 +331,20 @@ export class ConversationManager extends PluginComponent {
         },
         type: 'telegram-message'
       };
-      
+
       // Get memory manager - use fallback if runtime memory manager is unavailable
       const memoryManager = this.getMemoryManager();
       await memoryManager.createMemory(memoryData);
       this.logger.debug(`[MEMORY] Stored message from ${agentId} in group ${groupId}`);
-    } catch (error) {
-      this.logger.error(`ConversationManager: Error storing message: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[CONVO_MANAGER] Error storing message: ${error.message}`);
+      } else {
+        this.logger.error(`[CONVO_MANAGER] Error storing message: ${JSON.stringify(error)}`);
+      }
     }
   }
-  
+
   /**
    * Determine if an agent should respond to a message
    * 
@@ -350,170 +361,136 @@ export class ConversationManager extends PluginComponent {
     messageText?: string
   ): Promise<boolean> {
     try {
-      this.logger.debug(`[CONVO_MANAGER] Checking if ${agentId} should respond to message from ${fromAgentId || 'unknown'} in group ${groupId}`);
-      
-      // Get current conversation state
+      this.logger.debug(`[CONVO_MANAGER] Checking if ${agentId} should respond to message from ${fromAgentId || ''} in group ${groupId}`);
       const state = await this.getConversationState(groupId);
-      
-      // Don't respond to our own messages
       if (fromAgentId === agentId) {
         this.logger.debug(`[CONVO_MANAGER] Agent ${agentId} should not respond to itself`);
         return false;
       }
-      
-      // Get runtime to access character information
-      let runtime: IAgentRuntime;
+      let runtime: IAgentRuntime | undefined;
       try {
         runtime = await this.waitForRuntime();
-      } catch (error) {
-        this.logger.warn(`[CONVO_MANAGER] Error getting runtime: ${error.message}, using basic response logic`);
-        // If runtime not available, use basic decision logic
+      } catch (error: unknown) {
+        this.logger.warn(`[CONVO_MANAGER] Error getting runtime: ${error instanceof Error ? error.message : JSON.stringify(error)}, using basic response logic`);
         return this.basicShouldRespond(agentId, fromAgentId, messageText);
       }
-      
-      // Try to get character information
-      let character;
+      let character: any = undefined;
       let agentName = agentId;
-      let persona = "";
+      let persona = '';
       let topics: string[] = [];
       let interests: string[] = [];
-      
       try {
-        character = runtime.character;
+        character = runtime && runtime.character;
         if (character) {
           agentName = character.name || agentId;
-          persona = character.bio || "";
+          persona = character.bio || '';
           topics = character.topics || [];
           interests = character.interests || [];
         }
-      } catch (error) {
-        this.logger.warn(`[CONVO_MANAGER] Error getting character: ${error.message}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.warn(`[CONVO_MANAGER] Error getting character: ${error.message}`);
+        } else {
+          this.logger.warn(`[CONVO_MANAGER] Error getting character: ${JSON.stringify(error)}`);
+        }
       }
-      
-      // Get conversation history
-      let history = "";
+      let history = '';
       let participants: string[] = [];
       try {
         const memoryManager = this.getMemoryManager();
         const recentMessages = await memoryManager.getMemories({
           roomId: groupId.toString(),
-          type: "telegram-message",
+          type: 'telegram-message',
           count: 5
         });
-        
         if (recentMessages && recentMessages.length > 0) {
-          history = recentMessages.map(m => `${m.userId}: ${m.content.text}`).join("\n");
+          history = recentMessages.map((m: any) => `${m.userId}: ${m.content.text}`).join('\n');
         }
-        
-        // Get unique participants from the conversation state
         if (state && state.participants) {
           participants = state.participants;
         }
-      } catch (error) {
-        this.logger.warn(`[CONVO_MANAGER] Error getting history: ${error.message}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.warn(`[CONVO_MANAGER] Error getting history: ${error.message}`);
+        } else {
+          this.logger.warn(`[CONVO_MANAGER] Error getting history: ${JSON.stringify(error)}`);
+        }
       }
-      
-      // Enhanced prompt with richer context for better decision making
-      const prompt = `You are ${agentName}, an AI participating in a group chat.
-
-Your persona:
-${persona}
-
-Your interests: ${interests.join(', ')}
-Topics you know about: ${topics.join(', ')}
-
-Current group chat: Telegram group ${groupId}
-Other participants: ${participants.length > 0 ? participants.filter(p => p !== agentId).join(', ') : 'None identified yet'}
-
-Recent conversation:
-${history || 'No recent messages'}
-
-Message just received:
-FROM: ${fromAgentId || 'Unknown user'}
-MESSAGE: "${messageText || ""}"
-
-Should you respond to this message? Consider:
-- If it's directed at you
-- If it's about a topic you're interested in
-- If you have something valuable to add
-- If it's natural for you to join the conversation at this point
-
-Reply with ONLY ONE of these exact options:
-[RESPOND] - if you want to speak
-[IGNORE] - if you choose to remain silent`;
-      
-      // Use the agent's language model to decide
+      const prompt = `You are ${agentName}, an AI participating in a group chat.\n\nYour persona:\n${persona}\n\nYour interests: ${interests.join(', ')}\nTopics you know about: ${topics.join(', ')}\n\nCurrent group chat: Telegram group ${groupId}\nOther participants: ${participants.length > 0 ? participants.filter(p => p !== agentId).join(', ') : 'None identified yet'}\n\nRecent conversation:\n${history || 'No recent messages'}\n\nMessage just received:\nFROM: ${fromAgentId || ''}\nMESSAGE: \"${messageText || ''}\"\n\nShould you respond to this message? Consider:\n- If it's directed at you\n- If it's about a topic you're interested in\n- If you have something valuable to add\n- If it's natural for you to join the conversation at this point\n\nReply with ONLY ONE of these exact options:\n[RESPOND] - if you want to speak\n[IGNORE] - if you choose to remain silent`;
       try {
-        if (runtime.modelProvider) {
-          const result = await runtime.modelProvider.generateText({
+        if (runtime?.modelProvider && typeof (runtime.modelProvider as any).generateText === 'function') {
+          const result = await (runtime.modelProvider as { generateText: (opts: { prompt: string, temperature: number, maxTokens: number }) => Promise<string> }).generateText({
             prompt,
             temperature: 0.7,
             maxTokens: 50
           });
-          
-          const decision = result.includes("RESPOND") ? true : false;
-          this.logger.info(`[CONVO_MANAGER] LLM response decision for ${agentId}: ${decision ? "RESPOND" : "IGNORE"}`);
+          const decision = result.includes('RESPOND') ? true : false;
+          this.logger.info(`[CONVO_MANAGER] LLM response decision for ${agentId}: ${decision ? 'RESPOND' : 'IGNORE'}`);
           return decision;
         }
-      } catch (error) {
-        this.logger.warn(`[CONVO_MANAGER] Error generating LLM response: ${error.message}, falling back to basic logic`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.warn(`[CONVO_MANAGER] Error generating LLM response: ${error.message}, falling back to basic logic`);
+        } else {
+          this.logger.warn(`[CONVO_MANAGER] Error generating LLM response: ${JSON.stringify(error)}, falling back to basic logic`);
+        }
       }
-      
-      // Fallback to basic logic if LLM is unavailable
       return this.basicShouldRespond(agentId, fromAgentId, messageText);
-      
-    } catch (error) {
-      this.logger.error(`[CONVO_MANAGER] Error checking if agent should respond: ${error.message}`);
-      // Default to allowing response in case of error
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[CONVO_MANAGER] Error checking if agent should respond: ${error.message}`);
+      } else {
+        this.logger.error(`[CONVO_MANAGER] Error checking if agent should respond: ${JSON.stringify(error)}`);
+      }
       return true;
     }
   }
-  
+
   /**
    * Basic response decision logic without using runtime
    */
   private basicShouldRespond(agentId: string, fromAgentId: string | null, messageText?: string): boolean {
     // Determine if message is from a bot by checking agent ID patterns
     const isFromBot = fromAgentId && (
-      fromAgentId.includes('Bot') || 
-      fromAgentId.includes('_') || 
-      ['linda_evangelista_88', 'vc_shark_99', 'bitcoin_maxi_420', 
-       'bag_flipper_9000', 'code_samurai_77', 'eth_memelord_9000'].includes(fromAgentId)
+      fromAgentId.includes('Bot') ||
+      fromAgentId.includes('_') ||
+      ['linda_evangelista_88', 'vc_shark_99', 'bitcoin_maxi_420',
+        'bag_flipper_9000', 'code_samurai_77', 'eth_memelord_9000'].includes(fromAgentId)
     );
-    
+
     this.logger.debug(`[CONVO_MANAGER] Is message from bot? ${isFromBot}`);
-    
+
     // Check if this message directly mentions this agent (simple check)
     const isDirectedToThisAgent = messageText && (
       messageText.toLowerCase().includes(agentId.toLowerCase())
     );
-    
+
     if (isDirectedToThisAgent) {
       this.logger.debug(`[CONVO_MANAGER] Message is directed at this agent, will respond`);
       return true;
     }
-    
+
     // Always use a higher probability for bot-to-bot communication to ensure interactions happen
     if (isFromBot) {
       // Use a probability-based approach to avoid infinite loops but ensure good conversation flow
       // Higher probability means more responsive agents
       const probabilityFactor = 0.4; // 40% chance to respond to other bots
-      
+
       // Add randomness to avoid multiple agents responding at the same time
       const shouldRespond = Math.random() < probabilityFactor;
       this.logger.debug(`[CONVO_MANAGER] Bot-to-bot response decision: ${shouldRespond} (probability: ${probabilityFactor})`);
       return shouldRespond;
     }
-    
+
     // For messages from humans (not bots)
     const responseChance = 0.3; // 30% chance to respond to human messages
     const shouldRespond = Math.random() <= responseChance;
-    
+
     this.logger.debug(`[CONVO_MANAGER] Human message response probability ${responseChance}, shouldRespond=${shouldRespond}`);
-    
+
     return shouldRespond;
   }
-  
+
   /**
    * Check if a conversation is active in a group
    * 
@@ -524,7 +501,7 @@ Reply with ONLY ONE of these exact options:
     const state = await this.getConversationState(groupId);
     return !!state && state.status === 'active';
   }
-  
+
   /**
    * Get the timestamp of the last message in a conversation
    * 
@@ -535,7 +512,7 @@ Reply with ONLY ONE of these exact options:
     const state = await this.getConversationState(groupId);
     return (state && state.lastMessageTimestamp) || 0;
   }
-  
+
   /**
    * Check if it's a good time to kickstart a conversation
    * 
@@ -545,27 +522,27 @@ Reply with ONLY ONE of these exact options:
    */
   async canKickstartConversation(groupId: string | number, minIntervalMs: number): Promise<boolean> {
     const state = await this.getConversationState(groupId);
-    
+
     // If no conversation exists, we can kickstart
     if (!state) {
       return true;
     }
-    
+
     // If conversation is inactive, we can kickstart if enough time has passed
     if (state.status !== 'active') {
       const lastUpdateTime = state.lastUpdated || 0;
       const timeSinceLastUpdate = Date.now() - lastUpdateTime;
       return timeSinceLastUpdate >= minIntervalMs;
     }
-    
+
     // If conversation is active, check when the last message was sent
     const lastMessageTime = state.lastMessageTimestamp || 0;
     const timeSinceLastMessage = Date.now() - lastMessageTime;
-    
+
     // Only kickstart if enough time has passed since the last message
     return timeSinceLastMessage >= minIntervalMs;
   }
-  
+
   /**
    * Shutdown the conversation manager
    */

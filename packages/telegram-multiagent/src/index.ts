@@ -6,6 +6,7 @@
 
 // Import the plugin class with .js extension for ESM
 import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin.js';
+import { IAgentRuntime } from './types.js';
 
 // Create a plugin instance
 const plugin = new TelegramMultiAgentPlugin();
@@ -18,7 +19,7 @@ plugin.initialize = plugin.initialize.bind(plugin);
 plugin.clients = [
     {
         name: '@elizaos/clients/telegram', // Use the correct package name
-        start: async (runtime) => {
+        start: async (runtime: IAgentRuntime) => {
             console.log('[MultiAgentPlugin] Attempting to start embedded Telegram client...');
             // Retrieve token - Ensure runtime and character structure is correct
             // Safely access nested properties

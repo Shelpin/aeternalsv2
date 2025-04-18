@@ -5,7 +5,7 @@ import type {
     ICacheManager,
     IDatabaseCacheAdapter,
     UUID,
-} from "./types";
+} from "./types.js";
 
 export interface ICacheAdapter {
     get(key: string): Promise<string | undefined>;
@@ -34,7 +34,7 @@ export class MemoryCacheAdapter implements ICacheAdapter {
 }
 
 export class FsCacheAdapter implements ICacheAdapter {
-    constructor(private dataDir: string) {}
+    constructor(private dataDir: string) { }
 
     async get(key: string): Promise<string | undefined> {
         try {
@@ -70,7 +70,7 @@ export class DbCacheAdapter implements ICacheAdapter {
     constructor(
         private db: IDatabaseCacheAdapter,
         private agentId: UUID
-    ) {}
+    ) { }
 
     async get(key: string): Promise<string | undefined> {
         return this.db.getCache({ agentId: this.agentId, key });
@@ -86,8 +86,7 @@ export class DbCacheAdapter implements ICacheAdapter {
 }
 
 export class CacheManager<CacheAdapter extends ICacheAdapter = ICacheAdapter>
-    implements ICacheManager
-{
+    implements ICacheManager {
     adapter: CacheAdapter;
 
     constructor(adapter: CacheAdapter) {
@@ -107,7 +106,7 @@ export class CacheManager<CacheAdapter extends ICacheAdapter = ICacheAdapter>
                 return value;
             }
 
-            this.adapter.delete(key).catch(() => {});
+            this.adapter.delete(key).catch(() => { });
         }
 
         return undefined;

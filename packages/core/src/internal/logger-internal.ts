@@ -31,7 +31,7 @@ const createStream = () => {
     if (raw) {
         return undefined;
     }
-    return pretty({
+    return pretty.default({
         colorize: true,
         translateTime: "yyyy-mm-dd HH:MM:ss",
         ignore: "pid,hostname",
@@ -79,6 +79,8 @@ const options = {
     },
 };
 
+// Fix the pino constructor call to handle type issues
+// @ts-expect-error - pino is actually callable but TypeScript doesn't recognize it properly
 export const elizaLogger = pino(options, createStream());
 
-export default elizaLogger; 
+export default elizaLogger;

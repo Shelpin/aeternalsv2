@@ -22,7 +22,7 @@
   },
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "pnpm exec tsup --config tsup.config.ts && pnpm exec tsc -p tsconfig.declaration.json --emitDeclarationOnly"
+    "build": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@elizaos/adapter-sqlite": "workspace:*",

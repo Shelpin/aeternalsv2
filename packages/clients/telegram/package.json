@@ -12,6 +12,6 @@
   },
   "scripts": {
     "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "tsup --config tsup.config.ts --dts"
+    "build": "tsup --config tsup.config.cjs --dts"
   }
 }

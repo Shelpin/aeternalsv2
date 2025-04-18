@@ -49,13 +49,13 @@ export class ConversationKickstarter extends PluginComponent {
     this.conversationManager = conversationManager;
     this.relay = relay;
     this.config = {
-      probabilityFactor: 0.2,
-      minIntervalMs: 300000, // 5 minutes
-      includeTopics: true,
-      shouldTagAgents: true,
-      maxAgentsToTag: 2,
       ...config
     };
+    if (this.config.probabilityFactor === undefined) this.config.probabilityFactor = 0.2;
+    if (this.config.minIntervalMs === undefined) this.config.minIntervalMs = 300000;
+    if (this.config.includeTopics === undefined) this.config.includeTopics = true;
+    if (this.config.shouldTagAgents === undefined) this.config.shouldTagAgents = true;
+    if (this.config.maxAgentsToTag === undefined) this.config.maxAgentsToTag = 2;
     this.groupId = groupId;
     this.personality = personality;
     
@@ -76,10 +76,12 @@ export class ConversationKickstarter extends PluginComponent {
       const runtime = await this.waitForRuntime();
       this.agentId = runtime.getAgentId();
       this.logger.info(`ConversationKickstarter: Using agent ID from runtime: ${this.agentId}`);
-    } catch (error) {
-      // Fallback to environment variable
-      this.agentId = process.env.AGENT_ID || 'unknown-agent';
-      this.logger.warn(`ConversationKickstarter: Could not get agent ID from runtime, using fallback: ${this.agentId}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.warn(`ConversationKickstarter: Could not get agent ID from runtime, using fallback: ${this.agentId}. Error: ${error.message}`);
+      } else {
+        this.logger.warn(`ConversationKickstarter: Could not get agent ID from runtime, using fallback: ${this.agentId}. Unknown error: ${JSON.stringify(error)}`);
+      }
     }
   }
   
@@ -253,8 +255,12 @@ export class ConversationKickstarter extends PluginComponent {
       
       // Schedule next kickstart
       this.scheduleNextKickstart();
-    } catch (error) {
-      this.logger.error(`ConversationKickstarter: Kickstart attempt failed: ${error}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`ConversationKickstarter: Kickstart attempt failed: ${error.message}`);
+      } else {
+        this.logger.error(`ConversationKickstarter: Kickstart attempt failed: ${JSON.stringify(error)}`);
+      }
       this.scheduleNextKickstart();
     }
   }
@@ -276,21 +282,23 @@ export class ConversationKickstarter extends PluginComponent {
         // Get agent's character traits
         const { character } = runtime;
         
-        if (character) {
+        if (character && Array.isArray((character as { traits?: unknown[] }).traits)) {
           // Use character to influence topic
-          const traits = character.traits || [];
-          const style = character.style || {};
-          
-          this.logger.debug(`ConversationKickstarter: Using character traits for kickstart: ${traits.join(', ')}`);
+          const traits = (character as { traits: unknown[] }).traits;
+          const style = (character as { style?: unknown }).style || {};
+          this.logger.debug(`ConversationKickstarter: Using character traits for kickstart: ${Array.isArray(traits) ? traits.join(', ') : ''}`);
           
           // Enhance the topic with character-appropriate phrasing
           if (this.personality && this.personality.refineTopic) {
             return this.personality.refineTopic(topic);
           }
         }
-      } catch (error) {
-        // Continue with fallback if runtime is not available
-        this.logger.debug(`ConversationKickstarter: Not using character for kickstart: ${error.message}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.debug(`ConversationKickstarter: Not using character for kickstart: ${error.message}`);
+        } else {
+          this.logger.debug(`ConversationKickstarter: Not using character for kickstart: ${JSON.stringify(error)}`);
+        }
       }
       
       // Get agents to tag
@@ -303,8 +311,8 @@ export class ConversationKickstarter extends PluginComponent {
       let message = `${tagString}${topic}`;
       
       return message;
-    } catch (error) {
-      this.logger.error(`ConversationKickstarter: Failed to generate kickstart message: ${error}`);
+    } catch (error: unknown) {
+      this.logger.error(`ConversationKickstarter: Failed to generate kickstart message: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
       return null;
     }
   }
@@ -315,6 +323,17 @@ export class ConversationKickstarter extends PluginComponent {
    * @returns A random topic
    */
   private async getRandomTopic(): Promise<string> {
+    const fallbackTopics = [
+      "the future of decentralized finance",
+      "latest NFT trends",
+      "Bitcoin's recent price movements",
+      "Layer 2 scaling solutions",
+      "the metaverse and its potential",
+      "Web3 adoption challenges",
+      "crypto regulations worldwide",
+      "blockchain interoperability"
+    ];
+    
     // First try to get a topic from personality if available
     if (this.personality && this.personality.generateTopic) {
       try {
@@ -322,8 +341,12 @@ export class ConversationKickstarter extends PluginComponent {
         if (topic) {
           return topic;
         }
-      } catch (error) {
-        this.logger.debug(`ConversationKickstarter: Error generating topic from personality: ${error}`);
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          this.logger.debug(`ConversationKickstarter: Error generating topic from personality: ${error.message}`);
+        } else {
+          this.logger.debug(`ConversationKickstarter: Error generating topic from personality: ${JSON.stringify(error)}`);
+        }
       }
     }
     
@@ -331,13 +354,17 @@ export class ConversationKickstarter extends PluginComponent {
     try {
       const runtime = await this.waitForRuntime();
       
-      if (runtime.character && runtime.character.topics && runtime.character.topics.length > 0) {
-        const { topics } = runtime.character;
+      if (runtime.character && Array.isArray((runtime.character as { topics?: unknown[] }).topics) && (runtime.character as { topics: unknown[] }).topics.length > 0) {
+        const { topics } = runtime.character as { topics: string[] };
         const randomIndex = Math.floor(Math.random() * topics.length);
         return topics[randomIndex];
       }
-    } catch (error) {
-      this.logger.debug(`ConversationKickstarter: Not using character topics: ${error.message}`);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.debug(`ConversationKickstarter: Not using character topics: ${error.message}`);
+      } else {
+        this.logger.debug(`ConversationKickstarter: Not using character topics: ${JSON.stringify(error)}`);
+      }
     }
     
     // Then try to use available topics
@@ -345,21 +372,11 @@ export class ConversationKickstarter extends PluginComponent {
     
     if (topics.length > 0) {
       const randomIndex = Math.floor(Math.random() * topics.length);
-      return topics[randomIndex].title;
+      // Ensure .title is always a string
+      return topics[randomIndex].title || fallbackTopics[0];
     }
     
     // Fallback topics
-    const fallbackTopics = [
-      "What's your take on the current state of crypto?",
-      "Have you heard about the latest advances in AI?",
-      "Is DeFi still relevant or has it been overhyped?",
-      "What blockchain projects are you excited about?",
-      "What are your thoughts on Layer 2 solutions?",
-      "Will NFTs ever make a comeback?",
-      "How does the recent price action affect your strategies?",
-      "What's the most undervalued project right now?"
-    ];
-    
     const randomIndex = Math.floor(Math.random() * fallbackTopics.length);
     return fallbackTopics[randomIndex];
   }

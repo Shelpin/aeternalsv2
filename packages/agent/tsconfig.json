@@ -1,19 +1,28 @@
 {
   "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
+    "target": "ES2021",
+    "module": "nodenext",
     "lib": [
-      "ESNext",
+      "es2021",
       "dom"
     ],
-    "moduleResolution": "Bundler",
-    "outDir": "dist",
-    "rootDir": "src",
-    "strict": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": false,
+    "outDir": "./dist",
+    "rootDir": "./src",
     "declaration": true,
+    "baseUrl": ".",
+    "moduleResolution": "nodenext",
+    "skipLibCheck": true,
+    "composite": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "paths": {
+      "*": [
+        "src/*"
+      ]
+    },
+    "strict": false,
+    "forceConsistentCasingInFileNames": false,
     "types": [
       "node",
       "jest"
