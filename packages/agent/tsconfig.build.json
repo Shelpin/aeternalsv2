@@ -1,37 +1,63 @@
 {
-  "extends": "../../tsconfig.build.base.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2021",
-    "module": "nodenext",
-    "lib": [
-      "es2021",
-      "dom"
-    ],
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "declaration": true,
-    "baseUrl": ".",
-    "moduleResolution": "nodenext",
-    "skipLibCheck": true,
+    "outDir": "dist",
+    "rootDir": "src",
     "composite": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
+    "declaration": true,
+    "sourceMap": true,
     "paths": {
-      "*": [
-        "src/*"
+      "@elizaos/types": [
+        "../types/dist"
+      ],
+      "@elizaos/core": [
+        "../core/dist"
+      ],
+      "@elizaos/core/*": [
+        "../core/dist/*"
+      ],
+      "@elizaos/adapter-sqlite": [
+        "../adapter-sqlite/dist"
+      ],
+      "@elizaos/adapter-sqlite/*": [
+        "../adapter-sqlite/dist/*"
+      ],
+      "@elizaos/plugin-bootstrap": [
+        "../plugin-bootstrap/dist"
+      ],
+      "@elizaos/plugin-bootstrap/*": [
+        "../plugin-bootstrap/dist/*"
+      ],
+      "@elizaos/dynamic-imports": [
+        "../dynamic-imports/dist"
+      ],
+      "@elizaos/dynamic-imports/*": [
+        "../dynamic-imports/dist/*"
       ]
     }
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*"
   ],
   "exclude": [
-    "node_modules"
+    "**/__tests__/**",
+    "**/node_modules/**"
   ],
   "references": [
     {
+      "path": "../types"
+    },
+    {
       "path": "../core"
+    },
+    {
+      "path": "../adapter-sqlite"
+    },
+    {
+      "path": "../plugin-bootstrap"
+    },
+    {
+      "path": "../dynamic-imports"
     }
   ]
 }

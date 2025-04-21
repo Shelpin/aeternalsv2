@@ -1,167 +1,102 @@
 #!/bin/bash
+set -e
 
-# Script to verify package builds and import functionality
-# Following the requirements in deterministic-build-plan rule
+echo "=== ElizaOS Package Verification ==="
+echo "Verifying all packages can be imported correctly"
 
-# Define colors for output
-GREEN='\033[0;32m'
-RED='\033[0;31m'
-YELLOW='\033[0;33m'
-NC='\033[0m' # No Color
+# Define the packages to test in the correct order
+PACKAGES=( types core adapter-sqlite dynamic-imports plugin-bootstrap telegram-multiagent client-direct agent )
 
-# Define log file
-LOG_DIR="reports/implementation2104"
-mkdir -p "$LOG_DIR"
-VERIFICATION_LOG="${LOG_DIR}/package_verification.log"
+# Create a temporary directory for testing
+TEMP_DIR=$(mktemp -d)
+echo "Using temporary directory: $TEMP_DIR"
 
-echo "# ElizaOS Package Verification - $(date +"%Y-%m-%d %H:%M:%S")" > "$VERIFICATION_LOG"
-echo "" >> "$VERIFICATION_LOG"
-
-# Function to log verification results
-log_verification() {
-  echo "$1" | tee -a "$VERIFICATION_LOG"
+# Create package.json in temp dir
+cat > "$TEMP_DIR/package.json" << JSON
+{
+  "name": "elizaos-verification",
+  "type": "module",
+  "private": true
 }
+JSON
 
-# List of packages to verify in the correct order
-PACKAGES=(
-  "core"
-  "adapter-sqlite"
-  "dynamic-imports"
-  "plugin-bootstrap"
-  "clients/telegram"
-  "telegram-multiagent"
-  "client-direct"
-  "agent"
-)
-
-# Function to check package dist files
-verify_package_dist() {
-  local pkg="$1"
-  local pkg_path
+# Function to test ESM import
+test_esm_import() {
+  local package=$1
+  echo "Testing ESM import for @elizaos/$package..."
   
-  if [[ "$pkg" == *"/"* ]]; then
-    # Handle nested packages like clients/telegram
-    parent_dir=$(echo "$pkg" | cut -d '/' -f 1)
-    child_dir=$(echo "$pkg" | cut -d '/' -f 2)
-    pkg_path="packages/${parent_dir}/${child_dir}"
+  cat > "$TEMP_DIR/esm-test.js" << JS
+// ESM import test
+import('@elizaos/$package').then(m => {
+  console.log('✅ Successfully imported @elizaos/$package in ESM mode');
+}).catch(error => {
+  console.error('❌ Failed to import @elizaos/$package in ESM mode:', error);
+  process.exit(1);
+});
+JS
+
+  # Run the ESM test
+  if node "$TEMP_DIR/esm-test.js"; then
+    return 0
   else
-    pkg_path="packages/${pkg}"
-  fi
-  
-  # Check if dist directory exists
-  if [ ! -d "${pkg_path}/dist" ]; then
-    log_verification -e "${RED}❌ @elizaos/${pkg}: No dist directory found${NC}"
+    echo "❌ ESM import verification failed for @elizaos/$package"
     return 1
   fi
-  
-  # Check if index.js exists
-  if [ ! -f "${pkg_path}/dist/index.js" ]; then
-    log_verification -e "${RED}❌ @elizaos/${pkg}: No index.js found in dist${NC}"
-    return 1
-  fi
-  
-  # Check if declaration files exist
-  if [ ! -f "${pkg_path}/dist/index.d.ts" ]; then
-    log_verification -e "${YELLOW}⚠️ @elizaos/${pkg}: No declaration files found${NC}"
-    return 2
-  fi
-  
-  log_verification -e "${GREEN}✅ @elizaos/${pkg}: Dist files verified${NC}"
-  return 0
 }
 
-# Function to check package exports in package.json
-verify_package_exports() {
-  local pkg="$1"
-  local pkg_path
+# Function to test CommonJS import
+test_cjs_import() {
+  local package=$1
+  echo "Testing CommonJS import for @elizaos/$package..."
   
-  if [[ "$pkg" == *"/"* ]]; then
-    # Handle nested packages like clients/telegram
-    parent_dir=$(echo "$pkg" | cut -d '/' -f 1)
-    child_dir=$(echo "$pkg" | cut -d '/' -f 2)
-    pkg_path="packages/${parent_dir}/${child_dir}"
+  cat > "$TEMP_DIR/cjs-test.cjs" << JS
+// CommonJS import test
+try {
+  const pkg = require('@elizaos/$package');
+  console.log('✅ Successfully imported @elizaos/$package in CommonJS mode');
+} catch (error) {
+  console.error('❌ Failed to import @elizaos/$package in CommonJS mode:', error);
+  process.exit(1);
+}
+JS
+
+  # Run the CommonJS test
+  if node "$TEMP_DIR/cjs-test.cjs"; then
+    return 0
   else
-    pkg_path="packages/${pkg}"
-  fi
-  
-  # Check if package.json exists
-  if [ ! -f "${pkg_path}/package.json" ]; then
-    log_verification -e "${RED}❌ @elizaos/${pkg}: No package.json found${NC}"
+    echo "❌ CommonJS import verification failed for @elizaos/$package"
     return 1
   fi
-  
-  # Check exports field
-  if ! grep -q '"exports"' "${pkg_path}/package.json"; then
-    log_verification -e "${YELLOW}⚠️ @elizaos/${pkg}: No exports field in package.json${NC}"
-    return 2
-  fi
-  
-  log_verification -e "${GREEN}✅ @elizaos/${pkg}: Package.json exports verified${NC}"
-  return 0
 }
 
-# Main verification
-log_verification "Starting package verification..."
-log_verification "==================================="
+# Track errors
+FAILED=0
 
-# Verify each package
-failed=0
-warnings=0
-
-for pkg in "${PACKAGES[@]}"; do
-  log_verification -e "\nVerifying @elizaos/${pkg}..."
+# Test each package
+for package in "${PACKAGES[@]}"; do
+  echo "---------------------------------"
+  echo "Verifying @elizaos/$package"
   
-  # Check dist files
-  verify_package_dist "$pkg"
-  dist_status=$?
+  # Test both import styles
+  if ! test_esm_import "$package"; then
+    FAILED=$((FAILED+1))
+  fi
   
-  # Check package.json
-  verify_package_exports "$pkg"
-  exports_status=$?
-  
-  # Track status
-  if [ $dist_status -eq 1 ] || [ $exports_status -eq 1 ]; then
-    ((failed++))
-  elif [ $dist_status -eq 2 ] || [ $exports_status -eq 2 ]; then
-    ((warnings++))
+  if ! test_cjs_import "$package"; then
+    FAILED=$((FAILED+1))
   fi
 done
 
-# Runtime import verification
-log_verification -e "\nVerifying runtime imports..."
-log_verification "==================================="
+# Clean up
+echo "---------------------------------"
+echo "Cleaning up temporary files..."
+rm -rf "$TEMP_DIR"
 
-# ESM import test
-log_verification "Testing ESM imports..."
-node test-imports.mjs
-if [ $? -eq 0 ]; then
-  log_verification -e "${GREEN}✅ ESM import test passed${NC}"
+# Report results
+echo "---------------------------------"
+if [ $FAILED -eq 0 ]; then
+  echo "✅ All package verifications passed!"
 else
-  log_verification -e "${RED}❌ ESM import test failed${NC}"
-  ((failed++))
-fi
-
-# CommonJS import test
-log_verification "Testing CommonJS imports..."
-node test-imports.cjs
-if [ $? -eq 0 ]; then
-  log_verification -e "${GREEN}✅ CommonJS import test passed${NC}"
-else
-  log_verification -e "${RED}❌ CommonJS import test failed${NC}"
-  ((failed++))
-fi
-
-# Summary
-log_verification -e "\nVerification Summary"
-log_verification "==================================="
-log_verification "Packages verified: ${#PACKAGES[@]}"
-log_verification -e "Failures: ${RED}${failed}${NC}"
-log_verification -e "Warnings: ${YELLOW}${warnings}${NC}"
-
-if [ $failed -eq 0 ]; then
-  log_verification -e "${GREEN}✅ All critical checks passed!${NC}"
-  exit 0
-else
-  log_verification -e "${RED}❌ Some verifications failed. Check the log for details.${NC}"
+  echo "❌ $FAILED package verifications failed."
   exit 1
 fi 

@@ -1,8 +1,22 @@
 {
-    "name": "dynamic-imports",
-    "type": "module",
-    "main": "src/index.ts",
-    "scripts": {
-        "prebuild": "rimraf dist && find . -name '*.d.ts' -o -name '*.ts' | grep dist | xargs rm -f 2>/dev/null || true"
-    }
+  "name": "@elizaos/dynamic-imports",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:full": "npm run build",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch"
+  },
+  "types": "./dist/index.d.ts"
 }

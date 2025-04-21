@@ -1,42 +1,23 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "composite": true,
-    "declaration": true,
-    "declarationDir": "dist",
-    "emitDeclarationOnly": false,
-    "outDir": "./dist",
-    "target": "ES2021",
-    "module": "nodenext",
-    "lib": [
-      "es2021",
-      "dom"
-    ],
-    "rootDir": "./src",
-    "baseUrl": ".",
-    "moduleResolution": "nodenext",
-    "skipLibCheck": true,
-    "esModuleInterop": true,
-    "resolveJsonModule": true,
-    "allowSyntheticDefaultImports": true,
+    "rootDir": "src",
+    "outDir": "dist",
     "paths": {
-      "@elizaos/core": [
-        "../core/src/index.ts"
-      ],
-      "@elizaos/core/*": [
-        "../core/src/*"
-      ],
-      "*": [
-        "src/*"
+      "@elizaos/types": [
+        "../types/dist"
       ]
     }
   },
   "include": [
-    "src"
+    "src/**/*"
+  ],
+  "exclude": [
+    "src/**/__tests__/**/*"
   ],
   "references": [
     {
-      "path": "../core"
+      "path": "../types"
     }
   ]
 }

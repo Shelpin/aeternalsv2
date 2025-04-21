@@ -25,12 +25,12 @@ import { defaultCharacter } from "./defaultCharacter.js";
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import JSON5 from 'json5';
 
-import fs from "fs";
-import net from "net";
-import os from "os";
-import path from "path";
-import { fileURLToPath } from "url";
-import yargs from "yargs";
+import fs from 'node:fs';
+import net from 'node:net';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import yargs from 'yargs';
 
 const { filename: __filename, dirname: __dirname } = getModulePath(); // get the resolved path to the file
 // const __dirname = path.dirname(__filename); // Removed duplicate declaration

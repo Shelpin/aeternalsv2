@@ -1,29 +1,52 @@
 {
-    "compilerOptions": {
-        "target": "es2017",
-        "module": "commonjs",
-        "lib": [
-            "es2017",
-            "esnext",
-            "dom"
-        ],
-        "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true,
-        "outDir": "dist",
-        "rootDir": "src",
-        "esModuleInterop": true,
-        "emitDeclarationOnly": true,
-        "declarationDir": "dist"
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "noEmitOnError": false,
+    "isolatedModules": true,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@elizaos/core/*": [
+        "../core/dist/*"
+      ],
+      "@elizaos/core": [
+        "../core/dist/index.d.ts"
+      ],
+      "@elizaos/agent/*": [
+        "../agent/dist/*"
+      ],
+      "@elizaos/agent": [
+        "../agent/dist/index.d.ts"
+      ]
     },
-    "include": [
-        "src/**/*.ts"
+    "noEmit": false,
+    "declarationMap": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "NodeNext",
+    "target": "es2022",
+    "module": "NodeNext",
+    "lib": [
+      "es2022",
+      "dom"
     ],
-    "exclude": [
-        "dist",
-        "**/*.test.ts",
-        "**/*.spec.ts",
-        "**/*.d.ts",
-        "node_modules"
-    ]
+    "strict": true,
+    "resolveJsonModule": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules",
+    "src/**/*.spec.ts",
+    "src/**/*.test.ts"
+  ]
 }

@@ -3,23 +3,43 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "target": "es2021",
-    "lib": [
-      "es2021"
-    ],
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-    "strict": true,
-    "skipLibCheck": true
+    "composite": true,
+    "declaration": true,
+    "sourceMap": true,
+    "paths": {
+      "@elizaos/types": [
+        "../types/dist"
+      ],
+      "@elizaos/core": [
+        "../core/dist"
+      ],
+      "@elizaos/core/*": [
+        "../core/dist/*"
+      ],
+      "@elizaos/adapter-sqlite": [
+        "../adapter-sqlite/dist"
+      ],
+      "@elizaos/adapter-sqlite/*": [
+        "../adapter-sqlite/dist/*"
+      ]
+    }
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
-    "dist",
-    "node_modules"
+    "**/__tests__/**",
+    "**/node_modules/**"
+  ],
+  "references": [
+    {
+      "path": "../types"
+    },
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../adapter-sqlite"
+    }
   ]
 }

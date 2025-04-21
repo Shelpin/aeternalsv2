@@ -1,59 +1,81 @@
-import sha1 from 'js-sha1';
-import type { UUID } from './types.js';
+import { createHash } from 'node:crypto';
 import { z } from "zod";
 
-export const uuidSchema = z.string().uuid() as z.ZodType<UUID>;
+// Keep track of used IDs to avoid collision
+const usedIds = new Set<string>();
 
-export function validateUuid(value: unknown): UUID | null {
-    const result = uuidSchema.safeParse(value);
-    return result.success ? result.data : null;
+// UUID regex
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * UUID type with proper zod validation
+ */
+export const uuidSchema = z.string().regex(uuidRegex, "Invalid UUID format");
+
+export type UUID = z.infer<typeof uuidSchema>;
+
+/**
+ * Validate a string is a valid UUID
+ */
+export function isUUID(id: string): boolean {
+    return uuidRegex.test(id);
 }
 
-export function stringToUuid(target: string | number): UUID {
-    if (typeof target === "number") {
-        target = (target as number).toString();
+/**
+ * Convert a string to UUID
+ * If the string is not a valid UUID format, create a deterministic UUID from it
+ */
+export function stringToUuid(id: string): UUID {
+    if (isUUID(id)) {
+        return id as UUID;
+    }
+    // Convert non-UUID string to a deterministic UUID
+    return deterministicUUID(id) as UUID;
+}
+
+/**
+ * Generate a UUID (v4)
+ */
+export function v4(): string {
+    const uuid = "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => {
+        const randomValue = Math.floor(Math.random() * 16);
+        return (
+            c === "0"
+                ? randomValue
+                : c === "1"
+                    ? 4
+                    : (randomValue & 0x3) | 0x8
+        ).toString(16);
+    });
+
+    // Check for collision and regenerate if needed
+    if (usedIds.has(uuid)) {
+        return v4();
     }
 
-    if (typeof target !== "string") {
-        throw TypeError("Value must be string");
-    }
+    usedIds.add(uuid);
+    return uuid;
+}
 
-    const _uint8ToHex = (ubyte: number): string => {
-        const first = ubyte >> 4;
-        const second = ubyte - (first << 4);
-        const HEX_DIGITS = "0123456789abcdef".split("");
-        return HEX_DIGITS[first] + HEX_DIGITS[second];
-    };
+/**
+ * Create a deterministic UUID from a string
+ * This is useful for creating IDs that are the same
+ * each time for the same input
+ */
+export function deterministicUUID(str: string): string {
+    // Hash the string using SHA-1
+    const hash = createHash('sha1').update(str).digest('hex');
 
-    const _uint8ArrayToHex = (buf: Uint8Array): string => {
-        let out = "";
-        for (let i = 0; i < buf.length; i++) {
-            out += _uint8ToHex(buf[i]);
-        }
-        return out;
-    };
+    // Format as a UUID (8-4-4-4-12)
+    const uuid = [
+        hash.substring(0, 8),
+        hash.substring(8, 12),
+        // Version 5 UUID - Set the 4 most significant bits of the 7th byte to 0101 (5)
+        (parseInt(hash.substring(12, 16), 16) & 0x0fff | 0x5000).toString(16),
+        // Set the 2 most significant bits of the 9th byte to 10
+        (parseInt(hash.substring(16, 20), 16) & 0x3fff | 0x8000).toString(16),
+        hash.substring(20, 32)
+    ].join('-');
 
-    const escapedStr = encodeURIComponent(target);
-    const buffer = new Uint8Array(escapedStr.length);
-    for (let i = 0; i < escapedStr.length; i++) {
-        buffer[i] = escapedStr[i].charCodeAt(0);
-    }
-
-    const hash = sha1(buffer);
-    const hashBuffer = new Uint8Array(hash.length / 2);
-    for (let i = 0; i < hash.length; i += 2) {
-        hashBuffer[i / 2] = Number.parseInt(hash.slice(i, i + 2), 16);
-    }
-
-    return (_uint8ArrayToHex(hashBuffer.slice(0, 4)) +
-        "-" +
-        _uint8ArrayToHex(hashBuffer.slice(4, 6)) +
-        "-" +
-        _uint8ToHex(hashBuffer[6] & 0x0f) +
-        _uint8ToHex(hashBuffer[7]) +
-        "-" +
-        _uint8ToHex((hashBuffer[8] & 0x3f) | 0x80) +
-        _uint8ToHex(hashBuffer[9]) +
-        "-" +
-        _uint8ArrayToHex(hashBuffer.slice(10, 16))) as UUID;
+    return uuid;
 }

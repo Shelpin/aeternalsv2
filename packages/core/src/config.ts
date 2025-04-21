@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { getModulePath } from './utils/module-path.js';
-import { existsSync } from 'fs';
+import { existsSync } from 'node:fs';
 
 const modulePaths = getModulePath();
 const effectiveDirname = modulePaths.dirname || process.cwd(); // Fallback to cwd if dirname is null

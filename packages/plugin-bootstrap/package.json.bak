@@ -1,46 +1,30 @@
 {
   "name": "@elizaos/plugin-bootstrap",
-  "version": "0.25.9",
   "type": "module",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.js",
   "exports": {
-    "0": [
-      "{\"types\":\"./dist/index.d.ts\",\"import\":\"./dist/index.js\",\"require\":\"./dist/index.cjs\"}"
-    ],
-    "./package.json": "./package.json",
     ".": {
-      "import": {
-        "@elizaos/source": "./src/index.ts",
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.js"
-      }
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
     },
-    "/package": {
-      "json": "./package.json"
-    }
+    "./public-api": {
+      "types": "./dist/public-api.d.ts",
+      "import": "./dist/public-api.js",
+      "require": "./dist/public-api.cjs"
+    },
+    "./package.json": "./package.json"
   },
-  "files": [
-    "dist"
-  ],
+  "scripts": {
+    "prebuild": "rimraf dist",
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:full": "npm run build",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch"
+  },
   "dependencies": {
     "@elizaos/core": "workspace:*"
   },
-  "devDependencies": {
-    "@types/node": "^22.10.5",
-    "tsup": "8.3.5"
-  },
-  "scripts": {
-    "build": "rimraf dist && mkdir -p dist && cp index.d.ts dist/index.d.ts && tsup",
-    "dev": "tsup --watch",
-    "test": "vitest run",
-    "prebuild": "rimraf dist && find . -name '*.d.ts' -o -name '*.ts' | grep dist | xargs rm -f 2>/dev/null || true"
-  },
-  "peerDependencies": {
-    "whatwg-url": "7.1.0"
-  },
-  "publishConfig": {
-    "access": "public"
-  }
+  "types": "./dist/index.d.ts"
 }

@@ -22,17 +22,17 @@ import {
     type ClientSettings,
     type CommandSchema,
 } from "@elizaos/core";
-import bodyParser from "body-parser";
-import cors from "cors";
-import express, { type Request as ExpressRequest } from "express";
-import * as fs from "fs";
-import multer from "multer";
-import OpenAI from "openai";
-import * as path from "path";
-import { z } from "zod";
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import express, { type Request as ExpressRequest } from 'express';
+import * as fs from 'node:fs';
+import multer from 'multer';
+import OpenAI from 'openai';
+import * as path from 'node:path';
+import { z } from 'zod';
 import { createApiRouter } from "./api.js";
 import { createVerifiableLogApiRouter } from "./verifiable-log-api.js";
-import handlebars from "handlebars";
+import handlebars from 'handlebars';
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {

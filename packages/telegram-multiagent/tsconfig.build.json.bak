@@ -1,36 +1,25 @@
 {
-    "extends": "../../tsconfig.build.base.json",
-    "compilerOptions": {
-        "target": "es2017",
-        "module": "commonjs",
-        "lib": [
-            "es2017",
-            "esnext",
-            "dom"
-        ],
-        "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true,
-        "outDir": "dist",
-        "rootDir": "src",
-        "esModuleInterop": true,
-        "emitDeclarationOnly": true,
-        "declarationDir": "dist",
-        "baseUrl": ".",
-        "paths": {
-            "@elizaos/core/*": [
-                "../core/src/*"
-            ]
-        }
-    },
-    "include": [
-        "src/**/*.ts"
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "target": "es2021",
+    "lib": [
+      "es2021"
     ],
-    "exclude": [
-        "dist",
-        "**/*.test.ts",
-        "**/*.spec.ts",
-        "**/*.d.ts",
-        "node_modules"
-    ]
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules"
+  ]
 }

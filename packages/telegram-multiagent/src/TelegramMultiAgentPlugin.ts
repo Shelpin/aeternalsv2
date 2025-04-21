@@ -12,12 +12,12 @@ import { TelegramRelay } from './TelegramRelay.js';
 import { ConversationKickstarter } from './ConversationKickstarter.js';
 import { PersonalityEnhancer } from './PersonalityEnhancer.js';
 import { PluginComponent } from './PluginComponent.js';
-import path from 'path';
-import fs from 'fs';
+import path from 'node:path';
+import fs from 'node:fs';
 import { FallbackMemoryManager } from './FallbackMemoryManager.js';
 import { SqliteAdapterProxy } from './SqliteAdapterProxy.js';
 import { generateUUID } from './utils.js';
-import { createRequire } from 'module';
+import { createRequire } from 'node:module';
 import { config as initConfig } from './config.js';
 
 // Extend the Character interface to include additional properties

@@ -1,9 +1,9 @@
-import express from "express";
+import express from 'express';
 import type { Router } from 'express';
-import bodyParser from "body-parser";
-import cors from "cors";
-import path from "path";
-import fs from "fs";
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import path from 'node:path';
+import fs from 'node:fs';
 
 import {
     type AgentRuntime,
@@ -20,7 +20,7 @@ import {
 // import type { TeeLogQuery, TeeLogService } from "@elizaos/plugin-tee-log";
 // import { REST, Routes } from "discord.js";
 // Remove direct import from index to break circular dependency
-// import type { DirectClient } from ".";
+// import type { DirectClient } from "..js";
 
 interface UUIDParams {
     agentId: UUID;

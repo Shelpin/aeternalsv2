@@ -17,7 +17,24 @@
     "composite": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "noImplicitAny": false
+    "noImplicitAny": false,
+    "paths": {
+      "@elizaos/types": [
+        "../types/dist"
+      ],
+      "@elizaos/types/*": [
+        "../types/dist/*"
+      ],
+      "@elizaos/core": [
+        "../core/dist"
+      ],
+      "@elizaos/core/*": [
+        "../core/dist/*"
+      ],
+      "*": [
+        "src/*"
+      ]
+    }
   },
   "include": [
     "src/**/*.ts"
@@ -25,10 +42,5 @@
   "exclude": [
     "node_modules",
     "dist"
-  ],
-  "paths": {
-    "*": [
-      "src/*"
-    ]
-  }
+  ]
 }

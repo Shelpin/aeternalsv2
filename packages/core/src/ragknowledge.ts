@@ -9,8 +9,8 @@ import {
     KnowledgeScope,
 } from './types.js';
 import { stringToUuid } from './uuid.js';
-import { existsSync } from "fs";
-import { join } from "path";
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 /**
  * Manage knowledge in the database.
@@ -230,7 +230,7 @@ export class RAGKnowledgeManager implements IRAGKnowledgeManager {
 
                 // Enhanced reranking with sophisticated scoring
                 const rerankedResults = results
-                    .map((result) => {
+                    .map((result: RAGKnowledgeItem) => {
                         let score = result.similarity;
                         const queryTerms = this.getQueryTerms(processedQuery);
                         // Calculate matchingTerms outside the score check
@@ -264,9 +264,9 @@ export class RAGKnowledgeManager implements IRAGKnowledgeManager {
                         return { ...result, score };
                     })
                     // Handle potentially undefined scores in sorting
-                    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+                    .sort((a: RAGKnowledgeItem, b: RAGKnowledgeItem) => (b.score ?? 0) - (a.score ?? 0))
                     .filter(
-                        (result) =>
+                        (result: RAGKnowledgeItem) =>
                             // Handle potentially undefined score in comparison
                             typeof result.score === 'number' &&
                             result.score >= this.defaultRAGMatchThreshold

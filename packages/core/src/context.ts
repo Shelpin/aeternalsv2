@@ -1,4 +1,4 @@
-import handlebars from "handlebars";
+import handlebars from 'handlebars';
 import type { State, TemplateType } from './types.js';
 import { names, uniqueNamesGenerator } from "unique-names-generator";
 

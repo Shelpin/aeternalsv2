@@ -22,14 +22,14 @@
   },
   "scripts": {
     "prebuild": "rimraf dist",
-    "build": "tsup && tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/build/postbuild-dual.js",
     "build:types": "tsc -p tsconfig.build.json",
     "build:full": "npm run build",
     "clean": "rm -rf dist",
-    "dev": "tsup --watch"
+    "dev": "tsc -p tsconfig.build.json --watch"
   },
   "dependencies": {
-    "@elizaos/adapter-sqlite": "workspace:*",
+    "@elizaos/types": "workspace:*",
     "@fal-ai/client": "1.3.0",
     "fastembed": "1.14.4",
     "js-tiktoken": "1.0.19",

@@ -1,4 +1,4 @@
-import type { IAgentRuntime, State, Memory } from './types.js';
+import type { IAgentRuntime, State, Memory, Provider } from './types.js';
 
 /**
  * Formats provider outputs into a string which can be injected into the context.
@@ -14,11 +14,11 @@ export async function getProviders(
 ) {
     const providerResults = (
         await Promise.all(
-            runtime.providers.map(async (provider) => {
+            runtime.providers.map(async (provider: Provider) => {
                 return await provider.get(runtime, message, state);
             })
         )
-    ).filter((result) => result != null && result !== "");
+    ).filter((result: unknown) => result != null && result !== "");
 
     return providerResults.join("\n");
 }

@@ -1,94 +1,79 @@
 #!/usr/bin/env node
+import fs from 'fs';
+import path from 'path';
+import { glob } from 'glob';
 
 /**
- * Script to fix import extensions in the ElizaOS codebase
- * Based on the deterministic build plan
+ * Script to fix import paths in TypeScript files to ensure proper ESM compatibility
+ * Adds .js extensions to imports when required
  */
 
-const fs = require('fs');
-const path = require('path');
-const { execSync } = require('child_process');
+const shouldWrite = process.argv.includes('--write');
+const packagesDir = path.resolve('./packages');
 
-// Log to both console and file
-const LOG_DIR = 'reports/implementation2104';
-const LOG_FILE = path.join(LOG_DIR, 'import-extensions-fix.log');
+console.log(`Starting import path fixing (${shouldWrite ? 'write mode' : 'dry run mode'})`);
+console.log(`Looking for TypeScript files in ${packagesDir}...`);
 
-function log(message) {
-    console.log(message);
-    fs.appendFileSync(LOG_FILE, message + '\n');
-}
+// Find all TS files in the packages
+const tsFiles = glob.sync('**/src/**/*.ts', {
+    cwd: packagesDir,
+    ignore: ['**/node_modules/**', '**/dist/**', '**/*.d.ts']
+});
 
-// Initialize log file
-if (!fs.existsSync(LOG_DIR)) {
-    fs.mkdirSync(LOG_DIR, { recursive: true });
-}
-fs.writeFileSync(LOG_FILE, `# Import Extensions Fix Log - ${new Date().toISOString()}\n\n`);
+console.log(`Found ${tsFiles.length} TypeScript files to process`);
 
-// Fix patterns for common import extension issues
-const fixPatterns = [
-    {
-        // Fix multiple .js extensions (.js.js.js)
-        pattern: /from ['"](\.\.?\/[^'"]*?)\.js\.js\.js['"]/g,
-        replacement: 'from \'$1.js\''
-    },
-    {
-        // Fix double .js extensions (.js.js)
-        pattern: /from ['"](\.\.?\/[^'"]*?)\.js\.js['"]/g,
-        replacement: 'from \'$1.js\''
-    },
-    {
-        // Add missing .js extensions to relative imports
-        pattern: /from ['"](\.\.?\/[^'"]*?)(?!\.js)['"]/g,
-        replacement: (match, p1) => {
-            // Don't add .js if it's already there or if it's a directory import
-            if (p1.endsWith('.js') || p1.endsWith('/')) {
+let fixedFiles = 0;
+let fixedImports = 0;
+
+// Process each file
+for (const relativeFilePath of tsFiles) {
+    const filePath = path.join(packagesDir, relativeFilePath);
+    let content = fs.readFileSync(filePath, 'utf8');
+    let fileChanged = false;
+
+    // Find all imports and exports
+    const newContent = content.replace(
+        /(import|export)(.+?from\s+['"])([^'"@][^'"]*?)(['"])/g,
+        (match, importOrExport, middle, importPath, quote) => {
+            // Skip if it already has an extension or it's a package import
+            if (importPath.endsWith('.js') || importPath.startsWith('@') || importPath.includes('node:')) {
                 return match;
             }
-            return `from '${p1}.js'`;
+
+            // Skip if it's a directory import with index.ts
+            if (importPath.endsWith('/')) {
+                return match;
+            }
+
+            // Add .js extension
+            const newImport = `${importOrExport}${middle}${importPath}.js${quote}`;
+
+            fixedImports++;
+            return newImport;
         }
-    }
-];
+    );
 
-// Walk the packages directory and fix imports
-function walkAndFix(dir) {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    if (newContent !== content) {
+        fileChanged = true;
+        fixedFiles++;
 
-    for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-
-        if (entry.isDirectory()) {
-            if (entry.name !== 'node_modules' && entry.name !== 'dist') {
-                walkAndFix(fullPath);
-            }
-        } else if (entry.name.endsWith('.ts') || entry.name.endsWith('.tsx')) {
-            try {
-                const content = fs.readFileSync(fullPath, 'utf8');
-                let updatedContent = content;
-                let changed = false;
-
-                // Apply fixes
-                for (const fix of fixPatterns) {
-                    const newContent = updatedContent.replace(fix.pattern, fix.replacement);
-                    if (newContent !== updatedContent) {
-                        changed = true;
-                        updatedContent = newContent;
-                    }
-                }
-
-                // Write back if changed
-                if (changed) {
-                    fs.writeFileSync(fullPath, updatedContent);
-                    log(`Fixed imports in ${fullPath}`);
-                }
-            } catch (error) {
-                log(`Error processing ${fullPath}: ${error.message}`);
-            }
+        if (shouldWrite) {
+            fs.writeFileSync(filePath, newContent, 'utf8');
+            console.log(`Fixed imports in: ${relativeFilePath}`);
+        } else {
+            console.log(`Would fix imports in: ${relativeFilePath}`);
         }
     }
 }
 
-// Start fixing
-log('Starting to fix import extensions...');
-walkAndFix(path.join(process.cwd(), 'packages'));
+console.log('');
+console.log('Import fixing summary:');
+console.log(`- Files processed: ${tsFiles.length}`);
+console.log(`- Files with fixes: ${fixedFiles}`);
+console.log(`- Total imports fixed: ${fixedImports}`);
 
-log('Import extension fix process completed.'); 
+if (!shouldWrite && fixedImports > 0) {
+    console.log('');
+    console.log('This was a dry run. To actually apply the changes, run with --write flag:');
+    console.log('node scripts/fix-import-extensions.js --write');
+} 

@@ -1223,22 +1223,86 @@ export const models: Models = {
     },
 };
 
+// Helper function to convert ModelProviderName to string key for models object
+function getModelKey(provider: ModelProviderName): string {
+    switch (provider) {
+        case ModelProviderName.OPENAI: return 'openai';
+        case ModelProviderName.ETERNALAI: return 'eternalai';
+        case ModelProviderName.ANTHROPIC: return 'anthropic';
+        case ModelProviderName.GROK: return 'grok';
+        case ModelProviderName.GROQ: return 'groq';
+        case ModelProviderName.LLAMACLOUD: return 'llama_cloud';
+        case ModelProviderName.TOGETHER: return 'together';
+        case ModelProviderName.LLAMALOCAL: return 'llama_local';
+        case ModelProviderName.LMSTUDIO: return 'lmstudio';
+        case ModelProviderName.GOOGLE: return 'google';
+        case ModelProviderName.MISTRAL: return 'mistral';
+        case ModelProviderName.CLAUDE_VERTEX: return 'claude_vertex';
+        case ModelProviderName.REDPILL: return 'redpill';
+        case ModelProviderName.OPENROUTER: return 'openrouter';
+        case ModelProviderName.OLLAMA: return 'ollama';
+        case ModelProviderName.HEURIST: return 'heurist';
+        case ModelProviderName.GALADRIEL: return 'galadriel';
+        case ModelProviderName.FAL: return 'falai';
+        case ModelProviderName.GAIANET: return 'gaianet';
+        case ModelProviderName.ALI_BAILIAN: return 'ali_bailian';
+        case ModelProviderName.VOLENGINE: return 'volengine';
+        case ModelProviderName.NANOGPT: return 'nanogpt';
+        case ModelProviderName.HYPERBOLIC: return 'hyperbolic';
+        case ModelProviderName.VENICE: return 'venice';
+        case ModelProviderName.NVIDIA: return 'nvidia';
+        case ModelProviderName.NINETEEN_AI: return 'nineteen_ai';
+        case ModelProviderName.AKASH_CHAT_API: return 'akash_chat_api';
+        case ModelProviderName.LIVEPEER: return 'livepeer';
+        case ModelProviderName.LETZAI: return 'letzai';
+        case ModelProviderName.DEEPSEEK: return 'deepseek';
+        case ModelProviderName.INFERA: return 'infera';
+        case ModelProviderName.BEDROCK: return 'bedrock';
+        case ModelProviderName.ATOMA: return 'atoma';
+        case ModelProviderName.SECRETAI: return 'secret_ai';
+        case ModelProviderName.NEARAI: return 'nearai';
+        default: return 'openai'; // Default fallback
+    }
+}
+
+// Helper function to convert ModelClass to string key for model object
+function getModelClassKey(modelClass: ModelClass): string {
+    switch (modelClass) {
+        case ModelClass.SMALL: return 'small';
+        case ModelClass.MEDIUM: return 'medium';
+        case ModelClass.LARGE: return 'large';
+        case ModelClass.EMBEDDING: return 'embedding';
+        case ModelClass.IMAGE: return 'image';
+        default: return 'medium'; // Default fallback
+    }
+}
+
+/**
+ * Gets the model settings for a specific provider and model class.
+ */
 export function getModelSettings(
     provider: ModelProviderName,
     type: ModelClass
 ): ModelSettings | undefined {
-    return models[provider as keyof typeof models]?.model[type] as ModelSettings | undefined;
+    const modelKey = getModelKey(provider);
+    const modelClassKey = getModelClassKey(type);
+    return models[modelKey as keyof typeof models]?.model[modelClassKey] as ModelSettings | undefined;
 }
 
-
+/**
+ * Gets the embedding model settings for a specific provider.
+ */
 export function getEmbeddingModelSettings(
     provider: ModelProviderName
 ): EmbeddingModelSettings | undefined {
-    return models[provider as keyof typeof models]?.model[ModelClass.EMBEDDING] as
-        | EmbeddingModelSettings
-        | undefined;
+    const modelKey = getModelKey(provider);
+    return models[modelKey as keyof typeof models]?.model.embedding as EmbeddingModelSettings | undefined;
 }
 
-export function getEndpoint(provider: ModelProviderName) {
-    return models[provider as keyof typeof models].endpoint;
+/**
+ * Gets the endpoint for a specific provider.
+ */
+export function getEndpoint(provider: ModelProviderName): string | undefined {
+    const modelKey = getModelKey(provider);
+    return models[modelKey as keyof typeof models]?.endpoint;
 }

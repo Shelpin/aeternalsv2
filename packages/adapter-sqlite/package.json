@@ -1,29 +1,37 @@
 {
   "name": "@elizaos/adapter-sqlite",
   "type": "module",
-  "main": "dist/index.cjs",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
-    },
-    "./public-api": {
-      "types": "./dist/public-api.d.ts",
-      "import": "./dist/public-api.js",
-      "require": "./dist/public-api.cjs"
-    },
-    "./package.json": "./package.json"
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
   },
   "scripts": {
     "prebuild": "rimraf dist",
-    "build": "tsup && tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json && node ../../scripts/build/postbuild-dual.js",
     "build:types": "tsc -p tsconfig.build.json",
     "build:full": "npm run build",
     "clean": "rm -rf dist",
-    "dev": "tsup --watch"
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "test": "jest",
+    "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@elizaos/core": "workspace:*"
-  }
+    "@elizaos/core": "workspace:*",
+    "@elizaos/types": "workspace:*",
+    "better-sqlite3": "^8.6.0",
+    "sqlite-vec": "^0.5.2"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.5",
+    "typescript": "^5.2.2",
+    "@types/node": "^20.8.0"
+  },
+  "files": [
+    "dist"
+  ]
 }

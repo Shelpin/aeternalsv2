@@ -1,31 +1,41 @@
 {
-    "compilerOptions": {
-        "target": "es2017",
-        "module": "commonjs",
-        "lib": [
-            "es2017",
-            "es7",
-            "es6",
-            "dom"
-        ],
-        "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true,
-        "outDir": "dist",
-        "rootDir": "src",
-        "strict": false,
-        "esModuleInterop": true,
-        "emitDeclarationOnly": true,
-        "declarationDir": "dist"
-    },
-    "exclude": [
-        "dist",
-        "**/*.test.ts",
-        "**/*.spec.ts",
-        "**/*.d.ts",
-        "node_modules"
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "NodeNext",
+    "target": "es2022",
+    "module": "NodeNext",
+    "lib": [
+      "es2022",
+      "dom"
     ],
-    "include": [
-        "src/**/*.ts"
-    ]
+    "strict": true,
+    "isolatedModules": true,
+    "resolveJsonModule": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "declarationDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@elizaos/core": [
+        "../core/dist/index.d.ts"
+      ],
+      "@elizaos/core/*": [
+        "../core/dist/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "dist",
+    "node_modules"
+  ]
 }

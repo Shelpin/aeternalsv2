@@ -1,29 +1,20 @@
 {
-    "compilerOptions": {
-        "target": "es2017",
-        "module": "commonjs",
-        "lib": [
-            "es2017",
-            "esnext",
-            "dom"
-        ],
-        "declaration": true,
-        "declarationMap": true,
-        "sourceMap": true,
-        "outDir": "dist",
-        "rootDir": "src",
-        "esModuleInterop": true,
-        "emitDeclarationOnly": true,
-        "declarationDir": "dist"
-    },
-    "exclude": [
-        "dist",
-        "**/*.test.ts",
-        "**/*.spec.ts",
-        "**/*.d.ts",
-        "node_modules"
-    ],
-    "include": [
-        "src/**/*.ts"
-    ]
+  "extends": "../../tsconfig.build.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "declarationDir": "dist",
+    "baseUrl": ".",
+    "paths": {
+      "@elizaos/core/*": [
+        "../core/src/*"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
 }

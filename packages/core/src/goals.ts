@@ -5,19 +5,22 @@ import type {
     UUID,
 } from './types.js';
 
-export const getGoals = async ({
+/**
+ * Get all goals for an agent in a given room.
+ */
+export async function getGoals({
     runtime,
     roomId,
     userId,
-    onlyInProgress = true,
-    count = 5,
+    onlyInProgress,
+    count,
 }: {
     runtime: IAgentRuntime;
-    roomId: UUID;
-    userId?: UUID;
+    roomId: string;
+    userId?: string;
     onlyInProgress?: boolean;
     count?: number;
-}) => {
+}): Promise<any[]> {
     return runtime.databaseAdapter.getGoals({
         agentId: runtime.agentId,
         roomId,
@@ -25,7 +28,7 @@ export const getGoals = async ({
         onlyInProgress,
         count,
     });
-};
+}
 
 export const formatGoalsAsString = ({ goals }: { goals: Goal[] }) => {
     const goalStrings = goals.map((goal: Goal) => {

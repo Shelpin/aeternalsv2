@@ -1,11 +1,27 @@
-export * from './api/types.js';
+import type { Readable } from "node:stream";
+// Import needed types and enums from @elizaos/types
+import {
+    UUID,
+    Memory,
+    MemoryContent,
+    DatabaseAdapter,
+    IAgentRuntime,
+    DatabaseCacheAdapter,
+    ModelProviderName,
+    ModelClass
+} from "@elizaos/types";
 
-import type { Readable } from "stream";
-
-/**
- * Represents a UUID string in the format "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
- */
-export type UUID = `${string}-${string}-${string}-${string}-${string}`;
+// Re-export from @elizaos/types
+export {
+    UUID,
+    Memory,
+    MemoryContent,
+    DatabaseAdapter,
+    IAgentRuntime,
+    DatabaseCacheAdapter,
+    ModelProviderName,
+    ModelClass
+};
 
 /**
  * Represents the content of a message or communication
@@ -128,17 +144,6 @@ export interface Goal {
 }
 
 /**
- * Model size/type classification
- */
-export enum ModelClass {
-    SMALL = "small",
-    MEDIUM = "medium",
-    LARGE = "large",
-    EMBEDDING = "embedding",
-    IMAGE = "image",
-}
-
-/**
  * Model settings
  */
 export type ModelSettings = {
@@ -183,101 +188,64 @@ export type EmbeddingModelSettings = {
 };
 
 /**
- * Configuration for an AI model
+ * Model configuration
  */
 export type Model = {
     /** Optional API endpoint */
     endpoint?: string;
 
-    /** Model names by size class */
+    /** Model settings by size class */
     model: {
-        [ModelClass.SMALL]?: ModelSettings;
-        [ModelClass.MEDIUM]?: ModelSettings;
-        [ModelClass.LARGE]?: ModelSettings;
-        [ModelClass.EMBEDDING]?: EmbeddingModelSettings;
-        [ModelClass.IMAGE]?: ImageModelSettings;
+        small?: ModelSettings;
+        medium?: ModelSettings;
+        large?: ModelSettings;
+        embedding?: EmbeddingModelSettings;
+        image?: ImageModelSettings;
+        // Allow string indexing
+        [key: string]: ModelSettings | EmbeddingModelSettings | ImageModelSettings | undefined;
     };
 };
 
 /**
- * Model configurations by provider
+ * Model definitions
  */
 export type Models = {
-    [ModelProviderName.OPENAI]: Model;
-    [ModelProviderName.ETERNALAI]: Model;
-    [ModelProviderName.ANTHROPIC]: Model;
-    [ModelProviderName.GROK]: Model;
-    [ModelProviderName.GROQ]: Model;
-    [ModelProviderName.LLAMACLOUD]: Model;
-    [ModelProviderName.TOGETHER]: Model;
-    [ModelProviderName.LLAMALOCAL]: Model;
-    [ModelProviderName.LMSTUDIO]: Model;
-    [ModelProviderName.GOOGLE]: Model;
-    [ModelProviderName.MISTRAL]: Model;
-    [ModelProviderName.CLAUDE_VERTEX]: Model;
-    [ModelProviderName.REDPILL]: Model;
-    [ModelProviderName.OPENROUTER]: Model;
-    [ModelProviderName.OLLAMA]: Model;
-    [ModelProviderName.HEURIST]: Model;
-    [ModelProviderName.GALADRIEL]: Model;
-    [ModelProviderName.FAL]: Model;
-    [ModelProviderName.GAIANET]: Model;
-    [ModelProviderName.ALI_BAILIAN]: Model;
-    [ModelProviderName.VOLENGINE]: Model;
-    [ModelProviderName.NANOGPT]: Model;
-    [ModelProviderName.HYPERBOLIC]: Model;
-    [ModelProviderName.VENICE]: Model;
-    [ModelProviderName.NVIDIA]: Model;
-    [ModelProviderName.NINETEEN_AI]: Model;
-    [ModelProviderName.AKASH_CHAT_API]: Model;
-    [ModelProviderName.LIVEPEER]: Model;
-    [ModelProviderName.DEEPSEEK]: Model;
-    [ModelProviderName.INFERA]: Model;
-    [ModelProviderName.BEDROCK]: Model;
-    [ModelProviderName.ATOMA]: Model;
-    [ModelProviderName.SECRETAI]: Model;
-    [ModelProviderName.NEARAI]: Model;
-};
-
-/**
- * Available model providers
- */
-export enum ModelProviderName {
-    OPENAI = "openai",
-    ETERNALAI = "eternalai",
-    ANTHROPIC = "anthropic",
-    GROK = "grok",
-    GROQ = "groq",
-    LLAMACLOUD = "llama_cloud",
-    TOGETHER = "together",
-    LLAMALOCAL = "llama_local",
-    LMSTUDIO = "lmstudio",
-    GOOGLE = "google",
-    MISTRAL = "mistral",
-    CLAUDE_VERTEX = "claude_vertex",
-    REDPILL = "redpill",
-    OPENROUTER = "openrouter",
-    OLLAMA = "ollama",
-    HEURIST = "heurist",
-    GALADRIEL = "galadriel",
-    FAL = "falai",
-    GAIANET = "gaianet",
-    ALI_BAILIAN = "ali_bailian",
-    VOLENGINE = "volengine",
-    NANOGPT = "nanogpt",
-    HYPERBOLIC = "hyperbolic",
-    VENICE = "venice",
-    NVIDIA = "nvidia",
-    NINETEEN_AI = "nineteen_ai",
-    AKASH_CHAT_API = "akash_chat_api",
-    LIVEPEER = "livepeer",
-    LETZAI = "letzai",
-    DEEPSEEK = "deepseek",
-    INFERA = "infera",
-    BEDROCK = "bedrock",
-    ATOMA = "atoma",
-    SECRETAI = "secret_ai",
-    NEARAI = "nearai",
+    openai: Model;
+    eternalai: Model;
+    anthropic: Model;
+    grok: Model;
+    groq: Model;
+    llama_cloud: Model;
+    together: Model;
+    llama_local: Model;
+    lmstudio: Model;
+    google: Model;
+    mistral: Model;
+    claude_vertex: Model;
+    redpill: Model;
+    openrouter: Model;
+    ollama: Model;
+    heurist: Model;
+    galadriel: Model;
+    falai: Model;
+    gaianet: Model;
+    ali_bailian: Model;
+    volengine: Model;
+    nanogpt: Model;
+    hyperbolic: Model;
+    venice: Model;
+    nvidia: Model;
+    nineteen_ai: Model;
+    akash_chat_api: Model;
+    livepeer: Model;
+    deepseek: Model;
+    infera: Model;
+    bedrock: Model;
+    atoma: Model;
+    secret_ai: Model;
+    nearai: Model;
+    // Allow string indexing
+    [key: string]: Model;
 }
 
 /**
@@ -365,41 +333,6 @@ export interface State {
 
     /** Additional dynamic properties */
     [key: string]: unknown;
-}
-
-/**
- * Represents a stored memory/message
- */
-export interface Memory {
-    /** Optional unique identifier */
-    id?: UUID;
-
-    /** Associated user ID */
-    userId: UUID;
-
-    /** Associated agent ID */
-    agentId: UUID;
-
-    /** Optional creation timestamp */
-    createdAt?: number;
-
-    /** Memory content */
-    content: Content;
-
-    /** Optional embedding vector */
-    embedding?: number[];
-
-    /** Associated room ID */
-    roomId: UUID;
-
-    /** Whether memory is unique */
-    unique?: boolean;
-
-    /** Embedding similarity score */
-    similarity?: number;
-
-    /** Optional client name that originated the message */
-    clientName?: string;
 }
 
 /**
@@ -1285,109 +1218,17 @@ export abstract class Service {
     }
 
     public static getInstance<T extends Service>(): T {
-        if (!Service.instance) {
-            Service.instance = new (this as any)();
+        if (!this.instance) {
+            this.instance = new (this as any)();
         }
-        return Service.instance as T;
+        return this.instance as T;
     }
 
     get serviceType(): ServiceType {
         return (this.constructor as typeof Service).serviceType;
     }
 
-    // Add abstract initialize method that must be implemented by derived classes
     abstract initialize(runtime: IAgentRuntime): Promise<void>;
-}
-
-export interface IAgentRuntime {
-    // Properties
-    agentId: UUID;
-    serverUrl: string;
-    databaseAdapter: IDatabaseAdapter;
-    token: string | null;
-    modelProvider: ModelProviderName;
-    imageModelProvider: ModelProviderName;
-    imageVisionModelProvider: ModelProviderName;
-    character: Character;
-    providers: Provider[];
-    actions: Action[];
-    evaluators: Evaluator[];
-    plugins: Plugin[];
-
-    fetch?: typeof fetch | null;
-
-    messageManager: IMemoryManager;
-    descriptionManager: IMemoryManager;
-    documentsManager: IMemoryManager;
-    knowledgeManager: IMemoryManager;
-    ragKnowledgeManager: IRAGKnowledgeManager;
-    loreManager: IMemoryManager;
-
-    cacheManager: ICacheManager;
-
-    services: Map<ServiceType, Service>;
-    clients: ClientInstance[];
-
-    // verifiableInferenceAdapter?: IVerifiableInferenceAdapter | null;
-
-    initialize(): Promise<void>;
-
-    registerMemoryManager(manager: IMemoryManager): void;
-
-    getMemoryManager(name: string): IMemoryManager | null;
-
-    getService<T extends Service>(service: ServiceType): T | null;
-
-    registerService(service: Service): void;
-
-    getSetting(key: string): string | null;
-
-    // Methods
-    getConversationLength(): number;
-
-    processActions(
-        message: Memory,
-        responses: Memory[],
-        state?: State,
-        callback?: HandlerCallback,
-    ): Promise<void>;
-
-    evaluate(
-        message: Memory,
-        state?: State,
-        didRespond?: boolean,
-        callback?: HandlerCallback,
-    ): Promise<string[] | null>;
-
-    ensureParticipantExists(userId: UUID, roomId: UUID): Promise<void>;
-
-    ensureUserExists(
-        userId: UUID,
-        userName: string | null,
-        name: string | null,
-        source: string | null,
-    ): Promise<void>;
-
-    registerAction(action: Action): void;
-
-    ensureConnection(
-        userId: UUID,
-        roomId: UUID,
-        userName?: string,
-        userScreenName?: string,
-        source?: string,
-    ): Promise<void>;
-
-    ensureParticipantInRoom(userId: UUID, roomId: UUID): Promise<void>;
-
-    ensureRoomExists(roomId: UUID): Promise<void>;
-
-    composeState(
-        message: Memory,
-        additionalKeys?: { [key: string]: unknown },
-    ): Promise<State>;
-
-    updateRecentMessageState(state: State): Promise<State>;
 }
 
 export interface IImageDescriptionService extends Service {

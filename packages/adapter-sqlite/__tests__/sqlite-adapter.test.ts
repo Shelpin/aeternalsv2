@@ -1,4 +1,4 @@
-import type { UUID } from '@elizaos/core';
+import type { UUID } from '@elizaos/types';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SqliteDatabaseAdapter } from '../src.js';
 import { load } from '../src/sqlite_vec.js';

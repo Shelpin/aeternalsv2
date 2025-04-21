@@ -1,0 +1,162 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# O4-Mini Build Master Plan Rule
+
+This rule codifies a single, deterministic path to bring ElizaOS from a minimal build state to a fully clean, reproducible build, including detailed steps, logging, reporting procedures, and troubleshooting guidance.
+
+## Phase 0 – Preparation & Snapshot
+
+1. Install dependencies from lockfile:
+   ```bash
+   pnpm install --frozen-lockfile
+   ```
+2. (Optional) Snapshot current TS errors:
+   ```bash
+   pnpm exec tsc -b --noEmit | tee reports/pre_build_errors.txt
+   ```
+
+## Phase 1 – Build `@elizaos/types`
+```bash
+cd packages/types
+pnpm run build
+```
+*Verify:* `dist/index.js` and `dist/index.cjs` exist without errors.
+
+## Phase 2 – Build `@elizaos/adapter-sqlite`
+```bash
+cd ../adapter-sqlite
+pnpm run build
+```
+*Verify:* `dist/index.js` and `dist/index.cjs` exist without errors.
+
+## Phase 2b – Align Shared Types & Refactor Core Code
+1. **Extend `packages/types/src/index.ts`:** Add missing methods used by core:
+   ```ts
+   export interface IDatabaseAdapter {
+     connect(): Promise<void>;
+     disconnect(): Promise<void>;
+     query(sql: string, params?: any[]): Promise<any[]>;
+     execute(sql: string, params?: any[]): Promise<void>;
+     getParticipantsForRoom(roomId: string): Promise<string[]>;
+     getAccountById(userId: string): Promise<any | null>;
+     getGoals(params: any): Promise<any[]>;
+     updateGoal(goal: any): Promise<void>;
+     createGoal(goal: any): Promise<void>;
+     // add other core‐specific methods here
+   }
+
+   export interface Memory {
+     id: string;
+     userId?: string;
+     roomId?: string;
+     content: MemoryContent;
+     createdAt?: number;
+     embedding?: number[];
+     [key: string]: any;
+   }
+
+   // Export enums if needed:
+   export enum ModelProviderName { /* … */ }
+   export enum ModelClass { /* … */ }
+   ```
+2. Rebuild types:
+   ```bash
+   cd packages/types
+   pnpm run build
+   ```
+3. Refactor core source imports:
+   ```diff
+   - import type { IAgentRuntime, Actor, Memory } from '../types.js';
+   + import type { IAgentRuntime, Actor, Memory } from '@elizaos/types';
+   ```
+   Ensure all method calls match the updated `IDatabaseAdapter`.
+4. Quick compile check in core:
+   ```bash
+   cd packages/core
+   pnpm exec tsc -p tsconfig.build.json --noEmit
+   ```
+
+## Phase 3 – Prepare & Build `@elizaos/core`
+1. Create `packages/core/compile.js` to copy `src/index.js` → `dist/index.js` and generate `.cjs`.
+2. Update `package.json`:
+   ```json
+   {
+     "type": "module",
+     "main": "./dist/index.js",
+     "types": "./dist/index.d.ts",
+     "scripts": {
+       "build": "node compile.js"
+     }
+   }
+   ```
+3. Create `packages/core/src/index.ts`:
+   ```ts
+   export * from './runtime.js';
+   export * from './database.js';
+   ```
+4. Build core:
+   ```bash
+   cd packages/core
+   pnpm run build
+   ```
+*Verify:* `dist/index.js`, `dist/index.cjs`, `dist/index.d.ts` exist.
+
+## Phase 4 – Build Remaining Packages
+```bash
+pnpm --filter @elizaos/plugin-bootstrap run build
+pnpm --filter @elizaos/clients/telegram run build
+pnpm --filter @elizaos/dynamic-imports run build
+pnpm --filter @elizaos/telegram-multiagent run build
+pnpm --filter @elizaos/client-direct run build
+pnpm --filter @elizaos/agent run build
+```
+
+## Phase 5 – Full Clean Build Verification
+```bash
+bash scripts/build/clean-build.sh
+```
+*Expected:* All packages built successfully; logs in `reports/build_output/build.log`.
+
+## Post-Build Checks
+1. **No TS errors:**
+   ```bash
+   pnpm exec tsc -b --noEmit
+   ```
+2. **No circular dependencies:**
+   ```bash
+   npx madge --circular packages/
+   ```
+3. **Runtime import tests:**
+   ```bash
+   node -e "import('@elizaos/core'); console.log('Core OK')"
+   node -e "import('@elizaos/adapter-sqlite'); console.log('SQLite OK')"
+   ```
+
+## Logging & Reporting
+- Wrap each step via `scripts/run_step.sh` to log:
+  - Timestamp, session ID
+  - Command & exit code
+  - Duration
+  - First 50 lines of output
+- Store per-phase logs: `reports/build_output/phase-<n>.log`
+- Generate `reports/build_output/forensic-report.md` with summary per phase.
+
+## Troubleshooting Note
+**Better-sqlite3 (Node v23.3+ compatibility)**
+If you encounter errors building or loading `better-sqlite3`, try:
+```bash
+cd node_modules/better-sqlite3
+pm rebuild --build-from-source
+# or
+gnpx node-gyp rebuild
+```
+If that fails, downgrade Node to v20 as a last resort:
+```bash
+nvm install 20 && nvm use 20 && pnpm rebuild
+```
+
+---
+_This rule must be followed exactly for a clean, reproducible build._

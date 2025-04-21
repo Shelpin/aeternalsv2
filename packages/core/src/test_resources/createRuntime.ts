@@ -1,5 +1,6 @@
 import {
     DatabaseAdapter,
+    DatabaseAdapterBase
 } from '../database.js';
 // import { SqlJsDatabaseAdapter } from "@elizaos/adapter-sqljs"; // Commented out - package not found
 // import { SupabaseDatabaseAdapter } from "@elizaos/adapter-supabase"; // Commented out - package not found
@@ -17,21 +18,36 @@ import {
 import type { User } from './types.js';
 
 // Mock SQLite adapter for testing purposes
-class MockSqliteDatabaseAdapter extends DatabaseAdapter<any> {
+class MockSqliteDatabaseAdapter extends DatabaseAdapterBase {
     db: any;
 
     constructor(dbPath: string) {
         super();
-        this.db = { path: dbPath };
         console.log(`[MockSqliteDatabaseAdapter] Created with path: ${dbPath}`);
+        this.db = {};
     }
 
-    async init(): Promise<void> {
-        console.log(`[MockSqliteDatabaseAdapter] Initialized`);
+    // Connection methods
+    async connect(): Promise<void> {
+        console.log(`[MockSqliteDatabaseAdapter] connect`);
+    }
+
+    async disconnect(): Promise<void> {
+        console.log(`[MockSqliteDatabaseAdapter] disconnect`);
     }
 
     async close(): Promise<void> {
-        console.log(`[MockSqliteDatabaseAdapter] Closed`);
+        console.log(`[MockSqliteDatabaseAdapter] close`);
+    }
+
+    // General query methods
+    async query(sql: string, params?: any[]): Promise<any[]> {
+        console.log(`[MockSqliteDatabaseAdapter] query: ${sql}`);
+        return [];
+    }
+
+    async execute(sql: string, params?: any[]): Promise<void> {
+        console.log(`[MockSqliteDatabaseAdapter] execute: ${sql}`);
     }
 
     async getAccountById(userId: UUID): Promise<Account | null> {
@@ -443,7 +459,8 @@ export async function createRuntime({
         actions: actions ?? [],
         evaluators: evaluators ?? [],
         providers: providers ?? [],
-        databaseAdapter: adapter,
+        // Force type cast for test purposes
+        databaseAdapter: adapter as unknown as DatabaseAdapter,
     });
 
     // User and session should be defined by this point due to default initialization

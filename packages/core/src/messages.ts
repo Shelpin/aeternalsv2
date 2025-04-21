@@ -14,12 +14,12 @@ export async function getActorDetails({
     roomId,
 }: {
     runtime: IAgentRuntime;
-    roomId: UUID;
+    roomId: string;
 }) {
     const participantIds =
         await runtime.databaseAdapter.getParticipantsForRoom(roomId);
     const actors = await Promise.all(
-        participantIds.map(async (userId) => {
+        participantIds.map(async (userId: string) => {
             const account =
                 await runtime.databaseAdapter.getAccountById(userId);
             if (account) {
@@ -34,7 +34,7 @@ export async function getActorDetails({
         })
     );
 
-    return actors.filter((actor): actor is Actor => actor !== null);
+    return actors.filter((actor: any): actor is Actor => actor !== null);
 }
 
 /**

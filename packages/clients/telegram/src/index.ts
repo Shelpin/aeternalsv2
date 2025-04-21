@@ -1,4 +1,4 @@
-import TelegramBot from 'node-telegram-bot-api';
+import TelegramBot from 'node-telegram-bot-api.js';
 
 // VALHALLA FIX: Add type declaration for global runtime
 declare global {

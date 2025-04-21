@@ -625,3 +625,19 @@ Configure your TypeScript Language Server to:
 - Use the workspace TypeScript version (5.6.3)
 - Use non-relative imports
 - Skip type checking in node_modules
+
+## Build System
+
+ElizaOS now features a standardized build system that enables clean, reproducible builds across all packages. To build the entire project:
+
+```bash
+./clean-build.sh
+```
+
+The build system follows these steps:
+1. Checks for circular dependencies
+2. Standardizes package configurations
+3. Builds packages in dependency order
+4. Verifies the built packages can be imported correctly
+
+For more details on the build system, see [Build System Documentation](./scripts/build/README.md).

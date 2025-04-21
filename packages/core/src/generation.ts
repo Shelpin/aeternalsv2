@@ -13,13 +13,13 @@ import {
     // type MessageContent as AIMessageContent,
     // type MessageContentPart
 } from "ai";
-import { Buffer } from "buffer";
+import { Buffer } from 'node:buffer';
 import { createOllama } from "ollama-ai-provider";
-import OpenAI from "openai";
+import OpenAI from 'openai';
 import { encodingForModel, type TiktokenModel } from "js-tiktoken";
 // import { AutoTokenizer } from "@huggingface/transformers";
 import Together from "together-ai";
-import type { ZodSchema } from "zod";
+import type { ZodSchema } from 'zod';
 import { elizaLogger } from './internal/logger-internal.js';
 import {
     models,
@@ -59,9 +59,9 @@ import { fal } from "@fal-ai/client";
 
 import BigNumber from "bignumber.js";
 import { createPublicClient, http } from "viem";
-import fs from "fs";
-import os from "os";
-import path from "path";
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import * as z from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
