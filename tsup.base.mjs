@@ -20,5 +20,12 @@ export const baseConfig = {
     minify: false,
     esbuildOptions(options) {
         options.conditions = ["import", "node"];
-    }
+    },
+    external: [
+        'mock-aws-s3',
+        'aws-sdk',
+        'nock',
+        '@mapbox/node-pre-gyp',
+        'better-sqlite3'
+    ]
 }; 

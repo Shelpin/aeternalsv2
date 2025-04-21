@@ -216,7 +216,7 @@ export const continueAction: Action = {
 
             if (continueCount >= maxContinuesInARow - 1) {
                 // -1 because we're about to add another
-                response.action = null;
+                response.action = undefined;
             }
         }
 

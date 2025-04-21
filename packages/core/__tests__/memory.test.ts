@@ -1,7 +1,7 @@
-import { MemoryManager } from "../src/memory";
-import { CacheManager, MemoryCacheAdapter } from "../src/cache";
+import { MemoryManager } from '../src/memory.js';
+import { CacheManager, MemoryCacheAdapter } from '../src/cache.js';
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import type { IAgentRuntime, Memory, UUID } from "../src/types";
+import type { IAgentRuntime, Memory, UUID } from '../src/types.js';
 
 describe("MemoryManager", () => {
     let memoryManager: MemoryManager;

@@ -1,4 +1,4 @@
-import type { IAgentRuntime, Memory, State } from "../types";
+import type { IAgentRuntime, Memory, State } from '../types.js';
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock the fetch function

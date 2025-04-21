@@ -1,12 +1,11 @@
-import { defineConfig } from "tsup";
-const { baseConfig, commonExternals } = require("../../tsup.base");
+import { defineConfig } from 'tsup';
 
 export default defineConfig({
-  ...baseConfig,
+  entry: ["src/index.ts", "src/public-api.ts"],
   dts: false,
-  entry: ["src/index.ts", "src/public-api.ts", "src/utils/**/*.ts"],
-  external: [
-    ...commonExternals,
-    "@anush008/tokenizers", "tokenizers"
-  ]
+  format: ["esm", "cjs"],
+  splitting: true,
+  sourcemap: true,
+  clean: true,
+  external: ["fs", "path", "http", "https"]
 });

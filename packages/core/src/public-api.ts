@@ -36,10 +36,10 @@ export type {
   // ADDED missing types used by adapter-sqlite
   Relationship,
   ChunkRow
-} from "./types.js";
+} from './types.js';
 
 // Re-export specific value constants needed
-export { ModelProviderName, CacheStore, ModelClass } from "./types.js";
+export { ModelProviderName, CacheStore, ModelClass } from './types.js';
 
 // Export context utilities (correct path)
 export { composeContext } from './context.js';
@@ -55,13 +55,13 @@ export { embed } from './embedding.js';
 export { formatMessages } from './messages.js';
 
 // Export generation functions (assuming path)
-export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from "./generation.js";
+export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from './generation.js';
 
 // Existing value exports
-export { getGoals } from "./goals.js";
-export { AgentRuntime } from "./runtime.js";
-export { getModulePath } from "./utils/module-path.js";
-export { default as knowledge } from "./knowledge.js";
+export { getGoals } from './goals.js';
+export { AgentRuntime } from './runtime.js';
+export { getModulePath } from './utils/module-path.js';
+export { default as knowledge } from './knowledge.js';
 
 // Export MemoryManager implementation (assuming from ./memory)
 export { MemoryManager } from './memory.js';

@@ -3,7 +3,7 @@ import {
     formatGoalsAsString,
     updateGoal,
     createGoal,
-} from "../src/goals";
+} from '../src/goals.js';
 import {
     type Goal,
     GoalStatus,
@@ -13,8 +13,8 @@ import {
     type UUID,
     type Service,
     type ServiceType,
-} from "../src/types";
-import { CacheManager, MemoryCacheAdapter } from "../src/cache";
+} from '../src/types.js';
+import { CacheManager, MemoryCacheAdapter } from '../src/cache.js';
 import { describe, expect, vi, beforeEach } from "vitest";
 
 // Mock the database adapter

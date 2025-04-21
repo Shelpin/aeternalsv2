@@ -1,5 +1,5 @@
-import { getModelSettings, getImageModelSettings, getEndpoint, models } from "../src/models";
-import { ModelProviderName, ModelClass } from "../src/types";
+import { getModelSettings, getImageModelSettings, getEndpoint, models } from '../src/models.js';
+import { ModelProviderName, ModelClass } from '../src/types.js';
 import { describe, test, expect, vi } from "vitest";
 
 // Mock settings

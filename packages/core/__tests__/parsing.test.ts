@@ -4,7 +4,7 @@ import {
     parseBooleanFromText,
     parseJsonArrayFromText,
     parseJSONObjectFromText,
-} from "../src/parsing";
+} from '../src/parsing.js';
 
 describe("Parsing Module", () => {
     describe("parseShouldRespondFromText", () => {

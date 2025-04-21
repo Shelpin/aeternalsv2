@@ -3,14 +3,14 @@ import {
     formatEvaluators,
     formatEvaluatorExamples,
     formatEvaluatorExampleDescriptions,
-} from "../src/evaluators";
+} from '../src/evaluators.js';
 import type {
     Evaluator,
     HandlerCallback,
     IAgentRuntime,
     Memory,
     State,
-} from "../src/types";
+} from '../src/types.js';
 
 // Mock data for evaluators
 const mockEvaluators: Evaluator[] = [

@@ -1,5 +1,5 @@
 /* eslint-disable no-dupe-class-members */
-import { DatabaseAdapter } from "../src/database";
+import { DatabaseAdapter } from '../src/database.js';
 import {
     type Memory,
     type Actor,
@@ -9,7 +9,7 @@ import {
     type Participant,
     type Relationship,
     type UUID,
-} from "../src/types";
+} from '../src/types.js';
 
 class MockDatabaseAdapter extends DatabaseAdapter {
     getMemoryById(_id: UUID): Promise<Memory | null> {

@@ -1,4 +1,4 @@
-import type { IAgentRuntime, IMemoryManager, Memory, UUID } from "./types";
+import type { IAgentRuntime, IMemoryManager, Memory, UUID } from './types.js';
 /**
  * Manage memories in the database.
  */

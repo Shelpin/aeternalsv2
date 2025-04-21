@@ -1,6 +1,6 @@
-import type { Memory } from "./types.js";
-import type { IAgentRuntimeBridge } from "./api/types.js";
-import elizaLogger from "./logger.js";
+import type { Memory } from './types.js';
+import type { IAgentRuntimeBridge } from './api/types.js';
+import elizaLogger from './logger.js';
 
 async function get(runtime: IAgentRuntimeBridge, message: Memory): Promise<any> {
     if (!runtime.knowledgeManager) {

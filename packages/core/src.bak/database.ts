@@ -9,9 +9,9 @@ import type {
     RAGKnowledgeItem,
     Participant,
     IDatabaseAdapter,
-} from "./types";
-import { CircuitBreaker } from "./database/CircuitBreaker";
-import { elizaLogger } from "./logger";
+} from './types.js';
+import { CircuitBreaker } from './database/CircuitBreaker.js';
+import { elizaLogger } from './logger.js';
 
 /**
  * An abstract class representing a database adapter for managing various entities

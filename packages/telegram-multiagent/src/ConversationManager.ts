@@ -8,8 +8,7 @@ import {
 } from './types.js';
 import { PluginComponent } from './PluginComponent.js';
 import { FallbackMemoryManager } from './FallbackMemoryManager.js';
-import { TelegramMultiAgentPlugin } from "./TelegramMultiAgentPlugin.js";
-import { IMemoryManager } from "./types.js";
+import { IMemoryManager } from './interfaces.js';
 
 // Conversation states
 enum ConversationState {
@@ -367,6 +366,7 @@ export class ConversationManager extends PluginComponent {
         this.logger.debug(`[CONVO_MANAGER] Agent ${agentId} should not respond to itself`);
         return false;
       }
+
       let runtime: IAgentRuntime | undefined;
       try {
         runtime = await this.waitForRuntime();
@@ -374,6 +374,7 @@ export class ConversationManager extends PluginComponent {
         this.logger.warn(`[CONVO_MANAGER] Error getting runtime: ${error instanceof Error ? error.message : JSON.stringify(error)}, using basic response logic`);
         return this.basicShouldRespond(agentId, fromAgentId, messageText);
       }
+
       let character: any = undefined;
       let agentName = agentId;
       let persona = '';
@@ -394,6 +395,7 @@ export class ConversationManager extends PluginComponent {
           this.logger.warn(`[CONVO_MANAGER] Error getting character: ${JSON.stringify(error)}`);
         }
       }
+
       let history = '';
       let participants: string[] = [];
       try {
@@ -416,7 +418,9 @@ export class ConversationManager extends PluginComponent {
           this.logger.warn(`[CONVO_MANAGER] Error getting history: ${JSON.stringify(error)}`);
         }
       }
+
       const prompt = `You are ${agentName}, an AI participating in a group chat.\n\nYour persona:\n${persona}\n\nYour interests: ${interests.join(', ')}\nTopics you know about: ${topics.join(', ')}\n\nCurrent group chat: Telegram group ${groupId}\nOther participants: ${participants.length > 0 ? participants.filter(p => p !== agentId).join(', ') : 'None identified yet'}\n\nRecent conversation:\n${history || 'No recent messages'}\n\nMessage just received:\nFROM: ${fromAgentId || ''}\nMESSAGE: \"${messageText || ''}\"\n\nShould you respond to this message? Consider:\n- If it's directed at you\n- If it's about a topic you're interested in\n- If you have something valuable to add\n- If it's natural for you to join the conversation at this point\n\nReply with ONLY ONE of these exact options:\n[RESPOND] - if you want to speak\n[IGNORE] - if you choose to remain silent`;
+
       try {
         if (runtime?.modelProvider && typeof (runtime.modelProvider as any).generateText === 'function') {
           const result = await (runtime.modelProvider as { generateText: (opts: { prompt: string, temperature: number, maxTokens: number }) => Promise<string> }).generateText({
@@ -435,6 +439,7 @@ export class ConversationManager extends PluginComponent {
           this.logger.warn(`[CONVO_MANAGER] Error generating LLM response: ${JSON.stringify(error)}, falling back to basic logic`);
         }
       }
+
       return this.basicShouldRespond(agentId, fromAgentId, messageText);
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -550,4 +555,4 @@ export class ConversationManager extends PluginComponent {
     this.logger.info('ConversationManager: Shutting down');
     // No resources to clean up
   }
-} 
+}

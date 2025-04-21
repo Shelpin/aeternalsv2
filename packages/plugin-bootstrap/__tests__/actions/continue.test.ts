@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { continueAction } from '../../src/actions/continue';
+import { continueAction } from '../../src/actions/continue.js';
 import { composeContext, generateMessageResponse, generateTrueOrFalse, ModelClass } from '@elizaos/core';
 
 vi.mock('@elizaos/core', () => ({

@@ -1,4 +1,4 @@
-import settings from "./settings.js";
+import settings from './settings.js';
 import {
     type EmbeddingModelSettings,
     type ImageModelSettings,
@@ -6,7 +6,7 @@ import {
     ModelProviderName,
     type Models,
     type ModelSettings,
-} from "./types.js";
+} from './types.js';
 
 export const models: Models = {
     [ModelProviderName.OPENAI]: {

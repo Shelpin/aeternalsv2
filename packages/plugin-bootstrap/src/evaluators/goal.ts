@@ -88,12 +88,17 @@ async function handler(
                     ...goal,
                     ...update,
                     objectives: goal.objectives.map((objective) => {
-                        const updatedObjective = update.objectives?.find(uo => uo.description === objective.description);
+                        const updatedObjective = update.objectives?.find((uo: Objective) => uo.description === objective.description);
                         return updatedObjective ? { ...objective, ...updatedObjective } : objective;
                     }),
                 };
             }
-            return null; // No update for this goal
+            return {
+                id: "none",
+                status: "inactive",
+                description: "No goal update",
+                objectives: []
+            };
         })
         .filter(Boolean);
 

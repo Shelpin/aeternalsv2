@@ -1,8 +1,8 @@
-import { getEmbeddingModelSettings, getEndpoint } from "./models.js";
-import { type IAgentRuntime, ModelProviderName } from "./types.js";
-import settings from "./settings.js";
-import elizaLogger from "./logger.js";
-import LocalEmbeddingModelManager from "./localembeddingManager.js";
+import { getEmbeddingModelSettings, getEndpoint } from './models.js';
+import { type IAgentRuntime, ModelProviderName } from './types.js';
+import settings from './settings.js';
+import elizaLogger from './logger.js';
+import LocalEmbeddingModelManager from './localembeddingManager.js';
 
 interface EmbeddingOptions {
     model: string;

@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { ModelProviderName } from "./types.js";
-import elizaLogger from "./logger.js";
+import { ModelProviderName } from './types.js';
+import elizaLogger from './logger.js';
 
 // TODO: TO COMPLETE
 export const envSchema = z.object({

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { goalEvaluator } from '../../src/evaluators/goal';
+import { goalEvaluator } from '../../src/evaluators/goal.js';
 import { composeContext, generateText, getGoals, parseJsonArrayFromText } from '@elizaos/core';
 
 vi.mock('@elizaos/core', () => ({

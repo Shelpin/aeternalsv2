@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-import { getModulePath } from './utils/module-path';
+import { getModulePath } from './utils/module-path.js';
 
 const { filename: __filename, dirname: __dirname } = getModulePath();
 

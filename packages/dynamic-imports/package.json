@@ -11,7 +11,11 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "prebuild": "rimraf dist && mkdir -p dist",
-    "build": "tsc -p tsconfig.build.json"
+    "prebuild": "rimraf dist",
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:full": "npm run build",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch"
   }
 }

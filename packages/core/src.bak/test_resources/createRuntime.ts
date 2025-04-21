@@ -5,18 +5,18 @@ import {
 import { SqlJsDatabaseAdapter } from "@elizaos/adapter-sqljs";
 import { SupabaseDatabaseAdapter } from "@elizaos/adapter-supabase";
 import { PGLiteDatabaseAdapter } from "@elizaos/adapter-pglite";
-import type { DatabaseAdapter } from "../database";
-import { getEndpoint } from "../models";
-import { AgentRuntime } from "../runtime";
-import { type Action, type Evaluator, ModelProviderName, type Provider } from "../types";
+import type { DatabaseAdapter } from '../database.js';
+import { getEndpoint } from '../models.js';
+import { AgentRuntime } from '../runtime.js';
+import { type Action, type Evaluator, ModelProviderName, type Provider } from '../types.js';
 import {
     SUPABASE_ANON_KEY,
     SUPABASE_URL,
     TEST_EMAIL,
     TEST_PASSWORD,
     zeroUuid,
-} from "./constants";
-import type { User } from "./types";
+} from './constants.js';
+import type { User } from './types.js';
 
 /**
  * Creates a runtime environment for the agent.

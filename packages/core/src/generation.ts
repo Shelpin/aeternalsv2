@@ -20,21 +20,21 @@ import { encodingForModel, type TiktokenModel } from "js-tiktoken";
 // import { AutoTokenizer } from "@huggingface/transformers";
 import Together from "together-ai";
 import type { ZodSchema } from "zod";
-import { elizaLogger } from "./internal/logger-internal.js";
+import { elizaLogger } from './internal/logger-internal.js';
 import {
     models,
     getModelSettings,
     // getImageModelSettings, // Remove or correct this line
     getEndpoint,
-} from "./models.js";
+} from './models.js';
 import {
     parseBooleanFromText,
     parseJsonArrayFromText,
     parseJSONObjectFromText,
     parseShouldRespondFromText,
     parseActionResponseFromText,
-} from "./parsing.js";
-import settings from "./settings.js";
+} from './parsing.js';
+import settings from './settings.js';
 import {
     type Content,
     type IAgentRuntime,
@@ -54,7 +54,7 @@ import {
     // type ImageCaptionResponse,
     type ModelSettings,
     type ImageModelSettings,
-} from "./types.js";
+} from './types.js';
 import { fal } from "@fal-ai/client";
 
 import BigNumber from "bignumber.js";

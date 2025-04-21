@@ -11,10 +11,12 @@ const factsProvider: Provider = {
     get: async (runtime: IAgentRuntime, message: Memory, state?: State) => {
         const recentMessagesData = state?.recentMessagesData?.slice(-10);
 
-        const recentMessages = formatMessages({
-            messages: recentMessagesData,
-            actors: state?.actorsData,
-        });
+        const formatData = {
+            messages: recentMessagesData || [],
+            actors: state?.actorsData || [],
+        };
+
+        const recentMessages = formatMessages(formatData);
 
         const embedding = await embed(runtime, recentMessages);
 

@@ -3,8 +3,8 @@ import {
     composeActionExamples,
     formatActionNames,
     formatActions,
-} from "../src/actions";
-import type { Action } from "../src/types";
+} from '../src/actions.js';
+import type { Action } from '../src/types.js';
 
 describe("Actions", () => {
     const mockActions: Action[] = [

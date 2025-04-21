@@ -1,4 +1,4 @@
-import type { IAgentRuntime, Relationship, UUID } from "./types";
+import type { IAgentRuntime, Relationship, UUID } from './types.js';
 
 export async function createRelationship({
     runtime,

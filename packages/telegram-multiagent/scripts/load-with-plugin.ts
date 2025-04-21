@@ -1,5 +1,5 @@
 import { AgentRuntime } from '@elizaos/core';
-import { TelegramMultiAgentPlugin } from '../src';
+import { TelegramMultiAgentPlugin } from '../src.js';
 
 async function main() {
   console.log('Starting Telegram Multi-Agent Plugin test...');

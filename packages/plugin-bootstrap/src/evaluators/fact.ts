@@ -1,6 +1,7 @@
 import { composeContext } from "@elizaos/core/public-api";
 import { generateObjectArray } from "@elizaos/core/public-api";
 import { MemoryManager } from "@elizaos/core/public-api";
+import { stringToUuid } from "@elizaos/core";
 import {
     type ActionExample,
     type IAgentRuntime,
@@ -9,6 +10,7 @@ import {
     type Evaluator,
     type Objective,
     type State,
+    type UUID,
 } from "@elizaos/core/public-api";
 
 export const formatFacts = (facts: Memory[]) => {
@@ -92,12 +94,16 @@ async function handler(runtime: IAgentRuntime, message: Memory) {
         .map((fact) => fact.claim);
 
     for (const fact of filteredFacts) {
+        const safeAgentId = typeof agentId === 'string'
+            ? stringToUuid(agentId)
+            : agentId || stringToUuid("00000000-0000-0000-0000-000000000000");
+
         const factMemory = await factsManager.addEmbeddingToMemory({
-            userId: agentId!,
-            agentId,
+            userId: safeAgentId,
+            agentId: safeAgentId,
             content: { text: fact },
             roomId,
-            createdAt: Date.now(),
+            type: "fact",
         });
 
         await factsManager.createMemory(factMemory, true);
@@ -201,45 +207,4 @@ json\`\`\`
   { "claim": "Alex worked out 2 hours a day at the gym for a year.", "type": "fact", "in_bio": true, "already_known": false },
   { "claim": "Alex is really proud of himself.", "type": "opinion", "in_bio": false, "already_known": false }
 ]
-\`\`\`
-`,
-        },
-        {
-            context: `Actors in the scene:
-{{user1}}: Likes to play poker and go to the park. Friends with Eva.
-{{user2}}: Also likes to play poker. Likes to write and read.
-
-Facts about the actors:
-Mike and Eva won a regional poker tournament about six months ago
-Mike is married to Alex
-Eva studied Philosophy before switching to Computer Science`,
-            messages: [
-                {
-                    user: "{{user1}}",
-                    content: {
-                        text: "Remember when we won the regional poker tournament last spring",
-                    },
-                },
-                {
-                    user: "{{user2}}",
-                    content: {
-                        text: "That was one of the best days of my life",
-                    },
-                },
-                {
-                    user: "{{user1}}",
-                    content: {
-                        text: "It really put our poker club on the map",
-                    },
-                },
-            ] as ActionExample[],
-            outcome: `Claims:
-json\`\`\`
-[
-  { "claim": "Mike and Eva won the regional poker tournament last spring", "type": "fact", "in_bio": false, "already_known": true },
-  { "claim": "Winning the regional poker tournament put the poker club on the map", "type": "opinion", "in_bio": false, "already_known": false }
-]
-\`\`\``,
-        },
-    ],
-};
+\`\`

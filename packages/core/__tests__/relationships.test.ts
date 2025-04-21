@@ -3,8 +3,8 @@ import {
     getRelationship,
     getRelationships,
     formatRelationships,
-} from "../src/relationships";
-import type { IAgentRuntime, Relationship, UUID } from "../src/types";
+} from '../src/relationships.js';
+import type { IAgentRuntime, Relationship, UUID } from '../src/types.js';
 import { describe, expect, vi } from "vitest";
 
 // Mock runtime and databaseAdapter

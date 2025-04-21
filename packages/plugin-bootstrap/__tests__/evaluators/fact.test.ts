@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { factEvaluator } from '../../src/evaluators/fact';
+import { factEvaluator } from '../../src/evaluators/fact.js';
 import { composeContext, generateObjectArray, MemoryManager } from '@elizaos/core';
 
 vi.mock('@elizaos/core', () => ({

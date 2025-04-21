@@ -1,7 +1,7 @@
 import type { UUID } from '@elizaos/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { SqliteDatabaseAdapter } from '../src';
-import { load } from '../src/sqlite_vec';
+import { SqliteDatabaseAdapter } from '../src.js';
+import { load } from '../src/sqlite_vec.js';
 import type { Database } from 'better-sqlite3';
 
 // Mock the elizaLogger

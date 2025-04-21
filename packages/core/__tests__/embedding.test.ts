@@ -4,9 +4,9 @@ import {
     getEmbeddingConfig,
     getEmbeddingType,
     getEmbeddingZeroVector,
-} from "../src/embedding";
-import { type IAgentRuntime, ModelProviderName } from "../src/types";
-import settings from "../src/settings";
+} from '../src/embedding.js';
+import { type IAgentRuntime, ModelProviderName } from '../src/types.js';
+import settings from '../src/settings.js';
 
 // Mock environment-related settings
 vi.mock("../settings", () => ({

@@ -1,4 +1,4 @@
-import { type Character, ModelProviderName } from "../types";
+import { type Character, ModelProviderName } from '../types.js';
 
 export const mockCharacter: Character = {
     name: "Eliza",

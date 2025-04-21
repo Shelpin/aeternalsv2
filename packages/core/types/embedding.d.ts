@@ -1,4 +1,4 @@
-import { type IAgentRuntime } from "./types";
+import { type IAgentRuntime } from './types.js';
 export declare const EmbeddingProvider: {
     readonly OpenAI: "OpenAI";
     readonly Ollama: "Ollama";

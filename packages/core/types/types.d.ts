@@ -1,4 +1,4 @@
-export * from './api/types';
+export * from './api/types.js';
 import type { Readable } from "stream";
 /**
  * Represents a UUID string in the format "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
@@ -1250,7 +1250,7 @@ export interface DirectoryItem {
 export interface ChunkRow {
     id: string;
 }
-export * from "./api/types";
+export * from './api/types.js';
 export interface Memory {
     roomId: string;
     userId: string;

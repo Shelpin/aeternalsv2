@@ -15,8 +15,12 @@
     }
   },
   "scripts": {
-    "build": "echo 'No build required.'",
-    "clean": "rimraf dist"
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "clean": "rm -rf dist",
+    "prebuild": "rimraf dist",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:full": "npm run build",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "node-telegram-bot-api": "^0.61.0"

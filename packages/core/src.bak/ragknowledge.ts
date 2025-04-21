@@ -1,14 +1,14 @@
-import { embed } from "./embedding";
-import { splitChunks } from "./generation";
-import elizaLogger from "./logger";
+import { embed } from './embedding.js';
+import { splitChunks } from './generation.js';
+import elizaLogger from './logger.js';
 import {
     type IAgentRuntime,
     type IRAGKnowledgeManager,
     type RAGKnowledgeItem,
     type UUID,
     KnowledgeScope,
-} from "./types";
-import { stringToUuid } from "./uuid";
+} from './types.js';
+import { stringToUuid } from './uuid.js';
 import { existsSync } from "fs";
 import { join } from "path";
 

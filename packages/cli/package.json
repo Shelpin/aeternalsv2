@@ -4,7 +4,12 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "echo 'No build required.'"
+    "build": "tsup && tsc -p tsconfig.build.json",
+    "prebuild": "rimraf dist",
+    "build:types": "tsc -p tsconfig.build.json",
+    "build:full": "npm run build",
+    "clean": "rm -rf dist",
+    "dev": "tsup --watch"
   },
   "bin": {
     "elizaos": "index.js"

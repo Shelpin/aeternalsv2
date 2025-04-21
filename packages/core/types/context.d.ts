@@ -1,4 +1,4 @@
-import type { State, TemplateType } from "./types";
+import type { State, TemplateType } from './types.js';
 /**
  * Composes a context string by replacing placeholders in a template with corresponding values from the state.
  *

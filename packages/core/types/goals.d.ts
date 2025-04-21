@@ -1,4 +1,4 @@
-import type { IAgentRuntime, Goal, UUID } from "./types";
+import type { IAgentRuntime, Goal, UUID } from './types.js';
 export declare const getGoals: ({ runtime, roomId, userId, onlyInProgress, count, }: {
     runtime: IAgentRuntime;
     roomId: UUID;

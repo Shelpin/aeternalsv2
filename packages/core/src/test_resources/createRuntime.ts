@@ -1,20 +1,20 @@
 import {
     DatabaseAdapter,
-} from "../database.js";
+} from '../database.js';
 // import { SqlJsDatabaseAdapter } from "@elizaos/adapter-sqljs"; // Commented out - package not found
 // import { SupabaseDatabaseAdapter } from "@elizaos/adapter-supabase"; // Commented out - package not found
 // import { PGLiteDatabaseAdapter } from "@elizaos/adapter-pglite"; // Commented out - package not found
-import { getEndpoint } from "../models.js";
-import { AgentRuntime } from "../runtime.js";
-import { type Action, type Evaluator, ModelProviderName, type Provider, type UUID, type Account, type Actor, type Memory, type Participant, type Goal, type RAGKnowledgeItem } from "../types.js";
+import { getEndpoint } from '../models.js';
+import { AgentRuntime } from '../runtime.js';
+import { type Action, type Evaluator, ModelProviderName, type Provider, type UUID, type Account, type Actor, type Memory, type Participant, type Goal, type RAGKnowledgeItem } from '../types.js';
 import {
     SUPABASE_ANON_KEY,
     SUPABASE_URL,
     TEST_EMAIL,
     TEST_PASSWORD,
     zeroUuid,
-} from "./constants.js";
-import type { User } from "./types.js";
+} from './constants.js';
+import type { User } from './types.js';
 
 // Mock SQLite adapter for testing purposes
 class MockSqliteDatabaseAdapter extends DatabaseAdapter<any> {
