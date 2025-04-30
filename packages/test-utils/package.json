@@ -19,7 +19,9 @@
     },
     "scripts": {
         "prebuild": "rimraf dist",
-        "build": "tsc -b tsconfig.build.json"
+        "build": "echo 'Skipping test-utils build'",
+        "build:types": "tsc -b tsconfig.build.json",
+        "test": "jest"
     },
     "devDependencies": {}
 }

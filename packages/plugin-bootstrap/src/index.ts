@@ -1,4 +1,4 @@
-import type { Plugin } from "@elizaos/core/public-api.js";
+import type { Plugin } from "@elizaos/core";
 import type {
     PluginContext,
     Action,

@@ -1,4 +1,4 @@
-import type { IAgentRuntime, Memory, Provider, State } from "@elizaos/core/public-api";
+import type { IAgentRuntime, Memory, Provider, State } from '@elizaos/core';
 
 const boredomLevels = [
     {

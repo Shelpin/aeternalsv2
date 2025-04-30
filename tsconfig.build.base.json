@@ -8,12 +8,6 @@
             "@elizaos/types/*": [
                 "packages/types/dist/*"
             ],
-            "@elizaos/core": [
-                "packages/core/dist/public-api.d.ts"
-            ],
-            "@elizaos/core/*": [
-                "packages/core/dist/*"
-            ],
             "@elizaos/adapter-sqlite": [
                 "packages/adapter-sqlite/dist"
             ],
@@ -67,6 +61,12 @@
             ],
             "@elizaos/test-utils/*": [
                 "packages/test-utils/dist/*"
+            ],
+            "@elizaos/core": [
+                "packages/core/dist/public-api.d.ts"
+            ],
+            "@elizaos/core/*": [
+                "packages/core/dist/*"
             ]
         },
         "target": "ES2021",

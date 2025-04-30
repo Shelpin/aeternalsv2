@@ -1,12 +1,6 @@
 {
     "extends": "../../tsconfig.build.base.json",
     "compilerOptions": {
-        "baseUrl": "../..",
-        "paths": {
-            "@elizaos/core": [
-                "packages/core/dist/public-api.d.ts"
-            ]
-        },
         "module": "nodenext",
         "moduleResolution": "nodenext",
         "rootDir": "src",
@@ -29,7 +23,7 @@
             "path": "../types"
         },
         {
-            "path": "../core"
+            "path": "../core/tsconfig.build.json"
         }
     ]
 }

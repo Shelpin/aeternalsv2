@@ -1,18 +1,17 @@
-import { composeContext } from "@elizaos/core/public-api";
-import { generateObjectArray } from "@elizaos/core/public-api";
-import { MemoryManager } from "@elizaos/core/public-api";
-import { stringToUuid } from "@elizaos/core/public-api";
+import { composeContext } from "@elizaos/core";
+import { generateObjectArray } from "@elizaos/core";
+import { MemoryManager } from "@elizaos/core";
+import { stringToUuid } from "@elizaos/core";
 import { v4 as uuidv4 } from 'uuid';
-import {
-    type ActionExample,
-    type IAgentRuntime,
-    type Memory,
-    ModelClass,
-    type Evaluator,
-    type Objective,
-    type State,
-    type UUID,
-} from "@elizaos/core/public-api";
+import type {
+    ActionExample,
+    Evaluator,
+    Provider,
+    Memory,
+    State,
+    IAgentRuntime
+} from "@elizaos/core";
+import { ModelClass } from "@elizaos/core";
 
 export const formatFacts = (facts: Memory[]) => {
     const messageStrings = facts

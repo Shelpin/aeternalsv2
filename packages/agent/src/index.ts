@@ -17,7 +17,7 @@ import {
     getModulePath,
     stringToUuid,
     validateCharacterConfig,
-} from "@elizaos/core/public-api";
+} from '@elizaos/core';
 import { defaultCharacter } from "./defaultCharacter.js";
 
 import bootstrapPlugin from "@elizaos/plugin-bootstrap";

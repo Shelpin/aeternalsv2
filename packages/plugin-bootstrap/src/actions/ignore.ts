@@ -3,7 +3,7 @@ import type {
     IAgentRuntime,
     Memory,
     Action,
-} from "@elizaos/core/public-api";
+} from '@elizaos/core';
 
 export const ignoreAction: Action = {
     name: "IGNORE",

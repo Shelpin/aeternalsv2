@@ -1,4 +1,4 @@
-import { DatabaseAdapter, AgentRuntime, ModelProviderName } from '@elizaos/core/public-api.js';
+import { DatabaseAdapter, AgentRuntime, ModelProviderName } from '@elizaos/core';
 import type {
     Action,
     Evaluator,
@@ -11,7 +11,7 @@ import type {
     RAGKnowledgeItem,
     Character,
     UUID
-} from '@elizaos/core/public-api.js';
+} from '@elizaos/core';
 // import { SqlJsDatabaseAdapter } from "@elizaos/adapter-sqljs"; // Commented out - package not found
 // import { SupabaseDatabaseAdapter } from "@elizaos/adapter-supabase"; // Commented out - package not found
 // import { PGLiteDatabaseAdapter } from "@elizaos/adapter-pglite"; // Commented out - package not found

@@ -1,4 +1,4 @@
-import { composeContext, elizaLogger, generateMessageResponse, generateTrueOrFalse, booleanFooter, messageCompletionFooter } from "@elizaos/core/public-api";
+import { composeContext, elizaLogger, generateMessageResponse, generateTrueOrFalse, booleanFooter, messageCompletionFooter } from "@elizaos/core";
 import {
     type Action,
     type ActionExample,
@@ -8,7 +8,7 @@ import {
     type Memory,
     ModelClass,
     type State,
-} from "@elizaos/core/public-api";
+} from "@elizaos/core";
 
 const maxContinuesInARow = 3;
 
