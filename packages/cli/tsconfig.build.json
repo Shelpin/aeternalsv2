@@ -3,13 +3,20 @@
     "compilerOptions": {
         "composite": true,
         "rootDir": "./src",
-        "outDir": "./dist"
+        "outDir": "./dist",
+        "tsBuildInfoFile": "./dist/.tsbuildinfo"
     },
     "include": [
         "src/**/*"
     ],
     "exclude": [
-        "**/*.test.ts",
-        "**/__tests__/**"
+        "node_modules",
+        "dist",
+        "**/*.spec.ts",
+        "**/*.test.ts"
+    ],
+    "references": [
+        // Add references to other packages if cli depends on them
+        // e.g., { "path": "../core" }
     ]
 }

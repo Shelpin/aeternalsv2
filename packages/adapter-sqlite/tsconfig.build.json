@@ -1,13 +1,14 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "composite": true,
+    "incremental": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
     "rootDir": "src",
     "outDir": "dist",
-    "paths": {
-      "@elizaos/types": [
-        "../types/dist"
-      ]
-    }
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
   "include": [
     "src/**/*"

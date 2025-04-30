@@ -42,31 +42,29 @@ export const unfollowRoomAction: Action = {
         );
         return userState === "FOLLOWED";
     },
-    handler: async (runtime: IAgentRuntime, message: Memory) => {
-        async function _shouldUnfollow(state: State): Promise<boolean> {
-            const shouldUnfollowContext = composeContext({
-                state,
-                template: shouldUnfollowTemplate, // Define this template separately
-            });
+    execute: async (params: Record<string, any>, context: any): Promise<any> => {
+        const runtime: IAgentRuntime = context.runtime;
+        const message: Memory = context.message;
 
-            const response = await generateTrueOrFalse({
-                runtime,
-                context: shouldUnfollowContext,
-                modelClass: ModelClass.LARGE,
-            });
-
-            return response;
+        if (!runtime || !message) {
+            console.error("[UNFOLLOW_ROOM] Missing required context properties");
+            return null;
         }
 
-        const state = await runtime.composeState(message);
+        const { agentId } = runtime;
+        const { roomId, userId } = message;
+        const state = await runtime.composeState(message, { agentId, roomId });
 
-        if (await _shouldUnfollow(state)) {
-            await runtime.databaseAdapter.setParticipantUserState(
-                message.roomId,
-                runtime.agentId,
-                null
-            );
-        }
+        await runtime.databaseAdapter?.setParticipantUserState(
+            roomId,
+            userId,
+            null
+        );
+
+        const { actorName } = state;
+
+        runtime.logger.log("[UNFOLLOW_ROOM] Unfollowing room state change complete");
+        return { success: true, message: `Unfollowing room for ${actorName}` };
     },
     examples: [
         [

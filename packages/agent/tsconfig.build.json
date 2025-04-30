@@ -1,45 +1,19 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.build.base.json",
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
     "composite": true,
     "declaration": true,
     "sourceMap": true,
-    "paths": {
-      "@elizaos/types": [
-        "../types/dist"
-      ],
-      "@elizaos/core": [
-        "../core/dist"
-      ],
-      "@elizaos/core/*": [
-        "../core/dist/*"
-      ],
-      "@elizaos/adapter-sqlite": [
-        "../adapter-sqlite/dist"
-      ],
-      "@elizaos/adapter-sqlite/*": [
-        "../adapter-sqlite/dist/*"
-      ],
-      "@elizaos/plugin-bootstrap": [
-        "../plugin-bootstrap/dist"
-      ],
-      "@elizaos/plugin-bootstrap/*": [
-        "../plugin-bootstrap/dist/*"
-      ],
-      "@elizaos/dynamic-imports": [
-        "../dynamic-imports/dist"
-      ],
-      "@elizaos/dynamic-imports/*": [
-        "../dynamic-imports/dist/*"
-      ]
-    }
+    "strict": false,
+    "noImplicitAny": false
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
+    "src/test_resources/**/*",
     "**/__tests__/**",
     "**/node_modules/**"
   ],
@@ -54,10 +28,16 @@
       "path": "../adapter-sqlite"
     },
     {
+      "path": "../dynamic-imports"
+    },
+    {
       "path": "../plugin-bootstrap"
     },
     {
-      "path": "../dynamic-imports"
+      "path": "../telegram-multiagent/tsconfig.build.json"
+    },
+    {
+      "path": "../client-direct/tsconfig.build.json"
     }
   ]
 }

@@ -1,15 +1,35 @@
 {
-    "extends": "../../tsconfig.base.json",
+    "extends": "../../tsconfig.build.base.json",
     "compilerOptions": {
+        "baseUrl": "../..",
+        "paths": {
+            "@elizaos/core": [
+                "packages/core/dist/public-api.d.ts"
+            ]
+        },
+        "module": "nodenext",
+        "moduleResolution": "nodenext",
+        "rootDir": "src",
+        "outDir": "dist",
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
         "composite": true,
-        "rootDir": "./src",
-        "outDir": "./dist"
+        "skipLibCheck": true
     },
     "include": [
         "src/**/*"
     ],
     "exclude": [
-        "**/*.test.ts",
-        "**/__tests__/**"
+        "node_modules",
+        "dist"
+    ],
+    "references": [
+        {
+            "path": "../types"
+        },
+        {
+            "path": "../core"
+        }
     ]
 }

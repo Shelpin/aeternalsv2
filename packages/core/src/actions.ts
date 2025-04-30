@@ -10,7 +10,7 @@ import type { Action, ActionExample } from './types.js';
  */
 export const composeActionExamples = (actionsData: Action[], count: number) => {
     const data: ActionExample[][][] = actionsData.map((action: Action) => [
-        ...action.examples,
+        ...(action.examples || []),
     ]);
 
     const actionExamples: ActionExample[][] = [];

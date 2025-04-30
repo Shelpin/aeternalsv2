@@ -15,16 +15,13 @@ export const noneAction: Action = {
         "REPLY",
         "DEFAULT",
     ],
-    validate: async (_runtime: IAgentRuntime, _message: Memory) => {
+    validate: async (_runtime: IAgentRuntime, _message: Memory): Promise<boolean> => {
         return true;
     },
     description:
-        "Respond but perform no additional action. This is the default if the agent is speaking and not doing anything additional.",
-    handler: async (
-        _runtime: IAgentRuntime,
-        _message: Memory
-    ): Promise<boolean> => {
-        return true;
+        "Use this action when no other action is appropriate. For example, if asked a question you cannot answer, or if the user input is nonsensical.",
+    execute: async (params: Record<string, any>, context: any): Promise<any> => {
+        return { action: "none" };
     },
     examples: [
         [

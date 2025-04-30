@@ -42,33 +42,31 @@ export const muteRoomAction: Action = {
             roomId,
             runtime.agentId
         );
-        return userState !== "MUTED";
+        return userState === "FOLLOWED";
     },
-    handler: async (runtime: IAgentRuntime, message: Memory) => {
-        async function _shouldMute(state: State): Promise<boolean> {
-            const shouldMuteContext = composeContext({
-                state,
-                template: shouldMuteTemplate, // Define this template separately
-            });
+    execute: async (params: Record<string, any>, context: any): Promise<any> => {
+        const runtime: IAgentRuntime = context.runtime;
+        const message: Memory = context.message;
 
-            const response = await generateTrueOrFalse({
-                runtime,
-                context: shouldMuteContext,
-                modelClass: ModelClass.LARGE,
-            });
-
-            return response;
+        if (!runtime || !message) {
+            console.error("[MUTE_ROOM] Missing required context properties");
+            return null;
         }
 
-        const state = await runtime.composeState(message);
+        const { agentId } = runtime;
+        const { roomId, userId } = message;
+        const state = await runtime.composeState(message, { agentId, roomId });
 
-        if (await _shouldMute(state)) {
-            await runtime.databaseAdapter.setParticipantUserState(
-                message.roomId,
-                runtime.agentId,
-                "MUTED"
-            );
-        }
+        await runtime.databaseAdapter?.setParticipantUserState(
+            roomId,
+            userId,
+            "MUTED"
+        );
+
+        const { actorName } = state;
+
+        runtime.logger.log("[MUTE_ROOM] Muting room state change complete");
+        return { success: true, message: `Muting room for ${actorName}` };
     },
     examples: [
         [

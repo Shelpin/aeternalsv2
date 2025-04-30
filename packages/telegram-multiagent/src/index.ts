@@ -23,13 +23,20 @@ plugin.clients = [
             console.log('[MultiAgentPlugin] Attempting to start embedded Telegram client...');
             // Retrieve token - Ensure runtime and character structure is correct
             // Safely access nested properties
-            let token = runtime?.character?.secrets?.TELEGRAM_BOT_TOKEN ||
-                runtime?.character?.settings?.secrets?.TELEGRAM_BOT_TOKEN;
+            const isProduction = process.env.NODE_ENV === 'production';
+            const secrets = (runtime?.character && typeof runtime.character === 'object' && 'secrets' in runtime.character) ? runtime.character.secrets : {};
+            const settings = (runtime?.character && typeof runtime.character === 'object' && 'settings' in runtime.character) ? runtime.character.settings : {};
+            const agentId = runtime.getAgentId ? runtime.getAgentId() : 'unknown'; // Ensure getAgentId exists
+            // Default settings
+            const defaultSettings = {
+                TELEGRAM_BOT_TOKEN: (secrets as any)?.TELEGRAM_BOT_TOKEN || (settings as any)?.secrets?.TELEGRAM_BOT_TOKEN || null
+            };
+
+            let token = defaultSettings.TELEGRAM_BOT_TOKEN;
 
             if (!token) {
                 console.error('[MultiAgentPlugin] Telegram token not found in runtime character secrets.');
                 // Attempt to get from environment as a last resort, using the specific agent ID
-                const agentId = runtime?.getAgentId ? runtime.getAgentId() : process.env.AGENT_ID;
                 const tokenVarName = agentId ? `TELEGRAM_BOT_TOKEN_${agentId}` : null;
                 const envToken = tokenVarName ? process.env[tokenVarName] : null;
 

@@ -6,16 +6,14 @@ import path from 'node:path';
 import fs from 'node:fs';
 
 import {
-    type AgentRuntime,
-    type IAgentRuntime,
     elizaLogger,
-    getEnvVariable,
-    type UUID,
-    validateCharacterConfig,
-    ServiceType,
     type Character,
-    validateUuid
-} from "@elizaos/core/public-api";
+    type IAgentRuntime,
+    isUUID,
+    UUID,
+    getEnvVariable,
+    validateCharacterConfig,
+} from "@elizaos/core";
 
 // import type { TeeLogQuery, TeeLogService } from "@elizaos/plugin-tee-log";
 // import { REST, Routes } from "discord.js";
@@ -29,34 +27,32 @@ interface UUIDParams {
 
 // Create an interface for the methods we need from DirectClient
 interface IDirectClientMethods {
-    unregisterAgent(agent: AgentRuntime): void;
-    startAgent(character: any): Promise<AgentRuntime>;
+    unregisterAgent(agent: IAgentRuntime): void;
+    startAgent(character: any): Promise<IAgentRuntime>;
 }
 
 function validateUUIDParams(
     params: { agentId: string; roomId?: string },
     res: express.Response
 ): UUIDParams | null {
-    const agentId = validateUuid(params.agentId);
-    if (!agentId) {
+    if (!params.agentId || !isUUID(params.agentId)) {
         res.status(400).json({
-            error: "Invalid AgentId format. Expected to be a UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+            error: "Invalid or missing agentId format",
         });
         return null;
     }
 
     if (params.roomId) {
-        const roomId = validateUuid(params.roomId);
-        if (!roomId) {
+        if (!isUUID(params.roomId)) {
             res.status(400).json({
-                error: "Invalid RoomId format. Expected to be a UUID: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+                error: "Invalid roomId format",
             });
             return null;
         }
-        return { agentId, roomId };
+        return { agentId: params.agentId, roomId: params.roomId };
     }
 
-    return { agentId };
+    return { agentId: params.agentId };
 }
 
 export function createApiRouter(
@@ -86,7 +82,7 @@ export function createApiRouter(
         const agentsList = Array.from(agents.values()).map((agent) => ({
             id: agent.agentId,
             name: agent.character.name,
-            clients: Object.keys(agent.clients),
+            clients: Object.keys(agent.clients ?? {}),
         }));
         res.json({ agents: agentsList });
     });
@@ -96,8 +92,9 @@ export function createApiRouter(
             const uploadDir = path.join(process.cwd(), "data", "characters");
             const files = await fs.promises.readdir(uploadDir);
             res.json({ files });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
+        } catch (error: any) {
+            elizaLogger.error(error.stack || error);
+            res.status(500).json({ error: String(error) });
         }
     });
 
@@ -107,22 +104,25 @@ export function createApiRouter(
         };
         if (!agentId) return;
 
-        const agent = agents.get(agentId);
-
-        if (!agent) {
-            res.status(404).json({ error: "Agent not found" });
-            return;
+        const runtime = agents.get(agentId);
+        if (!runtime) {
+            return res.status(404).json({ error: 'Agent not found' });
         }
 
-        const character = agent?.character;
-        if (character?.settings?.secrets) {
-            delete character.settings.secrets;
-        }
+        try {
+            const character = runtime.character;
+            if (character?.settings?.secrets) {
+                delete character.settings.secrets;
+            }
 
-        res.json({
-            id: agent.agentId,
-            character: agent.character,
-        });
+            res.json({
+                id: runtime.agentId,
+                character: runtime.character,
+            });
+        } catch (error: any) {
+            elizaLogger.error(error.stack || error);
+            res.status(500).json({ error: String(error) });
+        }
     });
 
     router.delete("/agents/:agentId", async (req, res) => {
@@ -131,7 +131,7 @@ export function createApiRouter(
         };
         if (!agentId) return;
 
-        const agent: AgentRuntime = agents.get(agentId);
+        const agent: IAgentRuntime = agents.get(agentId);
 
         if (agent) {
             agent.stop();
@@ -148,7 +148,7 @@ export function createApiRouter(
         };
         if (!agentId) return;
 
-        let agent: AgentRuntime = agents.get(agentId);
+        let agent: IAgentRuntime = agents.get(agentId);
 
         // update character
         if (agent) {
@@ -162,15 +162,22 @@ export function createApiRouter(
         const characterJson = { ...req.body };
 
         // load character from body
-        const character = req.body;
+        let character: Character;
+        if (characterJson) {
+            // Use provided JSON directly
+            character = characterJson as Character;
+        } else if (req.body.characterPath) {
+            // Load and parse character file from disk
+            const fileContent = await fs.promises.readFile(req.body.characterPath, 'utf8');
+            character = JSON.parse(fileContent) as Character;
+        } else {
+            throw new Error("No character path or JSON provided");
+        }
         try {
             validateCharacterConfig(character);
-        } catch (e) {
-            elizaLogger.error(`Error parsing character: ${e}`);
-            res.status(400).json({
-                success: false,
-                message: e.message,
-            });
+        } catch (error: any) {
+            elizaLogger.error(error.stack || error);
+            res.status(400).json({ error: String(error) });
             return;
         }
 
@@ -178,12 +185,9 @@ export function createApiRouter(
         try {
             agent = await directClient.startAgent(character);
             elizaLogger.log(`${character.name} started`);
-        } catch (e) {
-            elizaLogger.error(`Error starting agent: ${e}`);
-            res.status(500).json({
-                success: false,
-                message: e.message,
-            });
+        } catch (error: any) {
+            elizaLogger.error(error.stack || error);
+            res.status(500).json({ error: String(error) });
             return;
         }
 
@@ -208,10 +212,8 @@ export function createApiRouter(
                 elizaLogger.info(
                     `Character stored successfully at ${filepath}`
                 );
-            } catch (error) {
-                elizaLogger.error(
-                    `Failed to store character: ${error.message}`
-                );
+            } catch (error: any) {
+                elizaLogger.error(error.stack || error);
             }
         }
 
@@ -258,18 +260,9 @@ export function createApiRouter(
         };
         if (!agentId || !roomId) return;
 
-        let runtime = agents.get(agentId);
-
-        // if runtime is null, look for runtime with the same name
+        const runtime = agents.get(agentId);
         if (!runtime) {
-            runtime = Array.from(agents.values()).find(
-                (a) => a.character.name.toLowerCase() === agentId.toLowerCase()
-            );
-        }
-
-        if (!runtime) {
-            res.status(404).send("Agent not found");
-            return;
+            return res.status(404).json({ error: 'Agent not found' });
         }
 
         try {
@@ -310,9 +303,9 @@ export function createApiRouter(
             };
 
             res.json(response);
-        } catch (error) {
-            console.error("Error fetching memories:", error);
-            res.status(500).json({ error: "Failed to fetch memories" });
+        } catch (error: any) {
+            elizaLogger.error(error.stack || error);
+            res.status(500).json({ error: String(error) });
         }
     });
 
@@ -329,7 +322,7 @@ export function createApiRouter(
     //             allAgents.push(...agents);
     //         }
 
-    //         const runtime: AgentRuntime = agents.values().next().value;
+    //         const runtime: IAgentRuntime = agents.values().next().value;
     //         const teeLogService = runtime
     //             .getService<TeeLogService>(ServiceType.TEE_LOG)
     //             .getInstance();
@@ -388,7 +381,7 @@ export function createApiRouter(
     //                 startTimestamp: query.startTimestamp || undefined,
     //                 endTimestamp: query.endTimestamp || undefined,
     //             };
-    //             const agentRuntime: AgentRuntime = agents.values().next().value;
+    //             const agentRuntime: IAgentRuntime = agents.values().next().value;
     //             const teeLogService = agentRuntime
     //                 .getService<TeeLogService>(ServiceType.TEE_LOG)
     //                 .getInstance();
@@ -420,46 +413,50 @@ export function createApiRouter(
         try {
             let character: Character;
             if (characterJson) {
-                character = await directClient.jsonToCharacter(
-                    characterPath,
-                    characterJson
-                );
+                // Use provided JSON directly
+                character = characterJson as Character;
             } else if (characterPath) {
-                character =
-                    await directClient.loadCharacterTryPath(characterPath);
+                // Load and parse character file from disk
+                const fileContent = await fs.promises.readFile(characterPath, 'utf8');
+                character = JSON.parse(fileContent) as Character;
             } else {
                 throw new Error("No character path or JSON provided");
             }
-            await directClient.startAgent(character);
+            const runtime = await directClient.startAgent(character);
+            if (!runtime) {
+                return res.status(500).json({ error: 'Failed to start agent' });
+            }
             elizaLogger.log(`${character.name} started`);
 
             res.json({
                 id: character.id,
                 character: character,
             });
-        } catch (e) {
-            elizaLogger.error(`Error parsing character: ${e}`);
-            res.status(400).json({
-                error: e.message,
-            });
+        } catch (error: any) {
+            elizaLogger.error(error.stack || error);
+            res.status(500).json({ error: String(error) });
             return;
         }
     });
 
     router.post("/agents/:agentId/stop", async (req, res) => {
-        const agentId = req.params.agentId;
-        console.log("agentId", agentId);
-        const agent: AgentRuntime = agents.get(agentId);
+        const { agentId } = validateUUIDParams(req.params, res) ?? {
+            agentId: null,
+        };
+        if (!agentId) return;
 
-        // update character
-        if (agent) {
-            // stop agent
-            agent.stop();
-            directClient.unregisterAgent(agent);
-            // if it has a different name, the agentId will change
+        const runtime = agents.get(agentId);
+        if (!runtime) {
+            return res.status(404).json({ error: 'Agent not found' });
+        }
+
+        try {
+            runtime.stop();
+            directClient.unregisterAgent(runtime);
             res.json({ success: true });
-        } else {
-            res.status(404).json({ error: "Agent not found" });
+        } catch (error: any) {
+            elizaLogger.error(error.stack || error);
+            res.status(500).json({ error: String(error) });
         }
     });
 

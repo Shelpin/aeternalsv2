@@ -1,4 +1,5 @@
-import TelegramBot from 'node-telegram-bot-api.js';
+import TelegramBot from 'node-telegram-bot-api';
+import type { User as TelegramUser, Message as TelegramMessage } from 'node-telegram-bot-api';
 
 // VALHALLA FIX: Add type declaration for global runtime
 declare global {
@@ -20,8 +21,8 @@ declare global {
 class TelegramClient {
   private bot: TelegramBot | null = null;
   private token: string = '';
-  private messageHandlers: Array<(message: any) => void> = [];
-  private botInfo: any = null;
+  private messageHandlers: Array<(message: TelegramMessage) => void> = [];
+  private botInfo: TelegramUser | null = null;
 
   /**
    * Initialize the Telegram client with a bot token
@@ -44,11 +45,11 @@ class TelegramClient {
     try {
       this.token = token;
       this.bot = new TelegramBot(token, { polling: true });
-      
+
       // Set up message handler
-      this.bot.on('message', (message) => {
+      this.bot.on('message', (message: TelegramMessage) => {
         console.log(`[TELEGRAM] Received message: ${JSON.stringify(message, null, 2)}`);
-        
+
         // Notify all registered handlers
         this.messageHandlers.forEach(handler => {
           try {
@@ -60,15 +61,15 @@ class TelegramClient {
       });
 
       // Get bot info
-      this.bot.getMe().then(info => {
+      this.bot.getMe().then((info: TelegramUser) => {
         this.botInfo = info;
         console.log(`[TELEGRAM] Bot initialized: ${info.username}`);
-      }).catch(error => {
+      }).catch((error: Error) => {
         console.error(`[TELEGRAM] Error getting bot info: ${error}`);
       });
 
       console.log(`[TELEGRAM] Client initialized with token: ${token.substring(0, 5)}...`);
-      
+
       // VALHALLA FIX: Ensure the client is injected into the runtime
       if (runtime) {
         // Ensure clients object exists
@@ -92,7 +93,7 @@ class TelegramClient {
   /**
    * Register a handler for incoming messages
    */
-  on(event: string, handler: (message: any) => void): void {
+  on(event: string, handler: (message: TelegramMessage) => void): void {
     if (event === 'message') {
       this.messageHandlers.push(handler);
       console.log(`[TELEGRAM] Registered message handler`);
@@ -141,7 +142,7 @@ class TelegramClient {
   /**
    * Get the bot information
    */
-  get getBotInfo(): any {
+  get getBotInfo(): TelegramUser | null {
     return this.botInfo;
   }
 }

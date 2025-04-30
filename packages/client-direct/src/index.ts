@@ -10,18 +10,23 @@ import {
     ModelClass,
     settings,
     stringToUuid,
-    type Client,
-    type Content,
-    type IAgentRuntime,
-    type Media,
-    type Memory,
-    type Plugin,
-    type AgentRuntime,
-    type Character,
-    type ClientMessagePayload,
-    type ClientSettings,
-    type CommandSchema,
 } from "@elizaos/core";
+
+// Types imported from public API
+import type {
+    Client,
+    Content,
+    IAgentRuntime,
+    Media,
+    Memory,
+    Plugin,
+    Character,
+    ClientInstance,
+    Action,
+    ICacheManager,
+} from "@elizaos/core";
+
+import type { ClientMessagePayload, ClientSettings, CommandSchema } from "./types.js";
 import bodyParser from 'body-parser';
 import cors from 'cors';
 import express, { type Request as ExpressRequest } from 'express';
@@ -34,6 +39,7 @@ import { createApiRouter } from "./api.js";
 import { createVerifiableLogApiRouter } from "./verifiable-log-api.js";
 import handlebars from 'handlebars';
 
+// Storage setup follows
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const uploadDir = path.join(process.cwd(), "data", "uploads");
@@ -118,6 +124,9 @@ export class DirectClient {
     public app: express.Application;
     private agents: Map<string, IAgentRuntime>; // container management
     private server: any; // Store server instance
+    public clients: ClientInstance[] = [];
+    public actions: Action[] = [];
+    public cacheManager: ICacheManager | null = null;
     public loadCharacterTryPath: Function; // Store loadCharacterTryPath functor
     public jsonToCharacter: Function; // Store jsonToCharacter functor
 
@@ -126,6 +135,8 @@ export class DirectClient {
         this.app = express();
         this.app.use(cors());
         this.agents = new Map();
+        this.loadCharacterTryPath = () => '';
+        this.jsonToCharacter = (json: unknown) => json as Character;
 
         this.app.use(bodyParser.json());
         this.app.use(bodyParser.urlencoded({ extended: true }));
@@ -248,11 +259,10 @@ export class DirectClient {
                     attachments.push({
                         id: Date.now().toString(),
                         url: filePath,
-                        title: req.file.originalname,
-                        source: "direct",
-                        description: `Uploaded file: ${req.file.originalname}`,
-                        text: "",
-                        contentType: req.file.mimetype,
+                        type: 'file',
+                        mimeType: req.file.mimetype,
+                        size: req.file.size,
+                        createdAt: Date.now(),
                     });
                 }
 
@@ -272,18 +282,18 @@ export class DirectClient {
 
                 const memory: Memory = {
                     id: stringToUuid(messageId + "-" + userId),
-                    ...userMessage,
-                    agentId: runtime.agentId,
                     userId,
                     roomId,
                     content,
                     createdAt: Date.now(),
+                    importance: 0,
+                    lastAccessed: Date.now(),
                 };
 
                 await runtime.messageManager.addEmbeddingToMemory(memory);
                 await runtime.messageManager.createMemory(memory);
 
-                let state = await runtime.composeState(userMessage, {
+                let state = await runtime.composeState(userMessage as any, {
                     agentName: runtime.character.name,
                 });
 
@@ -309,11 +319,13 @@ export class DirectClient {
                 // save response to memory
                 const responseMessage: Memory = {
                     id: stringToUuid(messageId + "-" + runtime.agentId),
-                    ...userMessage,
                     userId: runtime.agentId,
+                    roomId,
                     content: response,
                     embedding: getEmbeddingZeroVector(),
                     createdAt: Date.now(),
+                    importance: 0,
+                    lastAccessed: Date.now(),
                 };
 
                 await runtime.messageManager.createMemory(responseMessage);
@@ -324,7 +336,7 @@ export class DirectClient {
 
                 await runtime.processActions(
                     memory,
-                    [responseMessage],
+                    [responseMessage] as unknown as Memory[],
                     state,
                     async (newMessages) => {
                         message = newMessages;
@@ -411,10 +423,12 @@ export class DirectClient {
                         };
                         const memory: Memory = {
                             id: stringToUuid(msg),
-                            agentId: runtime.agentId,
                             userId: mUserId,
                             roomId,
                             content,
+                            createdAt: Date.now(),
+                            importance: 0,
+                            lastAccessed: Date.now(),
                         };
                         await runtime.messageManager.createMemory(memory);
                     }
@@ -439,7 +453,7 @@ export class DirectClient {
                     agentId: runtime.agentId,
                 };
 
-                const state = await runtime.composeState(userMessage, {
+                const state = await runtime.composeState(userMessage as any, {
                     agentName: runtime.character.name,
                 });
 
@@ -571,11 +585,12 @@ export class DirectClient {
                             );
                             const memory: Memory = {
                                 id: messageId,
-                                agentId: runtime.agentId,
                                 userId,
                                 roomId,
                                 content,
                                 createdAt: Date.now(),
+                                importance: 0,
+                                lastAccessed: Date.now(),
                             };
 
                             // run evaluators (generally can be done in parallel with processActions)
@@ -586,7 +601,7 @@ export class DirectClient {
                                     // pass memory (query) to any actions to call
                                     runtime.processActions(
                                         memory,
-                                        [responseMessage],
+                                        [responseMessage] as unknown as Memory[],
                                         state,
                                         async (_newMessages) => {
                                             // FIXME: this is supposed override what the LLM said/decided
@@ -800,11 +815,13 @@ export class DirectClient {
                     roomId,
                     content,
                     createdAt: Date.now(),
+                    importance: 0,
+                    lastAccessed: Date.now(),
                 };
 
                 await runtime.messageManager.createMemory(memory);
 
-                const state = await runtime.composeState(userMessage, {
+                const state = await runtime.composeState(userMessage as any, {
                     agentName: runtime.character.name,
                 });
 
@@ -840,7 +857,7 @@ export class DirectClient {
 
                 const _result = await runtime.processActions(
                     memory,
-                    [responseMessage],
+                    [responseMessage] as unknown as Memory[],
                     state,
                     async () => {
                         return [memory];
@@ -1066,28 +1083,50 @@ export class DirectClient {
             });
         }
     }
+
+    // Make DirectClient conform to ClientInstance
+    public async sendMessage(message: any): Promise<any> {
+        // Route via message method
+        return this.message(
+            message.text,
+            message.userId,
+            message.roomId,
+            message.agentId
+        );
+    }
 }
 
 export const DirectClientInterface: Client = {
     name: 'direct',
     config: {},
-    start: async (_runtime: IAgentRuntime) => {
+    start: async (_runtime: IAgentRuntime): Promise<ClientInstance> => {
         elizaLogger.log("DirectClientInterface start");
         const client = new DirectClient();
         const serverPort = Number.parseInt(settings.SERVER_PORT || "3000");
         client.start(serverPort);
-        return client;
+        // Wrap DirectClient into a ClientInstance
+        const instance: ClientInstance = {
+            start: async () => {
+                client.start(serverPort);
+            },
+            stop: async () => {
+                await client.stop();
+            },
+            sendMessage: async (message) => {
+                return client.message(
+                    message.text,
+                    message.userId,
+                    message.roomId,
+                    message.agentId
+                );
+            }
+        };
+        return instance;
     },
-    // stop: async (_runtime: IAgentRuntime, client?: Client) => {
-    //     if (client instanceof DirectClient) {
-    //         client.stop();
-    //     }
-    // },
 };
 
 const directPlugin: Plugin = {
     name: "direct",
-    description: "Direct client",
     clients: [DirectClientInterface],
 };
 export default directPlugin;

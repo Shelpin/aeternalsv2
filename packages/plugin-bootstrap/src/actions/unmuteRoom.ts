@@ -42,31 +42,29 @@ export const unmuteRoomAction: Action = {
         );
         return userState === "MUTED";
     },
-    handler: async (runtime: IAgentRuntime, message: Memory) => {
-        async function _shouldUnmute(state: State): Promise<boolean> {
-            const shouldUnmuteContext = composeContext({
-                state,
-                template: shouldUnmuteTemplate, // Define this template separately
-            });
+    execute: async (params: Record<string, any>, context: any): Promise<any> => {
+        const runtime: IAgentRuntime = context.runtime;
+        const message: Memory = context.message;
 
-            const response = generateTrueOrFalse({
-                context: shouldUnmuteContext,
-                runtime,
-                modelClass: ModelClass.LARGE,
-            });
-
-            return response;
+        if (!runtime || !message) {
+            console.error("[UNMUTE_ROOM] Missing required context properties");
+            return null;
         }
 
-        const state = await runtime.composeState(message);
+        const { agentId } = runtime;
+        const { roomId, userId } = message;
+        const state = await runtime.composeState(message, { agentId, roomId });
 
-        if (await _shouldUnmute(state)) {
-            await runtime.databaseAdapter.setParticipantUserState(
-                message.roomId,
-                runtime.agentId,
-                null
-            );
-        }
+        await runtime.databaseAdapter?.setParticipantUserState(
+            roomId,
+            userId,
+            null
+        );
+
+        const { actorName } = state;
+
+        runtime.logger.log("[UNMUTE_ROOM] Unmuting room state change complete");
+        return { success: true, message: `Unmuting room for ${actorName}` };
     },
     examples: [
         [

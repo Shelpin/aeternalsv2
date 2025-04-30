@@ -1,4 +1,4 @@
-import type { Client, IAgentRuntime } from "@elizaos/core/public-api";
+import type { Client, IAgentRuntime } from "@elizaos/core/public-api.js";
 import { describe, it, expect } from "@jest/globals";
 
 // Helper function to identify client types

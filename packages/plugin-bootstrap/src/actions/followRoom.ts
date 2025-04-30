@@ -57,31 +57,29 @@ export const followRoomAction: Action = {
         );
         return userState !== "FOLLOWED" && userState !== "MUTED";
     },
-    handler: async (runtime: IAgentRuntime, message: Memory) => {
-        async function _shouldFollow(state: State): Promise<boolean> {
-            const shouldFollowContext = composeContext({
-                state,
-                template: shouldFollowTemplate, // Define this template separately
-            });
+    execute: async (params: Record<string, any>, context: any): Promise<any> => {
+        const runtime: IAgentRuntime = context.runtime;
+        const message: Memory = context.message;
 
-            const response = await generateTrueOrFalse({
-                runtime,
-                context: shouldFollowContext,
-                modelClass: ModelClass.LARGE,
-            });
-
-            return response;
+        if (!runtime || !message) {
+            console.error("[FOLLOW_ROOM] Missing required context properties");
+            return null;
         }
 
-        const state = await runtime.composeState(message);
+        const { agentId } = runtime;
+        const { roomId, userId } = message;
+        const state = await runtime.composeState(message, { agentId, roomId });
 
-        if (await _shouldFollow(state)) {
-            await runtime.databaseAdapter.setParticipantUserState(
-                message.roomId,
-                runtime.agentId,
-                "FOLLOWED"
-            );
-        }
+        await runtime.databaseAdapter?.setParticipantUserState(
+            roomId,
+            userId,
+            "FOLLOWED"
+        );
+
+        const { actorName } = state;
+
+        runtime.logger.log("[FOLLOW_ROOM] Following room state change complete");
+        return { success: true, message: `Following room for ${actorName}` };
     },
     examples: [
         [

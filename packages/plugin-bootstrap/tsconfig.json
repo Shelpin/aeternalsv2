@@ -1,4 +1,5 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "target": "ESNext",
     "module": "NodeNext",
@@ -23,10 +24,5 @@
   },
   "include": [
     "src/**/*.ts"
-  ],
-  "references": [
-    {
-      "path": "../core"
-    }
   ]
 }

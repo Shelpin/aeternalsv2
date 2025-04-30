@@ -8,16 +8,13 @@ import type {
 export const ignoreAction: Action = {
     name: "IGNORE",
     similes: ["STOP_TALKING", "STOP_CHATTING", "STOP_CONVERSATION"],
-    validate: async (_runtime: IAgentRuntime, _message: Memory) => {
+    validate: async (_runtime: IAgentRuntime, _message: Memory): Promise<boolean> => {
         return true;
     },
     description:
         "Call this action if ignoring the user. If the user is aggressive, creepy or is finished with the conversation, use this action. Or, if both you and the user have already said goodbye, use this action instead of saying bye again. Use IGNORE any time the conversation has naturally ended. Do not use IGNORE if the user has engaged directly, or if something went wrong an you need to tell them. Only ignore if the user should be ignored.",
-    handler: async (
-        _runtime: IAgentRuntime,
-        _message: Memory,
-    ): Promise<boolean> => {
-        return true;
+    execute: async (params: Record<string, any>, context: any): Promise<any> => {
+        return { ignored: true };
     },
     examples: [
         [
@@ -50,7 +47,7 @@ export const ignoreAction: Action = {
             {
                 user: "{{user2}}",
                 content: {
-                    text: "Uh, don’t let the volatility sway your long-term strategy",
+                    text: "Uh, don't let the volatility sway your long-term strategy",
                 },
             },
             {

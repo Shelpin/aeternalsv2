@@ -5,18 +5,7 @@
     "rootDir": "src",
     "composite": true,
     "declaration": true,
-    "sourceMap": true,
-    "paths": {
-      "@elizaos/types": [
-        "../types/dist"
-      ],
-      "@elizaos/core": [
-        "../core/dist"
-      ],
-      "@elizaos/core/*": [
-        "../core/dist/*"
-      ]
-    }
+    "sourceMap": true
   },
   "include": [
     "src/**/*"

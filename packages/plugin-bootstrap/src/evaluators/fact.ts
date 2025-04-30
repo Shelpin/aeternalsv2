@@ -1,7 +1,8 @@
 import { composeContext } from "@elizaos/core/public-api";
 import { generateObjectArray } from "@elizaos/core/public-api";
 import { MemoryManager } from "@elizaos/core/public-api";
-import { stringToUuid } from "@elizaos/core";
+import { stringToUuid } from "@elizaos/core/public-api";
+import { v4 as uuidv4 } from 'uuid';
 import {
     type ActionExample,
     type IAgentRuntime,
@@ -98,14 +99,24 @@ async function handler(runtime: IAgentRuntime, message: Memory) {
             ? stringToUuid(agentId)
             : agentId || stringToUuid("00000000-0000-0000-0000-000000000000");
 
-        const factMemory = await factsManager.addEmbeddingToMemory({
-            userId: safeAgentId,
-            agentId: safeAgentId,
-            content: { text: fact },
+        // Construct a valid Memory object
+        const memoryToEmbed: Memory = {
+            id: uuidv4(), // Generate a unique ID
+            userId: safeAgentId, // Assuming agentId is the intended user here for facts
+            agentId: safeAgentId, // Include agentId if necessary for context
             roomId,
-            type: "fact",
-        });
+            content: {
+                text: fact,
+                type: "fact" // Move type inside content
+            },
+            createdAt: Date.now(),
+            importance: 0.8, // Assign a default importance
+            lastAccessed: Date.now(),
+        };
 
+        const factMemory = await factsManager.addEmbeddingToMemory(memoryToEmbed);
+
+        // Ensure createMemory receives the object *with* the embedding
         await factsManager.createMemory(factMemory, true);
 
         await new Promise((resolve) => setTimeout(resolve, 250));

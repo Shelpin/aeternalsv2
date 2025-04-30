@@ -1,9 +1,9 @@
 import type {
     IAgentRuntime,
-    Goal,
     Objective,
     UUID,
-} from './types.js';
+    Goal as DatabaseGoalType
+} from '@elizaos/types/index.js';
 
 /**
  * Get all goals for an agent in a given room.
@@ -30,12 +30,12 @@ export async function getGoals({
     });
 }
 
-export const formatGoalsAsString = ({ goals }: { goals: Goal[] }) => {
-    const goalStrings = goals.map((goal: Goal) => {
-        const header = `Goal: ${goal.name}\nid: ${goal.id}`;
+export const formatGoalsAsString = ({ goals }: { goals: DatabaseGoalType[] }) => {
+    const goalStrings = goals.map((goal: DatabaseGoalType) => {
+        const header = `Goal: ${goal.name || 'Unnamed Goal'}\nid: ${goal.id}`;
         const objectives =
             "Objectives:\n" +
-            goal.objectives
+            (goal.objectives || [])
                 .map((objective: Objective) => {
                     return `- ${objective.completed ? "[x]" : "[ ]"} ${objective.description} ${objective.completed ? " (DONE)" : " (IN PROGRESS)"}`;
                 })
@@ -50,7 +50,7 @@ export const updateGoal = async ({
     goal,
 }: {
     runtime: IAgentRuntime;
-    goal: Goal;
+    goal: DatabaseGoalType;
 }) => {
     return runtime.databaseAdapter.updateGoal(goal);
 };
@@ -60,7 +60,7 @@ export const createGoal = async ({
     goal,
 }: {
     runtime: IAgentRuntime;
-    goal: Goal;
+    goal: DatabaseGoalType;
 }) => {
     return runtime.databaseAdapter.createGoal(goal);
 };

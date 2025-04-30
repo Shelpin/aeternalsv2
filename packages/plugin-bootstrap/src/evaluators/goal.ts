@@ -79,11 +79,15 @@ async function handler(
     });
 
     // Apply the updates to the goals
-    const updatedGoals = goalsData
-        .map((goal: Goal): Goal => {
-            const update = updates?.find((u) => u.id === goal.id);
-            if (update) {
-                // Merge the update into the existing goal
+    const updatedGoals = updates
+        .map((update: any) => {
+            if (update.id === 'none') {
+                return null; // Return null for "none" updates
+            }
+
+            const goal = goalsData.find((g) => g.id === update.id);
+            if (goal) {
+                // Merge existing goal with updates, ensuring objectives are handled correctly
                 return {
                     ...goal,
                     ...update,
@@ -93,12 +97,10 @@ async function handler(
                     }),
                 };
             }
-            return {
-                id: "none",
-                status: "inactive",
-                description: "No goal update",
-                objectives: []
-            };
+            // This case should ideally not happen if the LLM only returns IDs of existing goals
+            // If it does, we might log a warning or handle it differently. Returning null for now.
+            runtime.logger.warn(`Goal ID ${update.id} from LLM response not found in existing goals.`);
+            return null;
         })
         .filter(Boolean);
 

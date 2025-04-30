@@ -1,6 +1,7 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.build.base.json",
   "compilerOptions": {
+    "isolatedModules": false,
     "rootDir": "src",
     "outDir": "dist",
     "skipLibCheck": true,
@@ -9,22 +10,14 @@
     "noEmitOnError": false,
     "noImplicitAny": false,
     "strict": false,
-    "sourceMap": true,
-    "paths": {
-      "@elizaos/types": [
-        "../types/dist"
-      ],
-      "@elizaos/types/*": [
-        "../types/dist/*"
-      ]
-    }
+    "sourceMap": true
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
-    "src/**/__tests__/**/*",
-    "src/test_resources/**/*"
+    "src/test_resources/**/*",
+    "src/**/__tests__/**/*"
   ],
   "references": [
     {

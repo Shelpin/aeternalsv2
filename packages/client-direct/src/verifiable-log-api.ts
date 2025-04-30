@@ -6,9 +6,9 @@ import cors from 'cors';
 import {
     type AgentRuntime,
     type IAgentRuntime,
-    elizaLogger,
-    ServiceType
-} from "@elizaos/core/public-api";
+    elizaLogger
+} from "@elizaos/core";
+import { ServiceType } from "@elizaos/core";
 // import type {
 //     VerifiableLogService,
 //     VerifiableLogQuery,

@@ -4,6 +4,6 @@
  * This package exports all available client implementations for ElizaOS.
  */
 
-// Export the Telegram client
-export * from './telegram/src/index.js';
-export { default as TelegramClient } from './telegram/src/index.js'; 
+// Export the Telegram client using the correct package name
+export * from '@elizaos/telegram-client';
+export { default as TelegramClient } from '@elizaos/telegram-client'; 

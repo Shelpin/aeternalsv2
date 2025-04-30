@@ -265,1004 +265,283 @@ export const models: Models = {
         },
     },
     [ModelProviderName.TOGETHER]: {
-        endpoint: "https://api.together.ai/v1",
+        endpoint: settings.TOGETHER_API_URL || "https://api.together.ai/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name: "meta-llama/Llama-3.2-3B-Instruct-Turbo",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name: "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo-128K",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name: "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.EMBEDDING]: {
-                name: "togethercomputer/m2-bert-80M-32k-retrieval",
-            },
-            [ModelClass.IMAGE]: {
-                name: "black-forest-labs/FLUX.1-schnell",
-                steps: 4,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.LLAMALOCAL]: {
+        endpoint: settings.LLAMALOCAL_API_URL || "http://localhost:8080/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name: "NousResearch/Hermes-3-Llama-3.1-8B-GGUF/resolve/main/Hermes-3-Llama-3.1-8B.Q8_0.gguf?download=true",
-                stop: ["<|eot_id|>", "<|eom_id|>"],
-                maxInputTokens: 32768,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name: "NousResearch/Hermes-3-Llama-3.1-8B-GGUF/resolve/main/Hermes-3-Llama-3.1-8B.Q8_0.gguf?download=true", // TODO: ?download=true
-                stop: ["<|eot_id|>", "<|eom_id|>"],
-                maxInputTokens: 32768,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name: "NousResearch/Hermes-3-Llama-3.1-8B-GGUF/resolve/main/Hermes-3-Llama-3.1-8B.Q8_0.gguf?download=true", // "RichardErkhov/NousResearch_-_Meta-Llama-3.1-70B-gguf", // TODO:
-                stop: ["<|eot_id|>", "<|eom_id|>"],
-                maxInputTokens: 32768,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.EMBEDDING]: {
-                name: "togethercomputer/m2-bert-80M-32k-retrieval",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.LMSTUDIO]: {
-        endpoint: settings.LMSTUDIO_SERVER_URL || "http://localhost:1234/v1",
+        endpoint: settings.LMSTUDIO_API_URL || "http://localhost:1234/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_LMSTUDIO_MODEL || settings.LMSTUDIO_MODEL || "hermes-3-llama-3.1-8b",
-                stop: ["<|eot_id|>", "<|eom_id|>"],
-                maxInputTokens: 32768,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_LMSTUDIO_MODEL || settings.LMSTUDIO_MODEL || "hermes-3-llama-3.1-8b",
-                stop: ["<|eot_id|>", "<|eom_id|>"],
-                maxInputTokens: 32768,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_LMSTUDIO_MODEL || settings.LMSTUDIO_MODEL || "hermes-3-llama-3.1-8b",
-                stop: ["<|eot_id|>", "<|eom_id|>"],
-                maxInputTokens: 32768,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.GOOGLE]: {
-        endpoint: "https://generativelanguage.googleapis.com",
+        endpoint: settings.GOOGLE_API_URL || "https://generativelanguage.googleapis.com/v1beta",
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_GOOGLE_MODEL ||
-                    settings.GOOGLE_MODEL ||
-                    "gemini-2.0-flash-exp",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_GOOGLE_MODEL ||
-                    settings.GOOGLE_MODEL ||
-                    "gemini-2.0-flash-exp",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_GOOGLE_MODEL ||
-                    settings.GOOGLE_MODEL ||
-                    "gemini-2.0-flash-exp",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.EMBEDDING]: {
-                name:
-                    settings.EMBEDDING_GOOGLE_MODEL ||
-                    settings.GOOGLE_MODEL ||
-                    "text-embedding-004",
-            },
+            [ModelClass.SMALL]: { name: "gemini-1.5-flash-latest", stop: [], maxInputTokens: 1048576, maxOutputTokens: 8192, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "gemini-1.5-pro-latest", stop: [], maxInputTokens: 1048576, maxOutputTokens: 8192, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "gemini-1.5-pro-latest", stop: [], maxInputTokens: 1048576, maxOutputTokens: 8192, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "text-embedding-004", dimensions: 768 },
         },
     },
     [ModelProviderName.MISTRAL]: {
+        endpoint: settings.MISTRAL_API_URL || "https://api.mistral.ai/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_MISTRAL_MODEL ||
-                    settings.MISTRAL_MODEL ||
-                    "mistral-small-latest",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_MISTRAL_MODEL ||
-                    settings.MISTRAL_MODEL ||
-                    "mistral-large-latest",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_MISTRAL_MODEL ||
-                    settings.MISTRAL_MODEL ||
-                    "mistral-large-latest",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
+            [ModelClass.SMALL]: { name: "mistral-small-latest", stop: [], maxInputTokens: 32768, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "mistral-medium-latest", stop: [], maxInputTokens: 32768, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "mistral-large-latest", stop: [], maxInputTokens: 32768, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "mistral-embed", dimensions: 1024 },
         },
     },
     [ModelProviderName.REDPILL]: {
-        endpoint: "https://api.red-pill.ai/v1",
-        // Available models: https://docs.red-pill.ai/get-started/supported-models
-        // To test other models, change the models below
+        endpoint: settings.REDPILL_API_URL || "https://api.redpill.ai/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_REDPILL_MODEL ||
-                    settings.REDPILL_MODEL ||
-                    "gpt-4o-mini",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_REDPILL_MODEL ||
-                    settings.REDPILL_MODEL ||
-                    "gpt-4o",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
-
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_REDPILL_MODEL ||
-                    settings.REDPILL_MODEL ||
-                    "gpt-4o",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
-
-            [ModelClass.EMBEDDING]: {
-                name: "text-embedding-3-small",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.OPENROUTER]: {
-        endpoint: "https://openrouter.ai/api/v1",
-        // Available models: https://openrouter.ai/models
-        // To test other models, change the models below
+        endpoint: settings.OPENROUTER_API_URL || "https://openrouter.ai/api/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_OPENROUTER_MODEL ||
-                    settings.OPENROUTER_MODEL ||
-                    "nousresearch/hermes-3-llama-3.1-405b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_OPENROUTER_MODEL ||
-                    settings.OPENROUTER_MODEL ||
-                    "nousresearch/hermes-3-llama-3.1-405b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_OPENROUTER_MODEL ||
-                    settings.OPENROUTER_MODEL ||
-                    "nousresearch/hermes-3-llama-3.1-405b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.EMBEDDING]: {
-                name: "text-embedding-3-small",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.OLLAMA]: {
-        endpoint: settings.OLLAMA_SERVER_URL || "http://localhost:11434",
+        endpoint: settings.OLLAMA_API_URL || "http://localhost:11434/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_OLLAMA_MODEL ||
-                    settings.OLLAMA_MODEL ||
-                    "llama3.2",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_OLLAMA_MODEL ||
-                    settings.OLLAMA_MODEL ||
-                    "hermes3",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_OLLAMA_MODEL ||
-                    settings.OLLAMA_MODEL ||
-                    "hermes3:70b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.7,
-            },
-
-            [ModelClass.EMBEDDING]: {
-                name: settings.OLLAMA_EMBEDDING_MODEL || "mxbai-embed-large",
-                dimensions: 1024,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.HEURIST]: {
-        endpoint: "https://llm-gateway.heurist.xyz",
+        endpoint: settings.HEURIST_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_HEURIST_MODEL ||
-                    "meta-llama/llama-3-70b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_HEURIST_MODEL ||
-                    "meta-llama/llama-3-70b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_HEURIST_MODEL ||
-                    "meta-llama/llama-3.3-70b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
-                temperature: 0.7,
-            },
-            [ModelClass.IMAGE]: {
-                name: settings.HEURIST_IMAGE_MODEL || "FLUX.1-dev",
-                steps: 20,
-            },
-            [ModelClass.EMBEDDING]: {
-                name: "BAAI/bge-large-en-v1.5",
-                dimensions: 1024,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.GALADRIEL]: {
-        endpoint: "https://api.galadriel.com/v1/verified",
+        endpoint: settings.GALADRIEL_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_GALADRIEL_MODEL || "gpt-4o-mini",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_GALADRIEL_MODEL || "gpt-4o",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_GALADRIEL_MODEL || "gpt-4o",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
-    [ModelProviderName.FAL]: {
-        endpoint: "https://api.fal.ai/v1",
-        model: {
-            [ModelClass.IMAGE]: { name: "fal-ai/flux-lora", steps: 28 },
-        },
-    },
-    [ModelProviderName.GAIANET]: {
-        endpoint: settings.GAIANET_SERVER_URL,
+    falai: {
+        endpoint: settings.FAL_API_URL || "https://api.fal.ai/v1",
         model: {
             [ModelClass.SMALL]: {
-                name:
-                    settings.GAIANET_MODEL ||
-                    settings.SMALL_GAIANET_MODEL ||
-                    "llama3b",
+                name: settings.SMALL_FAL_MODEL || "fal-small-placeholder",
                 stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
+                maxInputTokens: 8000,
+                maxOutputTokens: 2000,
                 temperature: 0.7,
             },
             [ModelClass.MEDIUM]: {
-                name:
-                    settings.GAIANET_MODEL ||
-                    settings.MEDIUM_GAIANET_MODEL ||
-                    "llama",
+                name: settings.MEDIUM_FAL_MODEL || "fal-medium-placeholder",
                 stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
+                maxInputTokens: 16000,
+                maxOutputTokens: 4000,
                 temperature: 0.7,
             },
             [ModelClass.LARGE]: {
-                name:
-                    settings.GAIANET_MODEL ||
-                    settings.LARGE_GAIANET_MODEL ||
-                    "qwen72b",
+                name: settings.LARGE_FAL_MODEL || "fal-large-placeholder",
                 stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                repetition_penalty: 0.4,
+                maxInputTokens: 32000,
+                maxOutputTokens: 4000,
                 temperature: 0.7,
+            },
+            [ModelClass.IMAGE]: {
+                name: settings.IMAGE_FAL_MODEL || "fal-image-placeholder",
             },
             [ModelClass.EMBEDDING]: {
-                name: settings.GAIANET_EMBEDDING_MODEL || "nomic-embed",
+                name: settings.EMBEDDING_FAL_MODEL || "fal-embedding-placeholder",
                 dimensions: 768,
             },
         },
     },
-    [ModelProviderName.ALI_BAILIAN]: {
-        endpoint: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    [ModelProviderName.GAIANET]: {
+        endpoint: settings.GAIANET_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name: "qwen-turbo",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name: "qwen-plus",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name: "qwen-max",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.6,
-            },
-            [ModelClass.IMAGE]: {
-                name: "wanx-v1",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
+        },
+    },
+    [ModelProviderName.ALI_BAILIAN]: {
+        endpoint: settings.ALI_BAILIAN_API_URL,
+        model: {
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.VOLENGINE]: {
-        endpoint:
-            settings.VOLENGINE_API_URL ||
-            "https://open.volcengineapi.com/api/v3/",
+        endpoint: settings.VOLENGINE_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_VOLENGINE_MODEL ||
-                    settings.VOLENGINE_MODEL ||
-                    "doubao-lite-128k",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_VOLENGINE_MODEL ||
-                    settings.VOLENGINE_MODEL ||
-                    "doubao-pro-128k",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_VOLENGINE_MODEL ||
-                    settings.VOLENGINE_MODEL ||
-                    "doubao-pro-256k",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.4,
-                presence_penalty: 0.4,
-                temperature: 0.6,
-            },
-            [ModelClass.EMBEDDING]: {
-                name: settings.VOLENGINE_EMBEDDING_MODEL || "doubao-embedding",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.NANOGPT]: {
-        endpoint: "https://nano-gpt.com/api/v1",
+        endpoint: settings.NANOGPT_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_NANOGPT_MODEL || "gpt-4o-mini",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_NANOGPT_MODEL || "gpt-4o",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_NANOGPT_MODEL || "gpt-4o",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 2048, maxOutputTokens: 256, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 2048, maxOutputTokens: 256, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 2048, maxOutputTokens: 256, temperature: 0.7 },
         },
     },
     [ModelProviderName.HYPERBOLIC]: {
-        endpoint: "https://api.hyperbolic.xyz/v1",
+        endpoint: settings.HYPERBOLIC_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_HYPERBOLIC_MODEL ||
-                    settings.HYPERBOLIC_MODEL ||
-                    "meta-llama/Llama-3.2-3B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_HYPERBOLIC_MODEL ||
-                    settings.HYPERBOLIC_MODEL ||
-                    "meta-llama/Meta-Llama-3.1-70B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_HYPERBOLIC_MODEL ||
-                    settings.HYPERBOLIC_MODEL ||
-                    "meta-llama/Meta-Llama-3.1-405-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.IMAGE]: {
-                name: settings.IMAGE_HYPERBOLIC_MODEL || "FLUX.1-dev",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.VENICE]: {
-        endpoint: "https://api.venice.ai/api/v1",
+        endpoint: settings.VENICE_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_VENICE_MODEL || "llama-3.3-70b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_VENICE_MODEL || "llama-3.3-70b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_VENICE_MODEL || "llama-3.1-405b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.IMAGE]: {
-                name: settings.IMAGE_VENICE_MODEL || "fluently-xl",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.NVIDIA]: {
-        endpoint: "https://integrate.api.nvidia.com/v1",
+        endpoint: settings.NVIDIA_API_URL || "https://integrate.api.nvidia.com/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_NVIDIA_MODEL || "meta/llama-3.2-3b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_NVIDIA_MODEL || "meta/llama-3.3-70b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_NVIDIA_MODEL || "meta/llama-3.1-405b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
+            [ModelClass.IMAGE]: { name: "placeholder-image" },
         },
     },
     [ModelProviderName.NINETEEN_AI]: {
-        endpoint: "https://api.nineteen.ai/v1",
+        endpoint: settings.NINETEEN_AI_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_NINETEEN_AI_MODEL ||
-                    "unsloth/Llama-3.2-3B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_NINETEEN_AI_MODEL ||
-                    "unsloth/Meta-Llama-3.1-8B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_NINETEEN_AI_MODEL ||
-                    "hugging-quants/Meta-Llama-3.1-70B-Instruct-AWQ-INT4",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.IMAGE]: {
-                name:
-                    settings.IMAGE_NINETEEN_AI_MODEL ||
-                    "dataautogpt3/ProteusV0.4-Lightning",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.AKASH_CHAT_API]: {
-        endpoint: "https://chatapi.akash.network/api/v1",
+        endpoint: settings.AKASH_CHAT_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_AKASH_CHAT_API_MODEL ||
-                    "Meta-Llama-3-2-3B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_AKASH_CHAT_API_MODEL ||
-                    "Meta-Llama-3-3-70B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_AKASH_CHAT_API_MODEL ||
-                    "Meta-Llama-3-1-405B-Instruct-FP8",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.LIVEPEER]: {
-        endpoint: settings.LIVEPEER_GATEWAY_URL || "http://gateway.test-gateway",
+        endpoint: settings.LIVEPEER_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_LIVEPEER_MODEL ||
-                    "meta-llama/Meta-Llama-3.1-8B-Instruct",
-                stop: [],
-                maxInputTokens: 8000,
-                maxOutputTokens: 8192,
-                temperature: 0,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_LIVEPEER_MODEL ||
-                    "meta-llama/Meta-Llama-3.1-8B-Instruct",
-                stop: [],
-                maxInputTokens: 8000,
-                maxOutputTokens: 8192,
-                temperature: 0,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_LIVEPEER_MODEL ||
-                    "meta-llama/Meta-Llama-3.1-8B-Instruct",
-                stop: [],
-                maxInputTokens: 8000,
-                maxOutputTokens: 8192,
-                temperature: 0,
-            },
-            [ModelClass.IMAGE]: {
-                name:
-                    settings.IMAGE_LIVEPEER_MODEL || "ByteDance/SDXL-Lightning",
-            },
+            [ModelClass.IMAGE]: { name: "placeholder-image" },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
         },
     },
     [ModelProviderName.INFERA]: {
-        endpoint: "https://api.infera.org",
+        endpoint: settings.INFERA_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_INFERA_MODEL || "llama3.2:3b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0,
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_INFERA_MODEL || "mistral-nemo:latest",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0,
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_INFERA_MODEL || "mistral-small:latest",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.DEEPSEEK]: {
-        endpoint: settings.DEEPSEEK_API_URL || "https://api.deepseek.com",
+        endpoint: settings.DEEPSEEK_API_URL || "https://api.deepseek.com/v1",
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_DEEPSEEK_MODEL || "deepseek-chat",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_DEEPSEEK_MODEL || "deepseek-chat",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_DEEPSEEK_MODEL || "deepseek-chat",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.7,
-            },
+            [ModelClass.SMALL]: { name: "deepseek-coder", stop: [], maxInputTokens: 16384, maxOutputTokens: 4096, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "deepseek-chat", stop: [], maxInputTokens: 16384, maxOutputTokens: 4096, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "deepseek-chat", stop: [], maxInputTokens: 16384, maxOutputTokens: 4096, temperature: 0.7 },
         },
     },
     [ModelProviderName.BEDROCK]: {
+        endpoint: settings.BEDROCK_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name: settings.SMALL_BEDROCK_MODEL || "amazon.nova-micro-v1:0",
-                maxInputTokens: 128000,
-                maxOutputTokens: 5120,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-                stop: [],
-            },
-            [ModelClass.MEDIUM]: {
-                name: settings.MEDIUM_BEDROCK_MODEL || "amazon.nova-lite-v1:0",
-                maxInputTokens: 128000,
-                maxOutputTokens: 5120,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-                stop: [],
-            },
-            [ModelClass.LARGE]: {
-                name: settings.LARGE_BEDROCK_MODEL || "amazon.nova-pro-v1:0",
-                maxInputTokens: 128000,
-                maxOutputTokens: 5120,
-                frequency_penalty: 0.0,
-                presence_penalty: 0.0,
-                temperature: 0.6,
-                stop: [],
-            },
-            [ModelClass.EMBEDDING]: {
-                name:
-                    settings.EMBEDDING_BEDROCK_MODEL ||
-                    "amazon.titan-embed-text-v1",
-            },
-            [ModelClass.IMAGE]: {
-                name: settings.IMAGE_BEDROCK_MODEL || "amazon.nova-canvas-v1:0",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.ATOMA]: {
-        endpoint: settings.ATOMA_API_URL || "https://api.atoma.network/v1",
+        endpoint: settings.ATOMA_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_ATOMA_MODEL ||
-                    "meta-llama/Llama-3.3-70B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_ATOMA_MODEL ||
-                    "meta-llama/Llama-3.3-70B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_ATOMA_MODEL ||
-                    "meta-llama/Llama-3.3-70B-Instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.SECRETAI]: {
-        endpoint: settings.SECRET_AI_URL || "https://ai1.scrtlabs.com:21434",
+        endpoint: settings.SECRETAI_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_SECRET_AI_MODEL ||
-                    "deepseek-r1:70b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_SECRET_AI_MODEL ||
-                    "deepseek-r1:70b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_SECRET_AI_MODEL ||
-                    "deepseek-r1:70b",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.7,
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
     [ModelProviderName.NEARAI]: {
-        endpoint: settings.NEARAI_API_URL || "https://api.near.ai/v1",
+        endpoint: settings.NEARAI_API_URL,
         model: {
-            [ModelClass.SMALL]: {
-                name:
-                    settings.SMALL_NEARAI_MODEL ||
-                    settings.NEARAI_MODEL ||
-                    "fireworks::accounts/fireworks/models/llama-v3p2-3b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.MEDIUM]: {
-                name:
-                    settings.MEDIUM_NEARAI_MODEL ||
-                    settings.NEARAI_MODEL ||
-                    "fireworks::accounts/fireworks/models/llama-v3p1-70b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.LARGE]: {
-                name:
-                    settings.LARGE_NEARAI_MODEL ||
-                    settings.NEARAI_MODEL ||
-                    "fireworks::accounts/fireworks/models/llama-v3p1-405b-instruct",
-                stop: [],
-                maxInputTokens: 128000,
-                maxOutputTokens: 8192,
-                temperature: 0.6,
-            },
-            [ModelClass.IMAGE]: {
-                name: settings.IMAGE_NEARAI_MODEL || "fireworks::accounts/fireworks/models/playground-v2-5-1024px-aesthetic",
-            },
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
+        },
+    },
+    [ModelProviderName.LETZAI]: {
+        endpoint: settings.LETZAI_API_URL,
+        model: {
+            [ModelClass.SMALL]: { name: "placeholder-small", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.MEDIUM]: { name: "placeholder-medium", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.LARGE]: { name: "placeholder-large", stop: [], maxInputTokens: 8192, maxOutputTokens: 2048, temperature: 0.7 },
+            [ModelClass.EMBEDDING]: { name: "placeholder-embedding" },
         },
     },
 };
 
 // Helper function to convert ModelProviderName to string key for models object
-function getModelKey(provider: ModelProviderName): string {
-    switch (provider) {
-        case ModelProviderName.OPENAI: return 'openai';
-        case ModelProviderName.ETERNALAI: return 'eternalai';
-        case ModelProviderName.ANTHROPIC: return 'anthropic';
-        case ModelProviderName.GROK: return 'grok';
-        case ModelProviderName.GROQ: return 'groq';
-        case ModelProviderName.LLAMACLOUD: return 'llama_cloud';
-        case ModelProviderName.TOGETHER: return 'together';
-        case ModelProviderName.LLAMALOCAL: return 'llama_local';
-        case ModelProviderName.LMSTUDIO: return 'lmstudio';
-        case ModelProviderName.GOOGLE: return 'google';
-        case ModelProviderName.MISTRAL: return 'mistral';
-        case ModelProviderName.CLAUDE_VERTEX: return 'claude_vertex';
-        case ModelProviderName.REDPILL: return 'redpill';
-        case ModelProviderName.OPENROUTER: return 'openrouter';
-        case ModelProviderName.OLLAMA: return 'ollama';
-        case ModelProviderName.HEURIST: return 'heurist';
-        case ModelProviderName.GALADRIEL: return 'galadriel';
-        case ModelProviderName.FAL: return 'falai';
-        case ModelProviderName.GAIANET: return 'gaianet';
-        case ModelProviderName.ALI_BAILIAN: return 'ali_bailian';
-        case ModelProviderName.VOLENGINE: return 'volengine';
-        case ModelProviderName.NANOGPT: return 'nanogpt';
-        case ModelProviderName.HYPERBOLIC: return 'hyperbolic';
-        case ModelProviderName.VENICE: return 'venice';
-        case ModelProviderName.NVIDIA: return 'nvidia';
-        case ModelProviderName.NINETEEN_AI: return 'nineteen_ai';
-        case ModelProviderName.AKASH_CHAT_API: return 'akash_chat_api';
-        case ModelProviderName.LIVEPEER: return 'livepeer';
-        case ModelProviderName.LETZAI: return 'letzai';
-        case ModelProviderName.DEEPSEEK: return 'deepseek';
-        case ModelProviderName.INFERA: return 'infera';
-        case ModelProviderName.BEDROCK: return 'bedrock';
-        case ModelProviderName.ATOMA: return 'atoma';
-        case ModelProviderName.SECRETAI: return 'secret_ai';
-        case ModelProviderName.NEARAI: return 'nearai';
-        default: return 'openai'; // Default fallback
-    }
+function getModelKey(modelName: string): string | undefined {
+    return Object.keys(ModelProviderName).find(key => ModelProviderName[key as keyof typeof ModelProviderName] === modelName);
 }
 
 // Helper function to convert ModelClass to string key for model object
@@ -1284,9 +563,11 @@ export function getModelSettings(
     provider: ModelProviderName,
     type: ModelClass
 ): ModelSettings | undefined {
-    const modelKey = getModelKey(provider);
-    const modelClassKey = getModelClassKey(type);
-    return models[modelKey as keyof typeof models]?.model[modelClassKey] as ModelSettings | undefined;
+    const providerModels = models[provider]?.model;
+    if (!providerModels) {
+        return undefined;
+    }
+    return providerModels[getModelClassKey(type)] as ModelSettings;
 }
 
 /**
@@ -1295,14 +576,20 @@ export function getModelSettings(
 export function getEmbeddingModelSettings(
     provider: ModelProviderName
 ): EmbeddingModelSettings | undefined {
-    const modelKey = getModelKey(provider);
-    return models[modelKey as keyof typeof models]?.model.embedding as EmbeddingModelSettings | undefined;
+    const providerModels = models[provider]?.model;
+    if (!providerModels) {
+        return undefined;
+    }
+    return providerModels[getModelClassKey(ModelClass.EMBEDDING)] as EmbeddingModelSettings;
 }
 
 /**
  * Gets the endpoint for a specific provider.
  */
 export function getEndpoint(provider: ModelProviderName): string | undefined {
-    const modelKey = getModelKey(provider);
-    return models[modelKey as keyof typeof models]?.endpoint;
+    const providerConfig = models[provider];
+    if (!providerConfig || !providerConfig.endpoint) {
+        return undefined;
+    }
+    return providerConfig.endpoint;
 }

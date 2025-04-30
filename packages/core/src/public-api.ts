@@ -25,7 +25,7 @@ export type {
   Adapter,
   Provider,
   State,
-  KnowledgeManager,
+  IRAGKnowledgeManager,
   // Types required by plugin-bootstrap
   Action,
   ActionExample,
@@ -33,13 +33,14 @@ export type {
   Objective,
   Evaluator, // Added from ./types
   IMemoryManager, // Export the interface
+  ICacheManager, // Added cache interface
   // ADDED missing types used by adapter-sqlite
   Relationship,
   ChunkRow
 } from './types.js';
 
 // Re-export specific value constants needed
-export { ModelProviderName, CacheStore, ModelClass } from './types.js';
+export { ModelProviderName, CacheStore, ModelClass, ServiceType, TokenizerType, TranscriptionProvider, ActionTimelineType, KnowledgeScope, LoggingLevel } from './types.js';
 
 // Export context utilities (correct path)
 export { composeContext } from './context.js';
@@ -56,11 +57,17 @@ export { formatMessages } from './messages.js';
 
 // Export generation functions (assuming path)
 export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from './generation.js';
+// ADDED missing generation functions used by client-direct
+export { generateCaption, generateImage, generateObject } from './generation.js'; // Assuming these are in generation.js
 
 // Existing value exports
 export { getGoals } from './goals.js';
 export { AgentRuntime } from './runtime.js';
 export { getModulePath } from './utils/module-path.js';
+// Corrected export paths for utilities
+export { getEnvVariable } from './settings.js';
+export { isUUID, stringToUuid } from './uuid.js';
+export { getEmbeddingZeroVector } from './embedding.js'; // Assuming this is in embedding.js
 export { default as knowledge } from './knowledge.js';
 
 // Export MemoryManager implementation (assuming from ./memory)
@@ -70,12 +77,11 @@ export { MemoryManager } from './memory.js';
 export type { IAgentRuntimeBridge } from './api/types.js';
 export type { AgentLogLevel, IAgentLogger } from './api/types.js';
 
-// Stubs - Review if these are still needed or can be removed/implemented
-export const CacheManager = {}; // Placeholder
-export const DbCacheAdapter = {}; // Placeholder
-export const FsCacheAdapter = {}; // Placeholder
-export const settings = {}; // Placeholder
-export const stringToUuid = (str: string) => str; // Placeholder
+// Correctly export Cache components and settings
+export { CacheManager, DbCacheAdapter, FsCacheAdapter } from './cache.js';
+export { settings } from './settings.js';
+
+// Keep other placeholders if they are still needed
 export const validateCharacterConfig = (config: any) => true; // Placeholder
 
 // ADDED DatabaseAdapter class export

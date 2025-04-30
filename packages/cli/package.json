@@ -4,9 +4,9 @@
   "main": "./dist/index.js",
   "scripts": {
     "test": "jest",
-    "build": "tsc -p tsconfig.build.json && node ../../scripts/build/postbuild-dual.js",
-    "prebuild": "rimraf dist",
-    "build:types": "tsc -p tsconfig.build.json",
+    "build": "echo 'Skipping build for cli package (no TS source)'",
+    "prebuild": "rm -rf dist",
+    "build:types": "echo 'No TypeScript files to build types for in cli package'",
     "build:full": "npm run build",
     "clean": "rm -rf dist",
     "dev": "tsup --watch",

@@ -6,23 +6,9 @@
     "composite": true,
     "declaration": true,
     "sourceMap": true,
-    "paths": {
-      "@elizaos/types": [
-        "../types/dist"
-      ],
-      "@elizaos/core": [
-        "../core/dist"
-      ],
-      "@elizaos/core/*": [
-        "../core/dist/*"
-      ],
-      "@elizaos/adapter-sqlite": [
-        "../adapter-sqlite/dist"
-      ],
-      "@elizaos/adapter-sqlite/*": [
-        "../adapter-sqlite/dist/*"
-      ]
-    }
+    "skipLibCheck": true,
+    "allowJs": true,
+    "resolveJsonModule": true
   },
   "include": [
     "src/**/*"

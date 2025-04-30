@@ -1947,9 +1947,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         if (shouldInterrupt) {
           this.logger.info(`[PLUGIN][PERSONALITY] Personality decided to respond!`, '', '');
           // Check if we should change topic
-          const shouldChangeTopic = await this.personality.shouldChangeTopic({
-            messages: conversation
-          });
+          // TODO: Investigate the correct signature for shouldChangeTopic. Casting to any for now.
+          const shouldChangeTopic = await this.personality.shouldChangeTopic({ messages: conversation } as any);
 
           if (shouldChangeTopic) {
             this.logger.info(`[PLUGIN][PERSONALITY] Personality decided to change topic!`, '', '');
@@ -1965,7 +1964,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
             try {
               this.logger.info(`[PLUGIN][PERSONALITY] Generating personality response after ${delay}ms delay`, '', '');
               // We should process this message through our normal response pipeline
-              await this.handleMessage(message);
+              // Corrected method name from handleMessage to handleIncomingMessage
+              await this.handleIncomingMessage(message);
             } catch (responseError: unknown) {
               if (responseError instanceof Error) {
                 this.logger.error(`[PLUGIN][PERSONALITY] Error during delayed response: ${responseError.message}`, '', '');

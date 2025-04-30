@@ -10,8 +10,8 @@
     }
   },
   "scripts": {
-    "prebuild": "rimraf dist",
-    "build": "tsc -p tsconfig.build.json && node ../../scripts/build/postbuild-dual.js",
+    "prebuild": "rm -rf dist",
+    "build": "tsc -p tsconfig.build.json",
     "build:types": "tsc -p tsconfig.build.json",
     "build:full": "npm run build",
     "clean": "rm -rf dist",
