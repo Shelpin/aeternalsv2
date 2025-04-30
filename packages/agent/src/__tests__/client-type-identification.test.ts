@@ -1,4 +1,4 @@
-import type { Client, IAgentRuntime } from "@elizaos/core/public-api.js";
+import type { Client, IAgentRuntime } from "@elizaos/core";
 import { describe, it, expect } from "@jest/globals";
 
 // Helper function to identify client types
@@ -24,21 +24,21 @@ class MockNamedClient implements Client {
     async start(_runtime?: IAgentRuntime) {
         return this;
     }
-    async stop(_runtime?: IAgentRuntime) {}
+    async stop(_runtime?: IAgentRuntime) { }
 }
 
 class MockConstructorClient implements Client {
     async start(_runtime?: IAgentRuntime) {
         return this;
     }
-    async stop(_runtime?: IAgentRuntime) {}
+    async stop(_runtime?: IAgentRuntime) { }
 }
 
 const mockPlainClient: Client = {
     async start(_runtime?: IAgentRuntime) {
         return {};
     },
-    async stop(_runtime?: IAgentRuntime) {},
+    async stop(_runtime?: IAgentRuntime) { },
 };
 
 describe("Client Type Identification", () => {

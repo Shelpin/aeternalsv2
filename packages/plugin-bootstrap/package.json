@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "prebuild": "rimraf dist",
+    "prebuild": "rimraf dist tsconfig.build.tsbuildinfo",
     "build": "tsc -b tsconfig.build.json",
     "build:types": "tsc --build tsconfig.build.json",
     "clean": "rimraf dist",

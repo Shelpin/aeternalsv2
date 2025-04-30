@@ -1,1 +1,1 @@
-import { Memory } from "@elizaos/core/public-api.js"; console.log(typeof Memory);
+import { Memory } from "@elizaos/core"; console.log(typeof Memory);
