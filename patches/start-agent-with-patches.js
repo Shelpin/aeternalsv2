@@ -35,6 +35,29 @@ console.log(`🔧 Character files: ${characterFiles.join(', ') || 'None provided
 
 async function main() {
   try {
+    // 📂 Step 2: Enforce new database path for agent startup
+    if (!process.env.SQLITE_FILE && !process.env.DATABASE_PATH) {
+      console.warn('⚠️ No DB path specified; defaulting to multiagent.db');
+      process.env.SQLITE_FILE = path.resolve(__dirname, '../packages/agent/data/multiagent.db');
+    } else {
+      process.env.SQLITE_FILE = process.env.SQLITE_FILE || process.env.DATABASE_PATH;
+    }
+
+    // 🔑 Step 3: Normalize Telegram token naming
+    const agentId = process.env.AGENT_ID;
+    if (agentId) {
+      const tokenVar = `TELEGRAM_BOT_TOKEN_${agentId}`;
+      const mappedToken = process.env[tokenVar];
+      if (mappedToken) {
+        process.env.TELEGRAM_BOT_TOKEN = mappedToken;
+        console.log(`🔑 Mapped ${tokenVar} -> TELEGRAM_BOT_TOKEN`);
+      } else {
+        console.warn(`⚠️ Environment variable ${tokenVar} is not defined, leaving TELEGRAM_BOT_TOKEN as is`);
+      }
+    } else {
+      console.warn('⚠️ AGENT_ID not set; cannot normalize Telegram token naming');
+    }
+
     // --- Start of Merged Patch Logic ---
     console.log("🔧 Applying all ElizaOS runtime patches directly...");
     let runtime = null;
@@ -170,7 +193,8 @@ async function main() {
       cwd: rootDir, // Ensure it runs from the project root
       env: {
         ...process.env, // Pass existing env vars (includes AGENT_ID, TOKEN, etc.)
-        VALHALLA_PATCHED: 'true' // Add a flag if needed
+        VALHALLA_PATCHED: 'true', // Add a flag if needed
+        NODE_OPTIONS: '--require dotenv/config'
       }
     });
 

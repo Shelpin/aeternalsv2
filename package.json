@@ -139,6 +139,8 @@
     "@deepgram/sdk": "^3.9.0",
     "@elizaos-plugins/clients": "workspace:*",
     "@elizaos/adapter-sqlite": "workspace:*",
+    "@elizaos/client-telegram": "0.25.6-alpha.1",
+    "@elizaos/telegram-multiagent": "workspace:*",
     "@injectivelabs/sdk-ts": "^1.14.33",
     "@vitest/eslint-plugin": "1.0.1",
     "ai": "4.1.16",

@@ -27,14 +27,10 @@ echo -e "   ${BLUE}Waiting for processes to fully stop...${NC}"
 sleep 5
 
 # Clean databases
-if [ "$RESET_DB" = "false" ]; then
-  echo -e "\n${YELLOW}[2] Skipping database wipe (flag RESET_DB=false)${NC}"
-else
-  echo -e "\n${YELLOW}[2] Cleaning up old memory databases (default behavior)...${NC}"
-  rm -f ./agent/data/*.db
-  rm -f ./packages/telegram-multiagent/test_memory.db
-  echo -e "   ${GREEN}Database files removed successfully${NC}"
-fi
+echo -e "\n${YELLOW}[2] Cleaning up old memory databases${NC}"
+rm -f ./agent/data/*.db
+rm -f ./packages/telegram-multiagent/test_memory.db
+echo -e "   ${GREEN}Database files removed successfully${NC}"
 
 # Consolidated build step after DB init
 echo -e "\n${YELLOW}[3] Running consolidated clean build...${NC}"
@@ -57,12 +53,6 @@ export FORCE_GC=true
 
 # Load and export environment variables from .env
 set -a && [ -f ".env" ] && source .env && set +a
-
-# Verify critical environment variables
-echo -e "\n${YELLOW}[2.1] Verifying environment variables...${NC}"
-echo -e "   ${GREEN}RELAY_SERVER_URL=${RELAY_SERVER_URL}${NC}"
-echo -e "   ${GREEN}TELEGRAM_GROUP_IDS=${TELEGRAM_GROUP_IDS}${NC}"
-echo -e "   ${GREEN}RESET_DB=${RESET_DB:-false}${NC}"
 
 # Run the main launch script
 echo -e "\n${YELLOW}[5] Executing launch_valhalla.sh${NC}"

@@ -670,20 +670,10 @@ async function initializeCache(runtime: AgentRuntime, character: any): Promise<C
 async function findDatabaseAdapter(runtime: AgentRuntime) {
     const { adapters } = runtime;
     let adapterInstance: IDatabaseAdapter & IDatabaseCacheAdapter | undefined;
-    // if not found, default to sqlite
     if (adapters.length === 0) {
-        // Import the named 'adapter' export from adapter-sqlite
-        const sqliteAdapterModule = await import('@elizaos/adapter-sqlite');
-        if (sqliteAdapterModule.adapter && typeof sqliteAdapterModule.adapter.init === 'function') {
-            // Call the init function to get the adapter instance
-            adapterInstance = sqliteAdapterModule.adapter.init(runtime) as IDatabaseAdapter & IDatabaseCacheAdapter;
-        } else {
-            elizaLogger.error(`@elizaos/adapter-sqlite module does not export the expected 'adapter' object with an 'init' function.`);
-        }
-
-        if (!adapterInstance) {
-            throw new Error("Internal error: Could not initialize the default SQLite database adapter.");
-        }
+        // Dynamically import the SQLite adapter and connect using the static connect() method
+        const { SQLiteAdapter } = await import('@elizaos/adapter-sqlite');
+        adapterInstance = await SQLiteAdapter.connect(runtime.agentId) as IDatabaseAdapter & IDatabaseCacheAdapter;
     } else if (adapters.length === 1) {
         // If an adapter was already provided (e.g., by another plugin), use its init method
         if (adapters[0] && typeof adapters[0].init === 'function') {

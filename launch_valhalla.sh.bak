@@ -61,29 +61,25 @@ if [ -f "./cleanup_ports.sh" ]; then
     ./cleanup_ports.sh
 fi
 
-# Database cleanup
-if [ "$RESET_DB" = "false" ]; then
-  echo -e "\n${YELLOW}[2.1] Skipping database wipe (flag RESET_DB=false)${NC}"
-else
-  echo -e "\n${YELLOW}[2.1] Cleaning up database files (default behavior)...${NC}"
-  echo -e "   ${BLUE}Removing old SQLite database files to prevent schema conflicts...${NC}"
-  rm -f ./packages/agent/data/*.db
-  rm -f ./packages/agent/data/*.sqlite
-  rm -f ./packages/**/test_memory.db
-  rm -f ./packages/**/test_memory.sqlite
-  echo -e "   ${GREEN}Database files removed. Fresh schema will be created on startup.${NC}"
-fi
+# Add database cleanup steps
+echo -e "\n${YELLOW}[2.1] Cleaning up database files...${NC}"
+echo -e "   ${BLUE}Removing old SQLite database files to prevent schema conflicts...${NC}"
+rm -f ./packages/agent/data/*.db
+rm -f ./packages/agent/data/*.sqlite
+rm -f ./packages/**/test_memory.db
+rm -f ./packages/**/test_memory.sqlite
+echo -e "   ${GREEN}Database files removed. Fresh schema will be created on startup.${NC}"
 
 # Initialize database schema
 echo -e "\n${YELLOW}[2.2] Initializing database schema...${NC}"
 echo -e "   ${BLUE}Creating database tables including 'memories' table...${NC}"
-node patches/init_db.cjs
-
-# Verify critical environment variables
-echo -e "\n${YELLOW}[2.3] Verifying environment variables...${NC}"
-echo -e "   ${GREEN}RELAY_SERVER_URL=${RELAY_SERVER_URL}${NC}"
-echo -e "   ${GREEN}TELEGRAM_GROUP_IDS=${TELEGRAM_GROUP_IDS}${NC}"
-echo -e "   ${GREEN}RESET_DB=${RESET_DB:-false}${NC}"
+node init_database.js
+if [ $? -eq 0 ]; then
+  echo -e "   ${GREEN}Database schema successfully initialized!${NC}"
+else
+  echo -e "   ${RED}Database initialization failed! Check errors above.${NC}"
+  echo -e "   ${YELLOW}Proceeding anyway, but agents may encounter database errors.${NC}"
+fi
 
 # Check if gc scripts are available for all agents
 echo -e "   ${BLUE}Verifying garbage collection scripts...${NC}"
@@ -178,15 +174,65 @@ for agent in "${agents[@]}"; do
     echo $GC_PID > $LOG_DIR/gc_${agent}.pid
 done
 
-# Manual Agent Startup (per-terminal isolation)
-echo -e "\n${YELLOW}[7] Manual Agent Startup${NC}"
-echo "Please run each of the following in its own terminal:" 
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/eth_memelord_9000.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3000 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/bag_flipper_9000.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3001 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/linda_evangelista_88.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3002 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/vc_shark_99.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3003 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/bitcoin_maxi_420.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3004 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/code_samurai_77.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3005 --log-level=debug"
+# Start each agent with staggered launch
+echo -e "\n${YELLOW}[7] Starting agents with memory optimization...${NC}"
+echo -e "   ${BLUE}Agents will be started with a 10 second delay between each${NC}"
+
+for agent in "${agents[@]}"; do
+    echo -e "   ${BLUE}Starting ${agent} on port ${PORT}...${NC}"
+    
+    # Create port file if needed
+    mkdir -p ports
+    echo $PORT > ports/${agent}.port
+    
+    # Set the correct bot token for each agent
+    BOT_TOKEN=""
+    case "${agent}" in
+        eth_memelord_9000)
+            BOT_TOKEN=$ETH_MEMELORD_BOT_TOKEN
+            ;;
+        bag_flipper_9000)
+            BOT_TOKEN=$BAG_FLIPPER_BOT_TOKEN
+            ;;
+        linda_evangelista_88)
+            BOT_TOKEN=$LINDA_EVANGELISTA_BOT_TOKEN
+            ;;
+        vc_shark_99)
+            BOT_TOKEN=$VC_SHARK_BOT_TOKEN
+            ;;
+        code_samurai_77)
+            BOT_TOKEN=$CODE_SAMURAI_BOT_TOKEN
+            ;;
+        bitcoin_maxi_420)
+            BOT_TOKEN=$BITCOIN_MAXI_BOT_TOKEN
+            ;;
+    esac
+    
+    # Start the agent with the appropriate bot token
+    NODE_OPTIONS="--max-old-space-size=512 --expose-gc" \
+    DISABLE_POLLING=false \
+    FORCE_GC=true \
+    AGENT_ID="${agent}" \
+    TELEGRAM_BOT_TOKEN="${BOT_TOKEN}" \
+    cd /root/eliza && pnpm --filter @elizaos/agent start --isRoot \
+      --character="characters/${agent}.json" \
+      --clients=@elizaos/client-telegram \
+      --plugins=@elizaos/telegram-multiagent \
+      --log-level=debug \
+      --port=$PORT > $LOG_DIR/${agent}.log 2>&1 &
+    
+    # Save PID
+    AGENT_PID=$!
+    echo $AGENT_PID > $LOG_DIR/${agent}.pid
+    echo -e "   ${GREEN}Started ${agent} with PID: ${AGENT_PID}${NC}"
+    
+    # Increment port for next agent
+    PORT=$((PORT + 1))
+    
+    # Wait between agent launches
+    echo -e "   ${BLUE}Waiting 10 seconds before next agent launch...${NC}"
+    sleep 10
+done
 
 # Wait for agents to initialize and register
 echo -e "\n${YELLOW}[8] Waiting for agents to initialize and register...${NC}"

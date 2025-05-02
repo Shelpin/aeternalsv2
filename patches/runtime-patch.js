@@ -152,5 +152,20 @@ export async function applyPatch() {
     globalThis.__elizaRuntime = runtime;
     console.log('✅ Runtime assigned globally from applyPatch()');
   }
+
+  // 🔗 Step 5: Connect to relay server via TelegramRelay
+  try {
+    const { TelegramRelay } = require('@elizaos/telegram-multiagent');
+    const relay = new TelegramRelay({
+      relayServerUrl: process.env.RELAY_SERVER_URL,
+      authToken: process.env.RELAY_AUTH_TOKEN,
+      agentId: runtime.getAgentId()
+    }, runtime.getLogger('relay'));
+    await relay.connect();
+    runtime.getLogger('relay').info('✅ Relay connected successfully via runtime patch');
+  } catch (err) {
+    runtime.getLogger('relay').error('❌ Relay connection failed in runtime patch', err);
+  }
+
   return runtime; // Return the runtime instance
 }

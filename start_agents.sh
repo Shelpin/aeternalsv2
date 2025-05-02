@@ -229,19 +229,9 @@ start_agent() {
         return 1
     fi
     
-    local token_var="${AGENTS[$character]}"
-    
-    # Convert character name to match environment variable case
-    local env_character
-    case "$character" in
-        "eth_memelord_9000") env_character="ETHMemeLord9000" ;;
-        "bag_flipper_9000") env_character="BagFlipper9000" ;;
-        "linda_evangelista_88") env_character="LindAEvangelista88" ;;
-        "vc_shark_99") env_character="VCShark99" ;;
-        "bitcoin_maxi_420") env_character="BitcoinMaxi420" ;;
-        "code_samurai_77") env_character="CodeSamurai77" ;;
-        *) env_character="$character" ;;
-    esac
+    # Derive the token variable name dynamically to match .env naming
+    # e.g., TELEGRAM_BOT_TOKEN_<agent_id> (lowercase underscores)
+    local token_var="TELEGRAM_BOT_TOKEN_${character}"
     
     echo "🚀 Starting ${character}..."
     echo "📝 Using token variable: ${token_var}"

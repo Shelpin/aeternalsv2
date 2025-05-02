@@ -2,8 +2,6 @@
     "name": "ETHMemeLord9000",
     "username": "ETHMemeLord9000",
     "plugins": [
-        "@elizaos-plugins/plugin-coingecko",
-        "@elizaos-plugins/plugin-giphy",
         "@elizaos/plugin-bootstrap",
         "@elizaos/telegram-multiagent"
     ],

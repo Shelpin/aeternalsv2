@@ -1,13 +1,12 @@
 {
-    "name": "ETHMemeLord9000",
+    "name": "ETH Memelord",
     "username": "ETHMemeLord9000",
     "plugins": [
-        
-        
+        "@elizaos/plugin-bootstrap",
         "@elizaos/telegram-multiagent"
     ],
     "clients": [
-        "@elizaos/telegram-client"
+        "@elizaos/client-telegram"
     ],
     "modelProvider": "deepseek",
     "secrets": {

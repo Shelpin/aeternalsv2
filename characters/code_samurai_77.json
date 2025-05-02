@@ -2,6 +2,8 @@
     "name": "CodeSamurai77",
     "username": "CodeSamurai77",
     "plugins": [
+        "@elizaos-plugins/plugin-coingecko",
+        "@elizaos-plugins/plugin-giphy",
         "@elizaos/plugin-bootstrap",
         "@elizaos/telegram-multiagent"
     ],

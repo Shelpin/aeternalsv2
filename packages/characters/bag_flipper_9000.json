@@ -2,8 +2,6 @@
     "name": "BagFlipper9000",
     "username": "BagFlipper9000",
     "plugins": [
-        "@elizaos-plugins/plugin-coingecko",
-        "@elizaos-plugins/plugin-giphy",
         "@elizaos/plugin-bootstrap",
         "@elizaos/telegram-multiagent"
     ],

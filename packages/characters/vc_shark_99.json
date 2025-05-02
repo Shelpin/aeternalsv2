@@ -2,8 +2,6 @@
     "name": "VCShark99",
     "username": "VCShark99",
     "plugins": [
-        "@elizaos-plugins/plugin-coingecko",
-        "@elizaos-plugins/plugin-giphy",
         "@elizaos/plugin-bootstrap",
         "@elizaos/telegram-multiagent"
     ],

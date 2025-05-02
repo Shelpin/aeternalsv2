@@ -15,12 +15,13 @@ export class SQLiteAdapter implements IDatabaseAdapter {
     /**
      * Connect to a SQLite database
      */
-    static connect(dbName: string, options = {}): SQLiteAdapter {
+    static async connect(dbName: string, options = {}): Promise<SQLiteAdapter> {
         const dbPath = typeof dbName === 'string'
             ? dbName
             : ':memory:';
-
-        return new SQLiteAdapter(dbPath);
+        const adapter = new SQLiteAdapter(dbPath);
+        await adapter.connect();
+        return adapter;
     }
 
     /**
@@ -233,4 +234,9 @@ export const adapter = {
         // Use the class constructor directly now
         return new SQLiteAdapter(dbPath);
     }
-}; 
+};
+
+// Export a convenience factory to match agent expectations
+export async function connect(dbName: string, options?: any) {
+    return SQLiteAdapter.connect(dbName, options);
+} 
