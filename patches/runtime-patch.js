@@ -15,6 +15,17 @@ const runtime = {
   plugins: {},
   actions: {},
 
+  // Provide agent identity
+  getAgentId: () => process.env.AGENT_ID || '<unknown>',
+
+  // Logger factory for patches
+  getLogger: (name) => ({
+    info: (...args) => console.log(`[${name}]`, ...args),
+    warn: (...args) => console.warn(`[${name}]`, ...args),
+    error: (...args) => console.error(`[${name}]`, ...args),
+    debug: (...args) => console.debug(`[${name}]`, ...args),
+  }),
+
   // Configuration methods
   getSetting(key, defaultValue) {
     return process.env[key] || defaultValue;
@@ -155,8 +166,11 @@ export async function applyPatch() {
 
   // 🔗 Step 5: Connect to relay server via TelegramRelay
   try {
-    const { TelegramRelay } = require('@elizaos/telegram-multiagent');
-    const relay = new TelegramRelay({
+    // Attempt to dynamically import TelegramRelay with debug logging
+    const { TelegramRelay } = await import('@elizaos/telegram-multiagent');
+    runtime.getLogger('relay').debug('🔧 Imported TelegramRelay from plugin: ' + TelegramRelay.name);
+    const RelayCtor = TelegramRelay;
+    const relay = new RelayCtor({
       relayServerUrl: process.env.RELAY_SERVER_URL,
       authToken: process.env.RELAY_AUTH_TOKEN,
       agentId: runtime.getAgentId()

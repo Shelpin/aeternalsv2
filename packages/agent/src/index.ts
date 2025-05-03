@@ -671,9 +671,12 @@ async function findDatabaseAdapter(runtime: AgentRuntime) {
     const { adapters } = runtime;
     let adapterInstance: IDatabaseAdapter & IDatabaseCacheAdapter | undefined;
     if (adapters.length === 0) {
-        // Dynamically import the SQLite adapter and connect using the static connect() method
+        // Dynamically import the SQLite adapter and connect using configured file path
         const { SQLiteAdapter } = await import('@elizaos/adapter-sqlite');
-        adapterInstance = await SQLiteAdapter.connect(runtime.agentId) as IDatabaseAdapter & IDatabaseCacheAdapter;
+        // Use SQLITE_FILE env var if provided, otherwise fallback to agent ID as file name
+        const dbPath = process.env.SQLITE_FILE || `${runtime.agentId}.sqlite`;
+        elizaLogger.info(`Connecting to SQLite database at path: ${dbPath}`);
+        adapterInstance = await SQLiteAdapter.connect(dbPath) as IDatabaseAdapter & IDatabaseCacheAdapter;
     } else if (adapters.length === 1) {
         // If an adapter was already provided (e.g., by another plugin), use its init method
         if (adapters[0] && typeof adapters[0].init === 'function') {

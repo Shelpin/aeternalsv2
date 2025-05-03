@@ -35,6 +35,13 @@ console.log(`🔧 Character files: ${characterFiles.join(', ') || 'None provided
 
 async function main() {
   try {
+    // 📍 Normalize AGENT_ID from --characters argument if not set
+    if (!process.env.AGENT_ID && characterFiles.length > 0) {
+      const agentId = path.basename(characterFiles[0], '.json');
+      process.env.AGENT_ID = agentId;
+      console.log(`🔑 AGENT_ID set to ${agentId} (derived from characters path)`);
+    }
+
     // 📂 Step 2: Enforce new database path for agent startup
     if (!process.env.SQLITE_FILE && !process.env.DATABASE_PATH) {
       console.warn('⚠️ No DB path specified; defaulting to multiagent.db');

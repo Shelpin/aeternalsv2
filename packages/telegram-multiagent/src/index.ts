@@ -55,14 +55,15 @@ plugin.clients = [
                 const telegramClientModule = await import('@elizaos/telegram-client');
                 const clientInstance = telegramClientModule.default; // Assuming default export is the singleton
 
-                if (clientInstance && typeof clientInstance.initialize === 'function') {
-                    clientInstance.initialize(token, runtime); // Pass runtime to allow injection
+                // Initialize the client if the method exists, then return the instance
+                if (typeof (clientInstance as any).initialize === 'function') {
+                    (clientInstance as any).initialize(token, runtime);
                     console.log('[MultiAgentPlugin] Telegram client initialized via plugin start method.');
-                    return clientInstance; // Return the initialized instance
                 } else {
-                    console.error('[MultiAgentPlugin] Imported Telegram client module or its initialize function is invalid.');
-                    return null;
+                    console.warn('[MultiAgentPlugin] Telegram client initialize method not found—skipping init.');
                 }
+                return clientInstance;
+
             } catch (error) {
                 console.error(`[MultiAgentPlugin] Error importing or initializing Telegram client: ${error}`);
                 return null;
@@ -72,6 +73,11 @@ plugin.clients = [
 ];
 console.log('[MultiAgentPlugin] Added clients array to plugin instance.');
 // ---- END ADDED LOGIC ----
+
+// Re-export TelegramRelay for external use (e.g. runtime-patch)
+export { TelegramRelay } from './TelegramRelay.js';
+
+export * from './TelegramRelay.js';
 
 // Verification logging to confirm initialize is now a direct property
 console.log("[TELEGRAM-MULTIAGENT] Plugin created with these properties:");

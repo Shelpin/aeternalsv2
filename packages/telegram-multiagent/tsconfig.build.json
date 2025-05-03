@@ -4,10 +4,10 @@
     "baseUrl": ".",
     "paths": {
       "@elizaos/telegram-client": [
-        "../clients/dist"
+        "../clients/telegram/dist"
       ],
       "@elizaos/telegram-client/*": [
-        "../clients/dist/*"
+        "../clients/telegram/dist/*"
       ]
     },
     "outDir": "dist",

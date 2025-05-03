@@ -7,6 +7,10 @@
 # Load and export environment variables from .env
 set -a && [ -f ".env" ] && source .env && set +a
 
+# Enforce default TELEGRAM_GROUP_IDS if not set in .env
+: "${TELEGRAM_GROUP_IDS:=-1002550618173}"
+export TELEGRAM_GROUP_IDS
+
 # Colors for prettier output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -31,7 +35,6 @@ echo -e "  ${GREEN}NODE_OPTIONS=${NODE_OPTIONS}${NC}"
 # Configuration
 RELAY_SERVER_URL="http://localhost:4000"
 RELAY_AUTH_TOKEN="elizaos-secure-relay-key"
-TELEGRAM_GROUP_IDS="-1002550618173"  # Update with your group ID
 LOG_DIR="./logs"
 
 # Create logs directory if it doesn't exist
@@ -100,12 +103,12 @@ done
 echo -e "\n${YELLOW}[3.1] Configuring Telegram Bot Tokens...${NC}"
 
 # Use tokens from .env file if available, otherwise use placeholders
-export ETH_MEMELORD_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_ETHMemeLord9000:-YOUR_TOKEN_HERE}"
-export BAG_FLIPPER_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_BagFlipper9000:-YOUR_TOKEN_HERE}"
-export LINDA_EVANGELISTA_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_LindAEvangelista88:-YOUR_TOKEN_HERE}"
-export VC_SHARK_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_VCShark99:-YOUR_TOKEN_HERE}"
-export CODE_SAMURAI_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_CodeSamurai77:-YOUR_TOKEN_HERE}"
-export BITCOIN_MAXI_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_BitcoinMaxi420:-YOUR_TOKEN_HERE}"
+export ETH_MEMELORD_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_eth_memelord_9000:-YOUR_TOKEN_HERE}"
+export BAG_FLIPPER_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_bag_flipper_9000:-YOUR_TOKEN_HERE}"
+export LINDA_EVANGELISTA_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_linda_evangelista_88:-YOUR_TOKEN_HERE}"
+export VC_SHARK_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_vc_shark_99:-YOUR_TOKEN_HERE}"
+export CODE_SAMURAI_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_code_samurai_77:-YOUR_TOKEN_HERE}"
+export BITCOIN_MAXI_BOT_TOKEN="${TELEGRAM_BOT_TOKEN_bitcoin_maxi_420:-YOUR_TOKEN_HERE}"
 
 # Show masked versions of tokens for verification
 mask_token() {

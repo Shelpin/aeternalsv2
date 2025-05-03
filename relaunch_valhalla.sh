@@ -58,12 +58,6 @@ export FORCE_GC=true
 # Load and export environment variables from .env
 set -a && [ -f ".env" ] && source .env && set +a
 
-# Verify critical environment variables
-echo -e "\n${YELLOW}[2.1] Verifying environment variables...${NC}"
-echo -e "   ${GREEN}RELAY_SERVER_URL=${RELAY_SERVER_URL}${NC}"
-echo -e "   ${GREEN}TELEGRAM_GROUP_IDS=${TELEGRAM_GROUP_IDS}${NC}"
-echo -e "   ${GREEN}RESET_DB=${RESET_DB:-false}${NC}"
-
 # Run the main launch script
 echo -e "\n${YELLOW}[5] Executing launch_valhalla.sh${NC}"
 ./launch_valhalla.sh
