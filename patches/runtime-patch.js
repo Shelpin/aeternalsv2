@@ -177,6 +177,22 @@ export async function applyPatch() {
     }, runtime.getLogger('relay'));
     await relay.connect();
     runtime.getLogger('relay').info('✅ Relay connected successfully via runtime patch');
+
+    // After relay connection, initialize plugin's SQLite memory manager
+    try {
+      // Step 1: Initialize the plugin's memory manager with SQLite adapter
+      const pluginModule = await import('@elizaos/telegram-multiagent');
+      const pluginInstance = pluginModule.default;
+      if (typeof pluginInstance.initializeMemoryManager === 'function') {
+        runtime.getLogger('memory').info('🔧 Initializing plugin memory manager...');
+        await pluginInstance.initializeMemoryManager();
+        runtime.getLogger('memory').info(`✅ SQLite adapter initialized for agent ${runtime.getAgentId()}`);
+      } else {
+        runtime.getLogger('memory').warn('⚠️ initializeMemoryManager() not found on plugin');
+      }
+    } catch (memErr) {
+      runtime.getLogger('memory').error('❌ Failed to initialize plugin memory manager', memErr);
+    }
   } catch (err) {
     runtime.getLogger('relay').error('❌ Relay connection failed in runtime patch', err);
   }

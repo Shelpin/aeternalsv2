@@ -509,23 +509,29 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           };
 
           // Ensure runtime.clients exists and attach the client
-          if (this.runtime) {
-            this.runtime.clients ??= {};
-            (this.runtime.clients as Record<string, unknown>).telegram = this.telegramClient;
-            this.logger.info(`[PLUGIN] Telegram client initialized and attached to runtime.clients.telegram`);
+          this.runtime.clients ??= {};
+          (this.runtime.clients as Record<string, unknown>).telegram = this.telegramClient;
+          this.logger.info(`[PLUGIN] Telegram client initialized and attached to runtime.clients.telegram`);
 
-            // STEP 5 - Test with Simulated Message
-            setTimeout(() => {
-              this.logger.info(`[PLUGIN][VALHALLA] Running simulated message test...`);
-              this.telegramClient.simulateMessage({
-                chat: { id: 'test_chat' },
-                text: 'What do you think about Ethereum?',
-                from: { id: 123456, username: 'test_user' }
-              });
-            }, 5000); // Wait 5 seconds after initialization
-          } else {
-            this.logger.warn(`[PLUGIN] Runtime not available yet, client created but not attached`);
-          }
+          // Step 2: Register incoming Telegram message handler
+          this.telegramClient.on('message', (msg: any) => {
+            this.logger.debug('[PLUGIN] Telegram message received, dispatching to handleIncomingMessage');
+            this.handleIncomingMessage(msg);
+          });
+          this.logger.info('[PLUGIN] Telegram client message handler registered');
+
+          // Step 3: Start polling relay for forwarded messages
+          await this.startRelayPolling();
+
+          // STEP 5 - Test with Simulated Message
+          setTimeout(() => {
+            this.logger.info(`[PLUGIN][VALHALLA] Running simulated message test...`);
+            this.telegramClient.simulateMessage({
+              chat: { id: 'test_chat' },
+              text: 'What do you think about Ethereum?',
+              from: { id: 123456, username: 'test_user' }
+            });
+          }, 5000); // Wait 5 seconds after initialization
         } else {
           throw new Error('TelegramClient not found in any of the expected locations');
         }
