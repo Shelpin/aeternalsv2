@@ -98,8 +98,43 @@ export class AgentRuntime implements IAgentRuntime {
 
     // ADDED Missing method stubs
     async initialize(): Promise<void> {
-        this.logger.info("AgentRuntime initialized (stub)");
-        // TODO: Implement actual initialization logic
+        this.logger.info("AgentRuntime initializing...");
+
+        // Register Plugins
+        if (this.providers && Array.isArray(this.providers)) {
+            this.logger.info(`Found ${this.providers.length} providers/plugins to register.`);
+            for (const plugin of this.providers) {
+                if (plugin && typeof plugin.register === 'function') {
+                    try {
+                        const pluginName = plugin.name || plugin.npmName || 'Unknown Plugin';
+                        this.logger.info(`Registering plugin: ${pluginName}`);
+                        const registrationResult = plugin.register(this); // Pass runtime instance
+                        if (registrationResult) {
+                            this.logger.info(`Successfully registered plugin: ${pluginName}`);
+                            // Optional: Await initialization if needed, per expert feedback
+                            // if (typeof plugin.initialize === 'function') {
+                            //     this.logger.info(`Initializing plugin: ${pluginName}`);
+                            //     await plugin.initialize(); 
+                            //     this.logger.info(`Initialized plugin: ${pluginName}`);
+                            // }
+                        } else {
+                            this.logger.warn(`Registration returned falsy value for plugin: ${pluginName}`);
+                        }
+                    } catch (error) {
+                        const pluginName = plugin.name || plugin.npmName || 'Unknown Plugin';
+                        this.logger.error(`Error registering plugin ${pluginName}: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
+                    }
+                } else {
+                    this.logger.warn(`Provider object found but lacks a register method.`);
+                    console.log('Invalid plugin object:', plugin); // Log the object for inspection
+                }
+            }
+        } else {
+            this.logger.info("No providers/plugins found in config to register.");
+        }
+
+        // TODO: Implement other actual initialization logic (e.g., loading knowledge)
+        this.logger.info("AgentRuntime core initialization complete.");
     }
 
     async composeState(message: Memory, additionalKeys?: Record<string, any>): Promise<State> {

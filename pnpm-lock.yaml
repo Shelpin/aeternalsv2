@@ -554,6 +554,10 @@ importers:
       '@elizaos/telegram-client':
         specifier: workspace:*
         version: link:../clients/telegram
+    devDependencies:
+      '@elizaos/types':
+        specifier: workspace:*
+        version: link:../types
 
   packages/test-utils:
     dependencies:

@@ -25,18 +25,18 @@ export interface IAgentRuntime {
   getService(name: string): unknown;
   registerService?: (name: string, service: unknown) => void;
   getCharacter?: () => Character;
-  
+
   // Memory management
   memoryManager?: {
     createMemory: (data: MemoryData) => Promise<unknown>;
     getMemories: (options: MemoryQuery) => Promise<Memory[]>;
     addEmbeddingToMemory?: (memoryId: string, embedding: number[]) => Promise<void>;
   };
-  
+
   // Response handling
   handleMessage?: (message: unknown) => Promise<unknown>;
   composeState?: (options: unknown) => Promise<unknown>;
-  
+
   // Allow for additional properties
   [key: string]: unknown;
 }
@@ -127,6 +127,8 @@ export interface TelegramMultiAgentConfig {
   maxRetries?: number;
   disablePolling?: boolean;
   kickstarterConfig?: KickstarterConfig;
+  retryLimit?: number;
+  retryDelayMs?: number;
 }
 
 /**
@@ -135,16 +137,16 @@ export interface TelegramMultiAgentConfig {
 export interface KickstarterConfig {
   // Probability factor (0-1) that affects how likely a kickstart is to happen
   probabilityFactor: number;
-  
+
   // Minimum time between kickstarts (ms)
   minIntervalMs: number;
-  
+
   // Should include topics in kickstarted messages
   includeTopics: boolean;
-  
+
   // Should tag other agents in kickstarter messages
   shouldTagAgents: boolean;
-  
+
   // Maximum number of agents to tag in a message
   maxAgentsToTag: number;
 }
@@ -291,9 +293,9 @@ export interface PersonalityStyle {
 }
 
 export const EmptyLogger: ElizaLogger = {
-  trace: (): void => {},
-  debug: (): void => {},
-  info: (): void => {},
-  warn: (): void => {},
-  error: (): void => {}
+  trace: (): void => { },
+  debug: (): void => { },
+  info: (): void => { },
+  warn: (): void => { },
+  error: (): void => { }
 }; 

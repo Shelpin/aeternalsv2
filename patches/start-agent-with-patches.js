@@ -153,18 +153,44 @@ async function main() {
 
     console.log(`✅ runtime.handleMessage is now ${typeof globalThis.__elizaRuntime.handleMessage === 'function' ? 'available' : 'not available'}`);
 
-    // --- Start Real Agent Spawn --- 
-    console.log('🚀 Spawning real agent process...');
-    const npmCmd = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
+    // Convert character file paths to absolute paths
+    const absoluteCharacterFiles = characterFiles.map(file => path.resolve(rootDir, file));
+    const absoluteCharactersArg = absoluteCharacterFiles.length > 0
+      ? `--characters=${absoluteCharacterFiles.join(',')}`
+      : '';
 
-    // Start the agent with the same arguments passed to this script
-    const agentProcess = spawn(npmCmd, ['--filter', '@elizaos/agent', 'start', ...args], {
+    // Prepare arguments for the spawned process, replacing the characters arg if needed
+    const agentArgs = args.map(arg => {
+      if (arg.startsWith('--characters=')) {
+        return absoluteCharactersArg;
+      }
+      return arg;
+    }).filter(arg => arg !== ''); // Filter out empty string if original was removed
+
+    // If the original args didn't have --characters, but we derived it, add it
+    if (!charactersArg && absoluteCharactersArg) {
+      agentArgs.push(absoluteCharactersArg);
+    }
+
+    console.log(`🔧 Absolute Character files Arg: ${absoluteCharactersArg || 'None'}`);
+
+    // --- Start Real Agent Spawn --- 
+    console.log('🚀 Spawning real agent process directly...');
+
+    const agentDistPath = path.resolve(rootDir, 'packages/agent/dist/index.js');
+    console.log(`🔧 Agent executable path: ${agentDistPath}`);
+
+    // Execute node directly with the agent script and modified arguments
+    const agentProcess = spawn('node', [agentDistPath, ...agentArgs], {
       stdio: 'inherit', // Show agent output directly in console
-      cwd: rootDir, // Ensure it runs from the project root
+      // Set the CWD to the agent's package directory so relative paths *within* the agent code work as expected
+      cwd: path.resolve(rootDir, 'packages/agent'),
       env: {
         ...process.env, // Pass existing env vars (includes AGENT_ID, TOKEN, etc.)
         VALHALLA_PATCHED: 'true', // Add a flag if needed
-        NODE_OPTIONS: '--require dotenv/config'
+        // NODE_OPTIONS should ideally be inherited or set globally, 
+        // but include it if necessary. Be careful with multiple --require flags.
+        // NODE_OPTIONS: '--require dotenv/config' // Keep if needed
       }
     });
 

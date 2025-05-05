@@ -5,7 +5,8 @@ import {
   TelegramMultiAgentConfig,
   RelayMessage,
   MemoryData,
-  Character
+  Character,
+  TelegramRelayConfig
 } from './types.js';
 import { ConversationManager } from './ConversationManager.js';
 import { TelegramRelay } from './TelegramRelay.js';
@@ -108,6 +109,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private telegramClient: any = null;
   private _eventHandlers: Record<string, Function[]> = {};
   private personality: PersonalityEnhancer | null = null;
+  private updatePollingInterval: ReturnType<typeof setInterval> | null = null;
 
   /**
    * Create a new TelegramMultiAgentPlugin
@@ -166,6 +168,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   register(runtime: IAgentRuntime): Plugin | boolean {
     try {
+      // ADDED LOG
+      console.log(`[REGISTER_DEBUG] ${this.name}: Register method called.`);
       this.logger.info(`[REGISTER] ${this.name}: Register method called`);
 
       // Store runtime reference even if null
@@ -193,11 +197,16 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   private async startInitialization(runtime: IAgentRuntime): Promise<void> {
     try {
+      // ADDED LOG
+      console.log(`[INIT_DEBUG] ${this.name}: startInitialization called.`);
       // Wait for runtime to be fully initialized - increased timeout to 30 seconds
       await new Promise(resolve => setTimeout(resolve, 1000)); // Small initial delay
-
+      // ADDED LOG
+      console.log(`[INIT_DEBUG] ${this.name}: Waiting for runtime...`);
       // Wait for runtime to be fully available
       const wrappedRuntime = await this.waitForRuntime(30000);
+      // ADDED LOG
+      console.log(`[INIT_DEBUG] ${this.name}: Runtime wait finished. Runtime available: ${!!wrappedRuntime}`);
 
       // Check for critical methods
       if (!wrappedRuntime || typeof wrappedRuntime.handleMessage !== 'function') {
@@ -234,9 +243,15 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       // Log the final agent ID that will be used for relay registration
       this.logger.info(`[IDENTITY] Agent ID for relay registration: ${this.agentId}`);
 
+      // ADDED LOG
+      console.log(`[INIT_DEBUG] ${this.name}: Calling this.initialize() with agentId: ${this.agentId}`);
       // Continue initialization
       await this.initialize();
+      // ADDED LOG
+      console.log(`[INIT_DEBUG] ${this.name}: Returned from this.initialize()`);
     } catch (error: unknown) {
+      // ADDED LOG
+      console.error(`[INIT_DEBUG] ${this.name}: Error in startInitialization: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
       if (error instanceof Error) {
         this.logger.error(`[PLUGIN] Initialization error: ${error.message}`);
       } else {
@@ -364,17 +379,59 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    * Initialize the plugin
    */
   async initialize(): Promise<void> {
+    // ADDED LOG
+    console.log(`[INIT_DEBUG] ${this.name}: initialize() method started.`);
     try {
-      this.logger.info('[INITIALIZE] Initializing Telegram client...');
-      // Use token from plugin config (set in loadConfig)
-      const botToken = this.config.botToken;
-      if (!botToken) {
-        throw new Error('Telegram bot token missing');
-      }
-      this.botToken = botToken;
-      this.logger.info(`[INITIALIZE] Using Telegram Token: ${this.botToken.substring(0, 10)}...`);
+      // Initialize Telegram client using the token from config
+      this.logger.info(`[INITIALIZE] Initializing Telegram client...`);
 
-      // Removed static telegramClient calls; dynamic initialization will occur in the STEP 2 block below
+      // VALHALLA FIX: Prioritize getting token via runtime.getSecret, fallback to global patch
+      let tokenToUse: string | undefined;
+      let foundViaRuntime = false;
+      if (this.runtime && typeof this.runtime.getSecret === 'function') {
+        try {
+          tokenToUse = await this.runtime.getSecret('TELEGRAM_BOT_TOKEN');
+          if (tokenToUse) {
+            this.logger.info(`[INITIALIZE] Got token via this.runtime.getSecret()`);
+            foundViaRuntime = true;
+          }
+        } catch (secretError) {
+          this.logger.error(`[INITIALIZE] Error calling this.runtime.getSecret: ${secretError}.`);
+        }
+      }
+
+      // Fallback 1: Check globalThis runtime patch
+      if (!foundViaRuntime && typeof globalThis !== 'undefined' && globalThis.__elizaRuntime && typeof globalThis.__elizaRuntime.getSecret === 'function') {
+        this.logger.warn(`[INITIALIZE] this.runtime.getSecret not found or failed. Trying globalThis.__elizaRuntime.getSecret().`);
+        try {
+          tokenToUse = await globalThis.__elizaRuntime.getSecret('TELEGRAM_BOT_TOKEN');
+          if (tokenToUse) {
+            this.logger.info(`[INITIALIZE] Got token via globalThis.__elizaRuntime.getSecret()`);
+          } else {
+            this.logger.warn(`[INITIALIZE] globalThis.__elizaRuntime.getSecret() returned empty.`);
+          }
+        } catch (globalSecretError) {
+          this.logger.error(`[INITIALIZE] Error calling globalThis.__elizaRuntime.getSecret: ${globalSecretError}.`);
+        }
+      }
+
+      // Fallback 2: Use plugin config (least reliable)
+      if (!tokenToUse) {
+        this.logger.warn(`[INITIALIZE] Could not get token via runtime or global patch. Falling back to plugin config value.`);
+        tokenToUse = this.config.botToken;
+      }
+
+      this.botToken = tokenToUse;
+
+      // Ensure bot token is available
+      if (!this.botToken) {
+        throw new Error('Telegram bot token missing'); // <<< ERROR SHOULD NOT HAPPEN NOW
+      }
+
+      this.logger.info(`[INITIALIZE] Using Telegram Bot Token: ${this.botToken.substring(0, 3)}...${this.botToken.substring(this.botToken.length - 3)}`);
+
+      // Create or find the Telegram client instance
+      let clientNeedsInitialization = false;
 
       // Make sure the runtime is available before proceeding
       if (!this.runtime) {
@@ -542,8 +599,42 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           });
           this.logger.info('[PLUGIN] Telegram client message handler registered');
 
+          // VALHALLA FIX: Instantiate the Relay connection HERE
+          try {
+            this.logger.info(`[RELAY_DEBUG] Attempting to initialize TelegramRelay for agent: ${this.agentId}`);
+            // Ensure agentId is definitely set before creating relay config
+            if (!this.agentId || this.agentId === DEFAULT_AGENT_ID) {
+              throw new Error('Agent ID is not properly set before initializing TelegramRelay');
+            }
+            // Create a config object that satisfies TelegramRelayConfig type
+            const relayConfig: TelegramRelayConfig = {
+              relayServerUrl: this.config.relayServerUrl,
+              authToken: this.config.authToken,
+              agentId: this.agentId, // Use the validated agentId
+              retryLimit: this.config.retryLimit || 3, // Add defaults if needed
+              retryDelayMs: this.config.retryDelayMs || 5000
+            };
+
+            // Corrected constructor call (2 args with correct type)
+            this.relay = new TelegramRelay(relayConfig, this.logger);
+            this.logger.info('[RELAY_DEBUG] TelegramRelay instance created.');
+
+            // Corrected connection/registration call
+            this.logger.info('[RELAY_DEBUG] Attempting this.relay.connect()...');
+            const connectSuccess = await this.relay.connect();
+            this.logger.info(`[RELAY_DEBUG] this.relay.connect() completed. Success: ${connectSuccess}`);
+
+            this.logger.info('[RELAY] TelegramRelay instance created and connected/registered.');
+          } catch (relayError) {
+            this.logger.error(`[RELAY] Failed to initialize or register TelegramRelay: ${relayError}`);
+            // Decide if we should throw or continue without relay
+            // For now, let's log and continue, polling might fail later
+          }
+
           // Step 3: Start polling relay for forwarded messages
+          this.logger.info('[RELAY_DEBUG] Calling startRelayPolling()...');
           await this.startRelayPolling();
+          this.logger.info('[RELAY_DEBUG] Returned from startRelayPolling().');
 
           // STEP 5 - Test with Simulated Message
           setTimeout(() => {
@@ -1618,6 +1709,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
     this.logger.info(`[RELAY] Starting polling for agent ${this.agentId}`);
 
+    this.logger.info(`[RELAY_DEBUG] Inside startRelayPolling for agent ${this.agentId}. Preparing interval.`);
+
     // Set up interval for polling the relay server
     const pollingIntervalMs = this.config.pollingIntervalMs || 2000;
 
@@ -1626,15 +1719,22 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
     // POLLING FIX: Only set up interval if DISABLE_POLLING is not set or explicitly false
     if (!process.env.DISABLE_POLLING || process.env.DISABLE_POLLING === 'false') {
-      setInterval(async () => {
+      // Use a flag to prevent multiple intervals if called again somehow
+      if (this.updatePollingInterval) {
+        this.logger.warn('[RELAY_DEBUG] Polling interval already exists. Clearing before setting new one.');
+        clearInterval(this.updatePollingInterval);
+      }
+      this.updatePollingInterval = setInterval(async () => {
+        this.logger.debug('[RELAY_POLL_TICK] Interval triggered.'); // Log tick start
         if (!this.relay) {
-          this.logger.warn(`[RELAY] Relay not initialized for polling`);
+          this.logger.warn(`[RELAY_POLL_TICK] Relay not initialized for polling`);
           return;
         }
 
         try {
           // Poll the relay for any new messages for this agent
           const messages = await this.relay.getRelayUpdates();
+          this.logger.debug('[RELAY_POLL_TICK] Got relay updates.'); // Log after getting updates
 
           if (messages && messages.length > 0) {
             this.logger.info(`[RELAY] Found ${messages.length} new messages via polling`);

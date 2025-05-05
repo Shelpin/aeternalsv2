@@ -264,20 +264,6 @@ async function jsonToCharacter(
         elizaLogger.debug(`[DEBUG] TELEGRAM_BOT_TOKEN after substitution: ${maskedToken}`);
     }
 
-    // Handle plugins
-    character.plugins = await handlePluginImporting(character.plugins);
-    elizaLogger.info(
-        character.name,
-        'loaded plugins:',
-        "[\n    " + character.plugins.map(p => `\"${p.npmName}\"`).join(", \n    ") + "\n]"
-    );
-
-    // Handle Post Processors plugins
-    if (character.postProcessors?.length > 0) {
-        elizaLogger.info(character.name, 'loading postProcessors', character.postProcessors);
-        character.postProcessors = await handlePluginImporting(character.postProcessors);
-    }
-
     // Handle extends
     if (character.extends) {
         elizaLogger.info(
@@ -425,31 +411,58 @@ export async function loadCharacters(
 }
 
 async function handlePluginImporting(plugins: string[]) {
+    // ADDED LOGGING
+    console.log("[PLUGIN_IMPORT_DEBUG] handlePluginImporting received:", plugins);
+    if (!Array.isArray(plugins)) {
+        console.error("[PLUGIN_IMPORT_ERROR] Input to handlePluginImporting is not an array!", plugins);
+        return [];
+    }
+    if (plugins.some(p => typeof p !== 'string')) {
+        console.error("[PLUGIN_IMPORT_ERROR] Input array to handlePluginImporting contains non-string elements!", plugins);
+        // Potentially throw an error or filter non-strings
+    }
+
     if (plugins.length > 0) {
+        // ADDED LOGGING
+        console.log("[PLUGIN_IMPORT_DEBUG] Calling Promise.all with the plugins array...");
         const importedPlugins = await Promise.all(
-            plugins.map(async (plugin) => {
+            plugins.map(async (plugin, index) => {
+                // console.log(`[PLUGIN_IMPORT_DEBUG] Mapping plugin at index ${index}. Value:`, plugin, `Type: ${typeof plugin}`);
+
                 // Attempt to import the plugin specifier
                 let importedModule: any;
                 try {
                     importedModule = await import(plugin);
                 } catch (importError) {
-                    // Fallback: load workspace package directly from local dist folder
-                    const pkgParts = plugin.split('/');
-                    const pkgName = pkgParts[1];
-                    const workspaceEntry = path.resolve(
-                        __dirname,             // .../packages/agent/dist
-                        '../../..',            // up to /root/eliza
-                        'packages',
-                        pkgName,
-                        'dist',
-                        'src',
-                        'index.js'
-                    );
+                    console.log(`[PLUGIN_IMPORT_DEBUG] Direct import failed for plugin at index ${index}. Value:`, plugin, `Type: ${typeof plugin}`);
+                    console.error('[PLUGIN_IMPORT_DEBUG] Direct import error:', importError);
+
+                    console.log(`[PLUGIN_IMPORT_DEBUG] Entering fallback logic for plugin: ${plugin}`);
                     try {
-                        importedModule = await import(workspaceEntry);
-                    } catch (workspaceError) {
-                        console.error(`Plugin import failed for ${plugin}:`, importError);
-                        console.error(`Workspace import failed for ${plugin}:`, workspaceError);
+                        if (typeof plugin !== 'string') {
+                            console.error(`[PLUGIN_IMPORT_ERROR] Plugin variable is not a string before split! Index: ${index}, Type: ${typeof plugin}, Value:`, plugin);
+                            return false;
+                        }
+                        const pkgParts = plugin.split('/');
+                        const pkgName = pkgParts[1];
+                        const workspaceEntry = path.resolve(
+                            __dirname,             // .../packages/agent/dist
+                            '../../..',            // up to /root/eliza
+                            'packages',
+                            pkgName,
+                            'dist',
+                            'src',
+                            'index.js'
+                        );
+                        try {
+                            importedModule = await import(workspaceEntry);
+                        } catch (workspaceError) {
+                            console.error(`Plugin import failed for ${plugin}:`, importError);
+                            console.error(`Workspace import failed for ${plugin}:`, workspaceError);
+                            return false;
+                        }
+                    } catch (splitError) {
+                        console.error(`[PLUGIN_IMPORT_ERROR] Error during plugin.split or path construction for plugin: ${plugin}. Error:`, splitError);
                         return false;
                     }
                 }
@@ -460,13 +473,14 @@ async function handlePluginImporting(plugins: string[]) {
                 if (!(importedModule as any)[functionName] && !(importedModule as any).default) {
                     elizaLogger.warn(plugin, 'does not have a default export or', functionName);
                 }
-                return {
-                    ...((importedModule as any).default || (importedModule as any)[functionName]),
-                    npmName: plugin
-                };
+                const pluginInstance = (importedModule as any).default || (importedModule as any)[functionName];
+                if (!pluginInstance) {
+                    elizaLogger.error(`Could not find default export or named export ${functionName} for plugin ${plugin}`);
+                    return false;
+                }
+                return pluginInstance;
             })
         );
-        // remove plugins that failed to load, so agent can try to start
         return importedPlugins.filter(p => !!p);
     } else {
         return [];
@@ -656,32 +670,93 @@ export function getTokenForProvider(
     }
 }
 
-// also adds plugins from character file into the runtime
+// VALHALLA FIX: Rewritten function to handle command-line clients
 export async function initializeClients(
-    character: Character,
+    character: Character, // Keep character for context if needed
     runtime: IAgentRuntime
 ) {
-    // each client can only register once
-    // and if we want two we can explicitly support it
-    const clients: ClientInstance[] = [];
-    // const clientTypes = clients.map((c) => c.name);
-    // elizaLogger.log("initializeClients", clientTypes, "for", character.name);
+    const args = parseArguments();
+    const clientNamesArg = args.clients;
+    elizaLogger.info(`Initializing clients based on --clients arg: ${clientNamesArg || 'None'}`);
 
-    if (character.plugins?.length > 0) {
-        for (const plugin of character.plugins) {
-            if (plugin.clients) {
-                for (const client of plugin.clients) {
-                    const startedClient = await client.start(runtime);
-                    elizaLogger.debug(
-                        `Initializing client: ${client.name}`
-                    );
-                    clients.push(startedClient);
+    // Ensure runtime has a clients array (Fix: use array, not object)
+    if (!runtime.clients || !Array.isArray(runtime.clients)) {
+        runtime.clients = [];
+    }
+
+    if (!clientNamesArg) {
+        elizaLogger.warn("No clients specified via --clients argument.");
+        return; // No clients to initialize
+    }
+
+    const clientNames = commaSeparatedStringToArray(clientNamesArg);
+
+    for (const clientName of clientNames) {
+        try {
+            elizaLogger.info(`Attempting to import client: ${clientName}`);
+            // Attempt direct import first
+            let clientModule: any;
+            try {
+                clientModule = await import(clientName);
+            } catch (importError) {
+                elizaLogger.warn(`Direct import failed for client ${clientName}, trying workspace path... Error: ${importError}`);
+                // Fallback: load workspace package directly from local dist folder
+                const pkgParts = clientName.split('/');
+                // Handle potential scopes like @elizaos/client-telegram
+                const pkgName = pkgParts.length > 1 && pkgParts[0].startsWith('@') ? pkgParts[1] : pkgParts[0];
+                const scope = pkgParts.length > 1 && pkgParts[0].startsWith('@') ? pkgParts[0] : '';
+                const workspaceDir = scope ? path.join('packages', 'clients', pkgName.replace('client-', '')) : path.join('packages', 'clients', pkgName);
+                const workspaceEntry = path.resolve(
+                    __dirname,       // .../packages/agent/dist
+                    '../../..',      // up to /root/eliza
+                    workspaceDir,
+                    'dist',
+                    // 'src', // Client build might be different
+                    'index.js'
+                );
+                elizaLogger.debug(`Trying workspace path for client: ${workspaceEntry}`);
+                try {
+                    clientModule = await import(workspaceEntry);
+                } catch (workspaceError) {
+                    elizaLogger.error(`Failed to import client ${clientName} via direct name or workspace path.`, workspaceError);
+                    continue; // Skip this client
                 }
             }
+
+            const clientInstance = clientModule?.default || clientModule;
+
+            if (clientInstance && typeof clientInstance.start === 'function') {
+                elizaLogger.info(`Calling start() on client module: ${clientName}`);
+                // Assuming start returns the initialized client or handles attachment itself
+                const startedClient = await clientInstance.start(runtime, character);
+                elizaLogger.success(`Successfully initialized client: ${clientName}`);
+
+                // Explicitly attach if start doesn't do it 
+                if (startedClient) {
+                    runtime.clients.push(startedClient);
+                    elizaLogger.debug(`Pushed client ${clientName} to runtime.clients array`);
+                }
+            } else if (clientInstance && typeof clientInstance.initialize === 'function') {
+                elizaLogger.info(`Calling initialize() on client module: ${clientName}`);
+                // Assuming initialize returns the initialized client or handles attachment itself
+                const initializedClient = await clientInstance.initialize(runtime, character);
+                elizaLogger.success(`Successfully initialized client: ${clientName}`);
+
+                // Explicitly attach if initialize doesn't do it
+                if (initializedClient) {
+                    runtime.clients.push(initializedClient);
+                    elizaLogger.debug(`Pushed client ${clientName} to runtime.clients array`);
+                }
+            } else {
+                elizaLogger.warn(`Client module ${clientName} imported but lacks a valid start() or initialize() method.`);
+            }
+
+        } catch (error) {
+            elizaLogger.error(`Error initializing client ${clientName}: ${error}`);
         }
     }
 
-    return clients;
+    elizaLogger.info("Finished client initialization process.");
 }
 
 export async function createAgent(
@@ -689,12 +764,31 @@ export async function createAgent(
     token: string
 ): Promise<AgentRuntime> {
     elizaLogger.log(`Creating runtime for character ${character.name}`);
+
+    // VALHALLA FIX: Process plugin strings here before creating runtime
+    let processedPlugins: any[] = [];
+    if (character.plugins && Array.isArray(character.plugins) && character.plugins.every((item: unknown) => typeof item === "string")) {
+        elizaLogger.info(`Importing ${character.plugins.length} plugin names specified in character config...`);
+        try {
+            processedPlugins = await handlePluginImporting(character.plugins as string[]);
+            elizaLogger.info(`Successfully imported ${processedPlugins.length} plugins.`);
+        } catch (pluginError) {
+            elizaLogger.error(`Error importing plugins specified in character config: ${pluginError}`);
+            // Decide if we should throw or continue without plugins
+            processedPlugins = [];
+        }
+    } else if (character.plugins && Array.isArray(character.plugins)) {
+        // Assume plugins are already processed objects if not all strings
+        elizaLogger.debug('Plugins array seems to contain pre-processed objects.');
+        processedPlugins = character.plugins;
+    }
+
     return new AgentRuntime({
         token,
         modelProvider: character.modelProvider,
         evaluators: [],
-        character,
-        plugins: character.plugins || [],
+        character, // Pass original character data
+        plugins: processedPlugins, // Pass the processed plugin OBJECTS
         fetch: logFetch,
     });
 }
