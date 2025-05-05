@@ -17,8 +17,17 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "paths": {
-      "*": [
-        "src/*"
+      "@elizaos/core": [
+        "../core/src"
+      ],
+      "@elizaos/core/*": [
+        "../core/src/*"
+      ],
+      "@elizaos/types": [
+        "../types/src"
+      ],
+      "@elizaos/types/*": [
+        "../types/src/*"
       ]
     },
     "strict": false,
@@ -42,6 +51,9 @@
   "references": [
     {
       "path": "../core"
+    },
+    {
+      "path": "../types"
     }
   ]
 }

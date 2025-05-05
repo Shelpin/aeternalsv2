@@ -22,6 +22,9 @@
   "dependencies": {
     "@elizaos/telegram-client": "workspace:*"
   },
+  "devDependencies": {
+    "@elizaos/types": "workspace:*"
+  },
   "types": "./dist/src/index.d.ts",
   "files": [
     "dist"

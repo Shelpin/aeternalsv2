@@ -50,6 +50,9 @@ class TelegramClient {
    * Initialize the client with a token
    */
   initialize(token: string, runtime?: any): void {
+    // EXPERT DIAGNOSTIC LOG
+    console.log(`[DEBUG] TelegramClient initialize() called with token: ${token ? token.substring(0, 5) : 'NULL'}...`);
+
     if (!token) {
       console.error('[TELEGRAM] No token provided for Telegram client');
       return;
@@ -82,6 +85,13 @@ class TelegramClient {
       });
 
       console.log(`[TELEGRAM] Client initialized with token: ${token.substring(0, 5)}...`);
+
+      // EXPERT DIAGNOSTIC LOG
+      if (this.bot?.isPolling()) {
+        console.warn('[POLLING ACTIVE] Telegram bot is polling right after initialization!');
+      } else {
+        console.log('[POLLING INACTIVE] Telegram bot created but not polling right after initialization.');
+      }
 
       // VALHALLA FIX: Ensure the client is injected into the runtime
       if (runtime) {

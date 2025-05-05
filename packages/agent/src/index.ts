@@ -808,7 +808,8 @@ async function startAgent(
         );
         elizaLogger.error(error);
         if (db) {
-            await db.close();
+            // VALHALLA FIX: Use disconnect() instead of close() as defined in SQLiteAdapter
+            await db.disconnect();
         }
         throw error;
     }

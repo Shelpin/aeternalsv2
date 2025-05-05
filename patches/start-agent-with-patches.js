@@ -93,26 +93,6 @@ async function main() {
       }
     } catch (e) { console.error("Error applying relay-config-fix:", e); }
 
-    // Attempt to Initialize Telegram Client
-    let telegramClient = null; // Define variable outside try block
-    try {
-      console.log("🔧 Attempting to initialize Telegram client...");
-      // Use relative path for import
-      const telegramClientModule = await import("../packages/clients/telegram/dist/index.js");
-      telegramClient = telegramClientModule.default; // Assign to outer variable
-      const token = process.env.TELEGRAM_BOT_TOKEN;
-      if (telegramClient && typeof telegramClient.initialize === 'function' && token) {
-        telegramClient.initialize(token);
-        console.log("✅ Telegram client singleton initialized with token.");
-      } else if (!token) {
-        console.warn("⚠️ TELEGRAM_BOT_TOKEN environment variable not set. Cannot initialize Telegram client.");
-      } else {
-        console.warn("⚠️ Could not find exported telegramClient or initialize method.");
-      }
-    } catch (err) {
-      console.error("❌ Failed to load or initialize Telegram client (relative path):", err);
-    }
-
     // Apply Runtime Patch (makes runtime global)
     console.log("🔧 Applying runtime patch...");
     try {
@@ -131,23 +111,6 @@ async function main() {
     } catch (error) {
       console.error("❌ Failed to apply runtime patch:", error);
       process.exit(1);
-    }
-
-    // Now try injecting the initialized client into the now-global runtime
-    // Use the telegramClient variable defined above
-    if (globalThis.__elizaRuntime && globalThis.__elizaRuntime.clients && telegramClient) {
-      if (!globalThis.__elizaRuntime.clients.telegram) {
-        globalThis.__elizaRuntime.clients.telegram = telegramClient;
-        console.log("✅ Injected initialized Telegram client into global runtime.");
-      } else {
-        console.log("ℹ️ Telegram client already present in global runtime.");
-      }
-    } else {
-      if (!telegramClient) {
-        console.warn("⚠️ Telegram client failed to load, cannot inject into runtime.");
-      } else {
-        console.warn("⚠️ Global runtime or runtime.clients not available for Telegram client injection.");
-      }
     }
 
     // Register handleMessage action

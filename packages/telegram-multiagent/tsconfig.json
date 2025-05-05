@@ -4,16 +4,22 @@
     "baseUrl": ".",
     "paths": {
       "@elizaos/core": [
-        "../core/dist"
+        "../core/src"
       ],
       "@elizaos/core/*": [
-        "../core/dist/*"
+        "../core/src/*"
       ],
       "@elizaos/telegram-client": [
-        "../clients/telegram/dist"
+        "../clients/telegram/src"
       ],
       "@elizaos/telegram-client/*": [
-        "../clients/telegram/dist/*"
+        "../clients/telegram/src/*"
+      ],
+      "@elizaos/types": [
+        "../types/src"
+      ],
+      "@elizaos/types/*": [
+        "../types/src/*"
       ]
     }
   },

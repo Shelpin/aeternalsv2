@@ -179,6 +179,23 @@ export async function applyPatch() {
     // The plugin will handle its own memory manager initialization within its lifecycle.
     logger.info('🔧 Memory initialization deferred to plugin.');
 
+    // VALHALLA FIX: Inject getSecret if it doesn't exist
+    if (!globalThis.__elizaRuntime.getSecret) {
+      console.log('[patch] 🔧 Injecting getSecret method into runtime...');
+      globalThis.__elizaRuntime.getSecret = (key) => {
+        const value = process.env[key];
+        // Optional: Add logging for debugging secret retrieval
+        // console.log(`[patch][getSecret] Requested key: ${key}, Found value: ${value ? 'Yes (length: ' + value.length + ')' : 'No'}`);
+        return value || undefined; // Ensure undefined is returned if not found
+      };
+      console.log('[patch] ✅ getSecret method injected.');
+    } else {
+      console.log('[patch] ℹ️ getSecret method already exists on runtime.');
+    }
+
+    // VALHALLA FIX: Automatic Relay Connection
+    // ... existing code ...
+
   } catch (err) {
     logger.error('❌ Error preparing configurations in runtime patch', err);
   }
