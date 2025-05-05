@@ -92,12 +92,18 @@ importers:
       bs58:
         specifier: 5.0.0
         version: 5.0.0
+      commander:
+        specifier: ^10.0.0
+        version: 10.0.1
       csv-parse:
         specifier: 5.6.0
         version: 5.6.0
       dotenv:
         specifier: ^16.4.7
         version: 16.5.0
+      json5:
+        specifier: ^2.2.3
+        version: 2.2.3
       langdetect:
         specifier: ^0.2.1
         version: 0.2.1
@@ -122,6 +128,9 @@ importers:
       ws:
         specifier: 8.18.0
         version: 8.18.0(bufferutil@4.0.9)(utf-8-validate@5.0.10)
+      yargs:
+        specifier: ^17.0.33
+        version: 17.7.2
       zod:
         specifier: 3.24.1
         version: 3.24.1
@@ -349,12 +358,18 @@ importers:
       chalk:
         specifier: ^5.3.0
         version: 5.4.1
+      commander:
+        specifier: ^10.0.0
+        version: 10.0.1
       handlebars:
         specifier: ^4.7.8
         version: 4.7.8
       js-tiktoken:
         specifier: ^1.0.10
         version: 1.0.19
+      json5:
+        specifier: ^2.2.3
+        version: 2.2.3
       lodash:
         specifier: ^4.17.21
         version: 4.17.21
@@ -397,6 +412,9 @@ importers:
       yaml:
         specifier: ^2.3.4
         version: 2.7.1
+      yargs:
+        specifier: ^17.0.33
+        version: 17.7.2
       zod:
         specifier: ^3.22.4
         version: 3.24.1

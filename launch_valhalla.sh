@@ -183,44 +183,14 @@ done
 
 # Manual Agent Startup (per-terminal isolation)
 echo -e "\n${YELLOW}[7] Manual Agent Startup${NC}"
-echo "Please run each of the following in its own terminal:" 
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/eth_memelord_9000.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3000 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/bag_flipper_9000.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3001 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/linda_evangelista_88.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3002 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/vc_shark_99.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3003 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/bitcoin_maxi_420.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3004 --log-level=debug"
-echo "  node patches/start-agent-with-patches.js --characters=packages/agent/src/characters/code_samurai_77.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3005 --log-level=debug"
+echo "Please run each of the following in its own terminal:"
+echo "  scripts/start-agent-valhalla.js --character=packages/agent/src/characters/eth_memelord_9000.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3000 --log-level=debug"
+echo "  scripts/start-agent-valhalla.js --character=packages/agent/src/characters/bag_flipper_9000.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3001 --log-level=debug"
+echo "  scripts/start-agent-valhalla.js --character=packages/agent/src/characters/linda_evangelista_88.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3002 --log-level=debug"
+echo "  scripts/start-agent-valhalla.js --character=packages/agent/src/characters/vc_shark_99.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3003 --log-level=debug"
+echo "  scripts/start-agent-valhalla.js --character=packages/agent/src/characters/bitcoin_maxi_420.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3004 --log-level=debug"
+echo "  scripts/start-agent-valhalla.js --character=packages/agent/src/characters/code_samurai_77.json --clients=@elizaos/client-telegram --plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap --port=3005 --log-level=debug"
 
-# Wait for agents to initialize and register
-echo -e "\n${YELLOW}[8] Waiting for agents to initialize and register...${NC}"
-sleep 20
-
-# Check agent registrations
-echo -e "\n${YELLOW}[9] Verifying agent registration with relay...${NC}"
-RELAY_HEALTH=$(curl -s http://localhost:4000/health)
-AGENTS_COUNT=$(echo $RELAY_HEALTH | grep -o '"agents":[0-9]*' | cut -d':' -f2)
-AGENTS_LIST=$(echo $RELAY_HEALTH | grep -o '"agents_list":"[^"]*"' | cut -d'"' -f4)
-
-echo -e "   ${BLUE}Agents registered: ${AGENTS_COUNT}${NC}"
-echo -e "   ${BLUE}Agents list: ${AGENTS_LIST}${NC}"
-
-if [ "$AGENTS_COUNT" -lt "${#agents[@]}" ]; then
-    echo -e "   ${YELLOW}Warning: Not all agents are registered with the relay server.${NC}"
-    echo -e "   ${YELLOW}Expected ${#agents[@]} agents, but only ${AGENTS_COUNT} are registered.${NC}"
-    echo -e "   ${YELLOW}Check agent logs for connection issues.${NC}"
-else
-    echo -e "   ${GREEN}All agents successfully registered with relay!${NC}"
-fi
-
-# Monitor instructions
-echo -e "\n${GREEN}✅ Valhalla system launched with OOM fixes!${NC}"
-echo -e "${BLUE}Available commands:${NC}"
-echo -e "   - ${YELLOW}tail -f logs/*.log${NC}              - View all logs"
-echo -e "   - ${YELLOW}tail -f logs/relay-server.log${NC}   - View relay logs"
-echo -e "   - ${YELLOW}tail -f logs/eth_memelord_9000.log${NC} - View specific agent logs"
-echo -e "   - ${YELLOW}ps aux --sort -rss | grep node${NC}  - Check memory usage"
-
-echo
 echo -e "${BLUE}┌─────────────────────────────────────────┐${NC}"
 echo -e "${BLUE}│    VALHALLA IS OPERATIONAL ⚔️  🛡️         │${NC}"
 echo -e "${BLUE}└─────────────────────────────────────────┘${NC}" 

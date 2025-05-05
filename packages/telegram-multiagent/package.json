@@ -1,11 +1,11 @@
 {
   "name": "@elizaos/telegram-multiagent",
   "type": "module",
-  "main": "./dist/index.js",
+  "main": "./dist/src/index.js",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs",
+      "import": "./dist/src/index.js",
+      "require": "./dist/src/index.js",
       "types": "./dist/index.d.ts"
     }
   },
@@ -22,7 +22,7 @@
   "dependencies": {
     "@elizaos/telegram-client": "workspace:*"
   },
-  "types": "./dist/index.d.ts",
+  "types": "./dist/src/index.d.ts",
   "files": [
     "dist"
   ]

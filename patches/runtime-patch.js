@@ -158,43 +158,29 @@ export { runtime };
 // This might be missing, causing the runtime variable in apply-patches.js to be undefined
 export async function applyPatch() {
   console.log('🔧 runtime-patch.js: applyPatch() called');
+  const logger = runtime.getLogger('patch');
   // Ensure global assignment happens if needed
   if (typeof globalThis !== 'undefined' && !globalThis.__elizaRuntime) {
     globalThis.__elizaRuntime = runtime;
-    console.log('✅ Runtime assigned globally from applyPatch()');
+    logger.info('✅ Runtime assigned globally from applyPatch()');
   }
 
-  // 🔗 Step 5: Connect to relay server via TelegramRelay
+  // 🔗 Prepare Relay Configuration (Defer Connection)
   try {
-    // Attempt to dynamically import TelegramRelay with debug logging
-    const { TelegramRelay } = await import('@elizaos/telegram-multiagent');
-    runtime.getLogger('relay').debug('🔧 Imported TelegramRelay from plugin: ' + TelegramRelay.name);
-    const RelayCtor = TelegramRelay;
-    const relay = new RelayCtor({
-      relayServerUrl: process.env.RELAY_SERVER_URL,
+    // Store config for later use by the plugin
+    runtime.relayConfig = {
+      relayServerUrl: process.env.RELAY_SERVER_URL || 'http://localhost:4000', // Ensure fallback
       authToken: process.env.RELAY_AUTH_TOKEN,
-      agentId: runtime.getAgentId()
-    }, runtime.getLogger('relay'));
-    await relay.connect();
-    runtime.getLogger('relay').info('✅ Relay connected successfully via runtime patch');
+      agentId: runtime.getAgentId() // Still gets initial <unknown> here, plugin will override
+    };
+    logger.info('🔧 Relay config prepared for plugin initialization.', runtime.relayConfig);
 
-    // After relay connection, initialize plugin's SQLite memory manager
-    try {
-      // Step 1: Initialize the plugin's memory manager with SQLite adapter
-      const pluginModule = await import('@elizaos/telegram-multiagent');
-      const pluginInstance = pluginModule.default;
-      if (typeof pluginInstance.initializeMemoryManager === 'function') {
-        runtime.getLogger('memory').info('🔧 Initializing plugin memory manager...');
-        await pluginInstance.initializeMemoryManager();
-        runtime.getLogger('memory').info(`✅ SQLite adapter initialized for agent ${runtime.getAgentId()}`);
-      } else {
-        runtime.getLogger('memory').warn('⚠️ initializeMemoryManager() not found on plugin');
-      }
-    } catch (memErr) {
-      runtime.getLogger('memory').error('❌ Failed to initialize plugin memory manager', memErr);
-    }
+    // 💾 Prepare Memory Configuration (Defer Initialization)
+    // The plugin will handle its own memory manager initialization within its lifecycle.
+    logger.info('🔧 Memory initialization deferred to plugin.');
+
   } catch (err) {
-    runtime.getLogger('relay').error('❌ Relay connection failed in runtime patch', err);
+    logger.error('❌ Error preparing configurations in runtime patch', err);
   }
 
   return runtime; // Return the runtime instance

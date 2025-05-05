@@ -1,34 +1,27 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "./tsconfig.build.json",
   "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "lib": [
-      "ES2020",
-      "dom"
-    ],
-    "moduleResolution": "node",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": false,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": false,
-    "declaration": true,
-    "sourceMap": true,
-    "resolveJsonModule": true,
-    "noImplicitAny": false,
-    "allowJs": true,
-    "noEmitOnError": false,
-    "isolatedModules": false
+    "baseUrl": ".",
+    "paths": {
+      "@elizaos/core": [
+        "../core/dist"
+      ],
+      "@elizaos/core/*": [
+        "../core/dist/*"
+      ],
+      "@elizaos/telegram-client": [
+        "../clients/telegram/dist"
+      ],
+      "@elizaos/telegram-client/*": [
+        "../clients/telegram/dist/*"
+      ]
+    }
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
-    "node_modules",
     "dist",
-    "**/*.test.ts",
-    "**/*.spec.ts"
+    "**/*.test.ts"
   ]
 }

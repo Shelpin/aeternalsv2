@@ -4,6 +4,9 @@
  * Multi-agent coordination for Telegram bots in ElizaOS
  */
 
+// @ts-nocheck - Removed temporarily to allow ambient declaration
+declare const process: any; // Declare process as ambient global for this file
+
 // Import the plugin class with .js extension for ESM
 import { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin.js';
 import { IAgentRuntime } from './types.js';
@@ -27,12 +30,20 @@ plugin.clients = [
             const secrets = (runtime?.character && typeof runtime.character === 'object' && 'secrets' in runtime.character) ? runtime.character.secrets : {};
             const settings = (runtime?.character && typeof runtime.character === 'object' && 'settings' in runtime.character) ? runtime.character.settings : {};
             const agentId = runtime.getAgentId ? runtime.getAgentId() : 'unknown'; // Ensure getAgentId exists
-            // Default settings
-            const defaultSettings = {
-                TELEGRAM_BOT_TOKEN: (secrets as any)?.TELEGRAM_BOT_TOKEN || (settings as any)?.secrets?.TELEGRAM_BOT_TOKEN || null
-            };
-
-            let token = defaultSettings.TELEGRAM_BOT_TOKEN;
+            // Retrieve token using runtime.getSecret to ensure substitution
+            let token: string | undefined | null = null;
+            if (typeof runtime.getSecret === 'function') {
+                token = runtime.getSecret('TELEGRAM_BOT_TOKEN');
+                if (token) {
+                    console.log('[MultiAgentPlugin] Found Telegram token via runtime.getSecret().');
+                } else {
+                    console.log('[MultiAgentPlugin] runtime.getSecret("TELEGRAM_BOT_TOKEN") returned null/undefined.');
+                }
+            } else {
+                console.warn('[MultiAgentPlugin] runtime.getSecret method not found. Falling back to direct access (may be unsubstituted).');
+                // Fallback to previous direct access method if getSecret isn't available
+                token = (secrets as any)?.TELEGRAM_BOT_TOKEN || (settings as any)?.secrets?.TELEGRAM_BOT_TOKEN || null;
+            }
 
             if (!token) {
                 console.error('[MultiAgentPlugin] Telegram token not found in runtime character secrets.');

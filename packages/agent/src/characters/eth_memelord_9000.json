@@ -10,7 +10,7 @@
     ],
     "modelProvider": "deepseek",
     "secrets": {
-        "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN_ETHMemeLord9000}"
+        "TELEGRAM_BOT_TOKEN": "${TELEGRAM_BOT_TOKEN_eth_memelord_9000}"
     },
     "settings": {
         "voice": {

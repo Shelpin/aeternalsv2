@@ -1,0 +1,127 @@
+🔧 Applying Valhalla runtime patch...
+✅ Valhalla runtime patch applied
+🔧 Attempting assignment to globalThis.__elizaRuntime...
+✅ Runtime assigned to globalThis.__elizaRuntime. Type: object
+
+> @elizaos/agent@ start /root/eliza/packages/agent
+> node dist/index.js "--character=/root/eliza/packages/agent/src/characters/eth_memelord_9000.json" "--clients=@elizaos/client-telegram" "--plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap" "--port=3000" "--log-level=debug"
+
+[ELIZA] Loading embedding settings: {
+  USE_OPENAI_EMBEDDING: 'true',
+  USE_OLLAMA_EMBEDDING: '',
+  OLLAMA_EMBEDDING_MODEL: 'false'
+}
+[ELIZA] Loading character settings: {
+  CHARACTER_PATH: undefined,
+  ARGV: [
+    '/root/.local/share/pnpm/nodejs/20.19.1/bin/node',
+    '/root/eliza/packages/agent/dist/index.js',
+    '--character=/root/eliza/packages/agent/src/characters/eth_memelord_9000.json',
+    '--clients=@elizaos/client-telegram',
+    '--plugins=@elizaos/telegram-multiagent,@elizaos/plugin-bootstrap',
+    '--port=3000',
+    '--log-level=debug'
+  ],
+  CHARACTER_ARG: '--character=/root/eliza/packages/agent/src/characters/eth_memelord_9000.json',
+  CWD: '/root/eliza/packages/agent'
+}
+[ELIZA] Loaded .env file from: /root/eliza/.env
+[ELIZA] Parsed settings: {
+  USE_OPENAI_EMBEDDING: 'true',
+  USE_OPENAI_EMBEDDING_TYPE: 'string',
+  USE_OLLAMA_EMBEDDING: '',
+  USE_OLLAMA_EMBEDDING_TYPE: 'string',
+  OLLAMA_EMBEDDING_MODEL: 'false'
+}
+🔧 Applying Valhalla runtime patch...
+✅ Valhalla runtime patch applied
+🔧 Attempting assignment to globalThis.__elizaRuntime...
+✅ Runtime assigned to globalThis.__elizaRuntime. Type: object
+[ELIZA] Starting agents...
+[ELIZA] Trying paths: [
+  {
+    path: '/root/eliza/packages/agent/src/characters/eth_memelord_9000.json',
+    exists: true
+  },
+  {
+    path: '/root/eliza/packages/agent/src/characters/eth_memelord_9000.json',
+    exists: true
+  },
+  {
+    path: '/root/eliza/packages/agent/src/characters/eth_memelord_9000.json',
+    exists: true
+  },
+  {
+    path: '/root/eliza/packages/agent/src/characters/eth_memelord_9000.json',
+    exists: true
+  },
+  {
+    path: '/root/eliza/packages/core/dist/utils/characters/eth_memelord_9000.json',
+    exists: false
+  },
+  {
+    path: '/root/eliza/packages/core/dist/characters/eth_memelord_9000.json',
+    exists: false
+  },
+  {
+    path: '/root/eliza/packages/core/characters/eth_memelord_9000.json',
+    exists: false
+  }
+]
+🔧 runtime-patch.js: applyPatch() called
+[patch] 🔧 Relay config prepared for plugin initialization. {
+  relayServerUrl: 'http://localhost:4000',
+  authToken: 'elizaos-secure-relay-key',
+  agentId: '<unknown>'
+}
+[patch] 🔧 Memory initialization deferred to plugin.
+[ELIZA] [PATCH] applyPatch() completed successfully after agent start.
+[CONSTRUCTOR] TelegramMultiAgentPlugin: Constructor called
+[CONFIG] Using default relay server: http://207.180.245.243:4000
+[CONFIG] Using default auth token: elizao****
+[INFO] TelegramMultiAgentPlugin: ConversationManager: Created
+[MEMORY] SQLite fallback: ON  
+[INFO] TelegramMultiAgentPlugin: ConversationManager: Fallback memory manager created
+[DEBUG] TelegramMultiAgentPlugin: [MEMORY] Using fallback memory manager since runtime memory manager is not available yet
+[MultiAgentPlugin] Added clients array to plugin instance.
+[TELEGRAM-MULTIAGENT] Plugin created with these properties:
+Own keys: [
+  'runtime',           'logger',
+  'waitingPromises',   'name',
+  'description',       'npmName',
+  'clients',           'config',
+  'relay',             'conversationManager',
+  'kickstarters',      'knownAgents',
+  'character',         'checkIntervalId',
+  'initialized',       'agentId',
+  'botToken',          'initializePromise',
+  'lastResponseTimes', 'lastSpeaker',
+  'recentSpeakers',    'fallbackMemory',
+  'heartbeatInterval', 'runtimeProxy',
+  'sqliteProxies',     'fallbackMemoryManagers',
+  'dbAdapter',         'agentRegistry',
+  'memoryManager',     'telegramClient',
+  '_eventHandlers',    'personality',
+  'initialize'
+]
+Has initialize: true
+plugin instanceof TelegramMultiAgentPlugin: true
+[ELIZA] ETH Memelord loaded plugins: [
+    "@elizaos/plugin-bootstrap", 
+    "@elizaos/telegram-multiagent"
+]
+[ELIZA SUCCESS] Successfully loaded character from: /root/eliza/packages/agent/src/characters/eth_memelord_9000.json
+[ELIZA] Starting agent: ETH Memelord e362ebc0-9d4b-562f-9af3-f7668d9a3558
+[ELIZA] Creating runtime for character ETH Memelord
+[ELIZA] Connecting to SQLite database at path: agent.sqlite
+Connected to SQLite database: agent.sqlite
+[INFO] Runtime:agent: AgentRuntime initialized (stub)
+[MultiAgentPlugin] Attempting to start embedded Telegram client...
+[MultiAgentPlugin] Found Telegram token in character secrets.
+[VALHALLA] Found global runtime, injecting Telegram client
+[VALHALLA] Telegram client mounted to runtime: true
+[TELEGRAM] Client initialized with token: ${TEL...
+[VALHALLA] Telegram client mounted to runtime: true
+[MultiAgentPlugin] Telegram client initialized via plugin start method.
+[ELIZA] Initializing client: @elizaos/clients/telegram
+[ELIZA] Started ETH Memelord as agent

@@ -30,6 +30,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from "commander";
 import yargs from 'yargs';
+import { applyPatch } from '../../../patches/runtime-patch.js';
+import { createRequire } from 'node:module';
 
 const { dirname: __dirname } = getModulePath();
 
@@ -46,24 +48,33 @@ const logFetch = async (url: string, options: any) => {
     return fetch(url, options);
 };
 
-export function parseArguments(): {
-    character?: string;
-    characters?: string;
-} {
+export function parseArguments(): { character?: string; characters?: string; clients?: string; plugins?: string; port?: number; 'log-level'?: string } {
     try {
-        return yargs(process.argv.slice(3))
-            .option("character", {
-                type: "string",
-                description: "Path to the character JSON file",
+        return yargs(process.argv.slice(2))
+            .option('character', {
+                alias: 'characters',
+                type: 'string',
+                describe: 'Path to character JSON file'
             })
-            .option("characters", {
-                type: "string",
-                description:
-                    "Comma separated list of paths to character JSON files",
+            .option('clients', {
+                type: 'string',
+                describe: 'Comma-separated list of client modules'
+            })
+            .option('plugins', {
+                type: 'string',
+                describe: 'Comma-separated list of plugin modules'
+            })
+            .option('port', {
+                type: 'number',
+                describe: 'Port for agent HTTP server'
+            })
+            .option('log-level', {
+                type: 'string',
+                describe: 'Logging level'
             })
             .parseSync();
     } catch (error) {
-        console.error("Error parsing arguments:", error);
+        console.error('Error parsing arguments:', error);
         return {};
     }
 }
@@ -188,23 +199,43 @@ async function loadCharactersFromUrl(url: string): Promise<Character[]> {
     }
 }
 
+// Merge top-level secrets into settings.secrets for proper substitution
+// (the JSON uses a top-level `secrets` field, but substitution logic looks in `settings.secrets`)
+function normalizeSecrets(character: any): void {
+    if (character.secrets) {
+        character.settings = character.settings || {};
+        character.settings.secrets = {
+            ...character.settings.secrets,
+            ...character.secrets
+        };
+        // Also overwrite top-level secrets so plugin override sees the real token
+        character.secrets = {
+            ...character.settings.secrets
+        };
+    }
+}
+
 async function jsonToCharacter(
     filePath: string,
     character: any
 ): Promise<Character> {
     validateCharacterConfig(character);
+    // Bring top-level secrets into settings for substitution
+    normalizeSecrets(character);
 
     // .id isn't really valid
     const characterId = character.id || character.name;
     const characterPrefix = `CHARACTER.${characterId
         .toUpperCase()
         .replace(/ /g, "_")}.`;
+
     const characterSettings = Object.entries(process.env)
         .filter(([key]) => key.startsWith(characterPrefix))
         .reduce((settings, [key, value]) => {
             const settingKey = key.slice(characterPrefix.length);
             return { ...settings, [settingKey]: value };
-        }, {});
+        }, {} as Record<string, string>);
+
     if (Object.keys(characterSettings).length > 0) {
         character.settings = character.settings || {};
         character.settings.secrets = {
@@ -212,9 +243,34 @@ async function jsonToCharacter(
             ...character.settings.secrets,
         };
     }
+
+    // Explicitly handle environment variable substitution for Telegram token
+    if (
+        character.settings?.secrets?.TELEGRAM_BOT_TOKEN?.startsWith("${") &&
+        character.settings.secrets.TELEGRAM_BOT_TOKEN.endsWith("}")
+    ) {
+        const envVarName = character.settings.secrets.TELEGRAM_BOT_TOKEN.slice(2, -1);
+        // Try direct env var, then fallback to generic TELEGRAM_BOT_TOKEN
+        let envVarValue = process.env[envVarName] || process.env.TELEGRAM_BOT_TOKEN;
+        if (envVarValue) {
+            elizaLogger.debug(`Substituting ${envVarName} for TELEGRAM_BOT_TOKEN`);
+            character.settings.secrets.TELEGRAM_BOT_TOKEN = envVarValue;
+        } else {
+            elizaLogger.warn(`Environment variable ${envVarName} not found for TELEGRAM_BOT_TOKEN substitution.`);
+        }
+        const token = character.settings.secrets.TELEGRAM_BOT_TOKEN;
+        const maskedToken = token && token.length > 6 ?
+            `${token.slice(0, 3)}...${token.slice(-3)}` : token;
+        elizaLogger.debug(`[DEBUG] TELEGRAM_BOT_TOKEN after substitution: ${maskedToken}`);
+    }
+
     // Handle plugins
     character.plugins = await handlePluginImporting(character.plugins);
-    elizaLogger.info(character.name, 'loaded plugins:', "[\n    " + character.plugins.map(p => `"${p.npmName}"`).join(", \n    ") + "\n]");
+    elizaLogger.info(
+        character.name,
+        'loaded plugins:',
+        "[\n    " + character.plugins.map(p => `\"${p.npmName}\"`).join(", \n    ") + "\n]"
+    );
 
     // Handle Post Processors plugins
     if (character.postProcessors?.length > 0) {
@@ -370,37 +426,46 @@ export async function loadCharacters(
 
 async function handlePluginImporting(plugins: string[]) {
     if (plugins.length > 0) {
-        // this logging should happen before calling, so we can include important context
-        //elizaLogger.info("Plugins are: ", plugins);
         const importedPlugins = await Promise.all(
             plugins.map(async (plugin) => {
+                // Attempt to import the plugin specifier
+                let importedModule: any;
                 try {
-                    const importedPlugin: Plugin = await import(plugin);
-                    const functionName =
-                        plugin
-                            .replace("@elizaos/plugin-", "")
-                            .replace("@elizaos-plugins/plugin-", "")
-                            .replace(/-./g, (x) => x[1].toUpperCase()) +
-                        "Plugin"; // Assumes plugin function is camelCased with Plugin suffix
-                    // Cast to any to bypass type check for potentially existing default export
-                    if (!(importedPlugin as any)[functionName] && !(importedPlugin as any).default) {
-                        elizaLogger.warn(plugin, 'does not have an default export or', functionName)
-                    }
-                    return {
-                        ...(
-                            // Cast to any to bypass type check for potentially existing default export
-                            (importedPlugin as any).default || (importedPlugin as any)[functionName]
-                        ), npmName: plugin
-                    };
+                    importedModule = await import(plugin);
                 } catch (importError) {
-                    console.error(
-                        `Failed to import plugin: ${plugin}`,
-                        importError
+                    // Fallback: load workspace package directly from local dist folder
+                    const pkgParts = plugin.split('/');
+                    const pkgName = pkgParts[1];
+                    const workspaceEntry = path.resolve(
+                        __dirname,             // .../packages/agent/dist
+                        '../../..',            // up to /root/eliza
+                        'packages',
+                        pkgName,
+                        'dist',
+                        'src',
+                        'index.js'
                     );
-                    return false; // Return null for failed imports
+                    try {
+                        importedModule = await import(workspaceEntry);
+                    } catch (workspaceError) {
+                        console.error(`Plugin import failed for ${plugin}:`, importError);
+                        console.error(`Workspace import failed for ${plugin}:`, workspaceError);
+                        return false;
+                    }
                 }
+                const functionName =
+                    plugin.replace("@elizaos/plugin-", "")
+                        .replace("@elizaos-plugins/plugin-", "")
+                        .replace(/-./g, (x) => x[1].toUpperCase()) + "Plugin";
+                if (!(importedModule as any)[functionName] && !(importedModule as any).default) {
+                    elizaLogger.warn(plugin, 'does not have a default export or', functionName);
+                }
+                return {
+                    ...((importedModule as any).default || (importedModule as any)[functionName]),
+                    npmName: plugin
+                };
             })
-        )
+        );
         // remove plugins that failed to load, so agent can try to start
         return importedPlugins.filter(p => !!p);
     } else {
@@ -764,7 +829,6 @@ const checkPortAvailable = (port: number): Promise<boolean> => {
             resolve(true);
         });
 
-        server.listen(port);
     });
 };
 
@@ -849,6 +913,13 @@ const startAgents = async () => {
 startAgents().catch((error) => {
     elizaLogger.error("Unhandled error in startAgents:", error);
     process.exit(1);
+});
+
+// Ensure patch runs *after* initial agent setup completes
+applyPatch().then(() => {
+    elizaLogger.info('[PATCH] applyPatch() completed successfully after agent start.');
+}).catch(patchError => {
+    elizaLogger.error('[PATCH] Error running applyPatch() after agent start:', patchError);
 });
 
 // Prevent unhandled exceptions from crashing the process if desired

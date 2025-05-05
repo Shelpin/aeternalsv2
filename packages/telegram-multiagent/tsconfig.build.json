@@ -8,10 +8,16 @@
       ],
       "@elizaos/telegram-client/*": [
         "../clients/telegram/dist/*"
+      ],
+      "@elizaos/core": [
+        "../core/dist"
+      ],
+      "@elizaos/core/*": [
+        "../core/dist/*"
       ]
     },
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -29,6 +35,7 @@
   ],
   "exclude": [
     "__tests__",
-    "**/*.test.ts"
+    "**/*.test.ts",
+    "src/plugin.ts"
   ]
 }

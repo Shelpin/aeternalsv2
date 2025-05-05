@@ -365,7 +365,16 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
    */
   async initialize(): Promise<void> {
     try {
-      this.logger.info('[PLUGIN] Initializing TelegramMultiAgentPlugin');
+      this.logger.info('[INITIALIZE] Initializing Telegram client...');
+      // Use token from plugin config (set in loadConfig)
+      const botToken = this.config.botToken;
+      if (!botToken) {
+        throw new Error('Telegram bot token missing');
+      }
+      this.botToken = botToken;
+      this.logger.info(`[INITIALIZE] Using Telegram Token: ${this.botToken.substring(0, 10)}...`);
+
+      // Removed static telegramClient calls; dynamic initialization will occur in the STEP 2 block below
 
       // Make sure the runtime is available before proceeding
       if (!this.runtime) {
@@ -415,10 +424,10 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
         try {
           // Try direct import via require (CommonJS)
-          const telegramModule = require('@elizaos/client-telegram');
+          const telegramModule = require('@elizaos/telegram-client');
           if (telegramModule && telegramModule.TelegramClient) {
             TelegramClient = telegramModule.TelegramClient;
-            loadedFrom = '@elizaos/client-telegram (direct import)';
+            loadedFrom = '@elizaos/telegram-client (direct import)';
             this.logger.info(`[PLUGIN] Successfully loaded TelegramClient via direct import`);
           }
         } catch (directImportError: unknown) {
@@ -430,11 +439,10 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
           // If direct import fails, fallback to path resolution
           const possiblePaths = [
-            // Direct import as expected by pnpm workspace
-            '@elizaos/client-telegram',
+            '@elizaos/telegram-client',
             // Absolute paths with correct module name
-            '/root/eliza/node_modules/@elizaos/client-telegram',
-            '/root/eliza/node_modules/.pnpm/@elizaos+client-telegram@0.1.0/node_modules/@elizaos/client-telegram',
+            '/root/eliza/node_modules/@elizaos/telegram-client',
+            '/root/eliza/node_modules/.pnpm/@elizaos+telegram-client@0.1.0/node_modules/@elizaos/telegram-client',
             // Relative paths from current directory
             path.resolve(process.cwd(), 'packages/clients/telegram'),
             path.resolve(process.cwd(), 'packages/clients/telegram/dist'),
@@ -490,8 +498,22 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           this.logger.info(`[PLUGIN] Successfully loaded TelegramClient from ${loadedFrom}`);
 
           // Initialize the client with our config
+          // Substitute env var in token if needed
+          let resolvedToken = this.config.botToken;
+          if (resolvedToken?.startsWith('${') && resolvedToken.endsWith('}')) {
+            const envVarName = resolvedToken.slice(2, -1);
+            const envVarValue = process.env[envVarName];
+            if (envVarValue) {
+              this.logger.debug(`[PLUGIN] Substituting ${envVarName} for bot token`);
+              resolvedToken = envVarValue;
+            } else {
+              this.logger.warn(`[PLUGIN] Environment variable ${envVarName} not found for bot token substitution.`);
+              resolvedToken = undefined; // Ensure it fails if var not found
+            }
+          }
+
           this.telegramClient = new TelegramClient({
-            botToken: this.config.botToken,
+            botToken: resolvedToken,
             relayServerUrl: this.config.relayServerUrl,
             agentId: this.agentId,
             logger: this.logger

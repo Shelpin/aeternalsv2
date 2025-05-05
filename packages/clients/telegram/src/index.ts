@@ -12,6 +12,13 @@ declare global {
   };
 }
 
+// Add options interface for constructor overloading
+interface TelegramClientOptions {
+  botToken: string;
+  runtime?: any;
+  [key: string]: any;
+}
+
 /**
  * Telegram client for ElizaOS
  * 
@@ -27,9 +34,15 @@ class TelegramClient {
   /**
    * Initialize the Telegram client with a bot token
    */
-  constructor(token?: string) {
-    if (token) {
-      this.initialize(token);
+  constructor(tokenOrOptions?: string | TelegramClientOptions) {
+    if (!tokenOrOptions) {
+      return;
+    }
+    if (typeof tokenOrOptions === 'string') {
+      this.initialize(tokenOrOptions);
+    } else {
+      const { botToken, runtime } = tokenOrOptions;
+      this.initialize(botToken, runtime);
     }
   }
 
@@ -144,6 +157,22 @@ class TelegramClient {
    */
   get getBotInfo(): TelegramUser | null {
     return this.botInfo;
+  }
+
+  /**
+   * Stop the Telegram bot polling and cleanup
+   */
+  public stop(): void {
+    if (this.bot) {
+      try {
+        this.bot.stopPolling();
+        console.log('[TELEGRAM] Bot polling stopped');
+      } catch (error) {
+        console.error('[TELEGRAM] Error stopping bot polling:', error);
+      }
+    } else {
+      console.warn('[TELEGRAM] stop() called but bot is not initialized');
+    }
   }
 }
 
