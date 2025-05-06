@@ -12,7 +12,9 @@
   "scripts": {
     "prebuild": "rm -rf dist tsconfig.build.tsbuildinfo",
     "build": "tsc -b tsconfig.build.json",
-    "start": "node dist/index.js",
+    "start": "node ../../patches/start-agent-with-patches.js",
+    "start:dev": "ts-node src/index.ts",
+    "start:prod": "node dist/index.js",
     "build:types": "tsc --build tsconfig.build.json",
     "build:full": "npm run build",
     "clean": "rm -rf dist",
