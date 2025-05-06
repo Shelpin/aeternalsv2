@@ -99,6 +99,22 @@ async function main() {
       const runtimePatch = await import("./runtime-patch.js");
       if (runtimePatch && typeof runtimePatch.applyPatch === 'function') {
         runtime = await runtimePatch.applyPatch(); // Assign to local runtime variable
+
+        // STEP 1 from "Final Ascent" plan: Inject proxy for runtime.clients
+        if (globalThis.__elizaRuntime) { // Ensure globalThis.__elizaRuntime was set by applyPatch
+          const proxyClients = new Proxy({}, {
+            get: (_, prop) => {
+              // Optional: Add a log here to see when the proxy is accessed
+              // console.log(`[PROXY ACCESS] globalThis.__elizaRuntime.clients.${String(prop)}`);
+              return globalThis.__elizaRuntime?.clients?.[prop];
+            }
+          });
+          globalThis.__elizaRuntime.clients = proxyClients; // Modify the global instance's clients property
+          console.log("🔧 Applied proxy to globalThis.__elizaRuntime.clients");
+        } else {
+          console.warn("⚠️ globalThis.__elizaRuntime not set after runtimePatch.applyPatch(), proxy not applied.");
+        }
+
         console.log("✅ Runtime patch applied and made globally available");
         console.log(`🔧 Checking globalThis after patch: ${globalThis.__elizaRuntime ? 'SET' : 'NOT SET'}`);
         if (globalThis.__elizaRuntime) {

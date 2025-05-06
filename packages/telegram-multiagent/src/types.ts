@@ -116,7 +116,6 @@ export interface TelegramMultiAgentConfig {
   relayServerUrl: string;
   authToken: string;
   typingSimulation?: TypingSimulation;
-  botToken?: string;
   agentId?: string;
   groupIds?: string[];
   conversationCheckIntervalMs?: number;
