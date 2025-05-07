@@ -499,18 +499,51 @@ importers:
 
   packages/core:
     dependencies:
+      '@ai-sdk/amazon-bedrock':
+        specifier: ^1.0.0
+        version: 1.1.6(zod@3.24.1)
+      '@ai-sdk/anthropic':
+        specifier: ^1.1.6
+        version: 1.1.6(zod@3.24.1)
+      '@ai-sdk/google':
+        specifier: ^1.1.0
+        version: 1.1.0(zod@3.24.1)
+      '@ai-sdk/groq':
+        specifier: ^1.1.0
+        version: 1.1.7(zod@3.24.1)
+      '@ai-sdk/mistral':
+        specifier: ^1.1.0
+        version: 1.1.6(zod@3.24.1)
+      '@ai-sdk/openai':
+        specifier: ^1.1.0
+        version: 1.1.9(zod@3.24.1)
+      '@ai-sdk/provider-utils':
+        specifier: 2.1.6
+        version: 2.1.6(zod@3.24.1)
       '@elizaos/types':
         specifier: workspace:*
         version: link:../types
       '@fal-ai/client':
         specifier: 1.3.0
         version: 1.3.0
+      ai:
+        specifier: ^3.2.14
+        version: 3.4.33(openai@4.94.0(encoding@0.1.13)(ws@8.18.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(zod@3.24.1))(react@19.1.0)(sswr@2.2.0(svelte@5.28.2))(svelte@5.28.2)(vue@3.5.13(typescript@5.1.6))(zod@3.24.1)
+      bignumber.js:
+        specifier: ^9.1.2
+        version: 9.3.0
       fastembed:
         specifier: 1.14.4
         version: 1.14.4
+      handlebars:
+        specifier: ^4.7.8
+        version: 4.7.8
       js-tiktoken:
         specifier: 1.0.19
         version: 1.0.19
+      ollama-ai-provider:
+        specifier: ^1.2.0
+        version: 1.2.0(zod@3.24.1)
       openai:
         specifier: 4.94.0
         version: 4.94.0(encoding@0.1.13)(ws@8.18.0(bufferutil@4.0.9)(utf-8-validate@5.0.10))(zod@3.24.1)
@@ -520,19 +553,178 @@ importers:
       together-ai:
         specifier: 0.15.0
         version: 0.15.0(bufferutil@4.0.9)(encoding@0.1.13)(utf-8-validate@5.0.10)
+      unique-names-generator:
+        specifier: ^4.7.1
+        version: 4.7.1
+      uuid:
+        specifier: ^9.0.1
+        version: 9.0.1
+      viem:
+        specifier: 2.21.58
+        version: 2.21.58(bufferutil@4.0.9)(typescript@5.1.6)(utf-8-validate@5.0.10)(zod@3.24.1)
+      zod:
+        specifier: ^3.23.8
+        version: 3.24.1
     devDependencies:
       '@elizaos/test-utils':
         specifier: workspace:*
         version: link:../test-utils
+      '@types/babel__core':
+        specifier: 7.20.5
+        version: 7.20.5
+      '@types/babel__generator':
+        specifier: 7.27.0
+        version: 7.27.0
+      '@types/babel__template':
+        specifier: 7.4.4
+        version: 7.4.4
+      '@types/babel__traverse':
+        specifier: 7.20.7
+        version: 7.20.7
+      '@types/bignumber.js':
+        specifier: ^5.0.4
+        version: 5.0.4
+      '@types/body-parser':
+        specifier: 1.19.5
+        version: 1.19.5
+      '@types/caseless':
+        specifier: 0.12.5
+        version: 0.12.5
+      '@types/commander':
+        specifier: 2.12.5
+        version: 2.12.5
+      '@types/connect':
+        specifier: 3.4.38
+        version: 3.4.38
+      '@types/cors':
+        specifier: 2.8.17
+        version: 2.8.17
+      '@types/debug':
+        specifier: 4.1.12
+        version: 4.1.12
+      '@types/dotenv':
+        specifier: ^8.2.3
+        version: 8.2.3
+      '@types/express':
+        specifier: 4.17.21
+        version: 4.17.21
+      '@types/express-serve-static-core':
+        specifier: 5.0.6
+        version: 5.0.6
+      '@types/fs-extra':
+        specifier: ^11.0.4
+        version: 11.0.4
+      '@types/glob':
+        specifier: ^8.1.0
+        version: 8.1.0
+      '@types/graceful-fs':
+        specifier: 4.1.9
+        version: 4.1.9
+      '@types/hast':
+        specifier: 3.0.4
+        version: 3.0.4
+      '@types/http-errors':
+        specifier: 2.0.4
+        version: 2.0.4
+      '@types/istanbul-lib-coverage':
+        specifier: 2.0.6
+        version: 2.0.6
+      '@types/istanbul-lib-report':
+        specifier: 3.0.3
+        version: 3.0.3
+      '@types/istanbul-reports':
+        specifier: 3.0.4
+        version: 3.0.4
+      '@types/jest':
+        specifier: ^29.5.14
+        version: 29.5.14
       '@types/js-sha1':
         specifier: ^0.6.0
         version: 0.6.3
+      '@types/json-schema':
+        specifier: 7.0.15
+        version: 7.0.15
+      '@types/jsonfile':
+        specifier: 6.1.4
+        version: 6.1.4
+      '@types/lodash':
+        specifier: 4.17.16
+        version: 4.17.16
+      '@types/mdast':
+        specifier: 4.0.4
+        version: 4.0.4
+      '@types/mime':
+        specifier: 4.0.0
+        version: 4.0.0
+      '@types/minimatch':
+        specifier: 5.1.2
+        version: 5.1.2
+      '@types/ms':
+        specifier: 2.1.0
+        version: 2.1.0
+      '@types/multer':
+        specifier: 1.4.12
+        version: 1.4.12
+      '@types/node':
+        specifier: 22.15.14
+        version: 22.15.14
+      '@types/node-int64':
+        specifier: 0.4.32
+        version: 0.4.32
+      '@types/node-schedule':
+        specifier: ^2.1.5
+        version: 2.1.7
+      '@types/node-telegram-bot-api':
+        specifier: 0.64.8
+        version: 0.64.8
+      '@types/parquetjs':
+        specifier: 0.10.6
+        version: 0.10.6
       '@types/pino':
         specifier: ^7.0.5
         version: 7.0.5
       '@types/pino-pretty':
         specifier: ^5.0.0
         version: 5.0.0
+      '@types/progress-stream':
+        specifier: 2.0.5
+        version: 2.0.5
+      '@types/qs':
+        specifier: 6.9.18
+        version: 6.9.18
+      '@types/range-parser':
+        specifier: 1.2.7
+        version: 1.2.7
+      '@types/request':
+        specifier: 2.48.12
+        version: 2.48.12
+      '@types/send':
+        specifier: 0.17.4
+        version: 0.17.4
+      '@types/serve-static':
+        specifier: 1.15.7
+        version: 1.15.7
+      '@types/sqlite3':
+        specifier: ^5.1.0
+        version: 5.1.0(encoding@0.1.13)
+      '@types/tough-cookie':
+        specifier: 4.0.5
+        version: 4.0.5
+      '@types/unist':
+        specifier: 3.0.3
+        version: 3.0.3
+      '@types/uuid':
+        specifier: ^9.0.8
+        version: 9.0.8
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
+      '@types/yargs':
+        specifier: 17.0.33
+        version: 17.0.33
+      '@types/yargs-parser':
+        specifier: 21.0.3
+        version: 21.0.3
 
   packages/dynamic-imports: {}
 
@@ -2534,6 +2726,10 @@ packages:
   '@types/better-sqlite3@7.6.13':
     resolution: {integrity: sha512-NMv9ASNARoKksWtsq/SHakpYAYnhBrQgGD8zkLYk/jaK8jUGn08CfEdTRgYhMypUQAfzSP8W6gNLe0q19/t4VA==}
 
+  '@types/bignumber.js@5.0.4':
+    resolution: {integrity: sha512-y/nRKmgKRakrBZ4B3/1mhZOEHrKcf6BniqxVlsVrmaG6fN6WzzUlXfsD+KX+Ii4C+093A7h1p6LkOsXktOfQnQ==}
+    deprecated: This is a stub types definition. bignumber.js provides its own type definitions, so you do not need this installed.
+
   '@types/bn.js@5.1.6':
     resolution: {integrity: sha512-Xh8vSwUeMKeYYrj3cX4lGQgFSF/N03r+tv4AiLl1SucqV+uTQpxRcnM8AkXKHwYP9ZPXOYXRr2KPXpVlIvqh9w==}
 
@@ -2568,6 +2764,9 @@ packages:
 
   '@types/express-serve-static-core@4.19.6':
     resolution: {integrity: sha512-N4LZ2xG7DatVqhCZzOGb1Yi5lMbXSZcmdLDe9EzSndPV2HpWYWzRbaerl2n27irrm94EPpprqa8KpskPT085+A==}
+
+  '@types/express-serve-static-core@5.0.6':
+    resolution: {integrity: sha512-3xhRnjJPkULekpSzgtoNYYcTWgEZkp4myc+Saevii5JPnHNvHMRlBSHDbs7Bh1iPPoVTERHEZXyhyLbMEsExsA==}
 
   '@types/express@4.17.21':
     resolution: {integrity: sha512-ejlPM315qwLpaQlQDTjPdsUFSc6ZsP4AN6AlWnogPjQ7CVi7PYF3YVz+CY3jE2pwYf7E/7HlDAN0rV2GxTG0HQ==}
@@ -2625,6 +2824,10 @@ packages:
   '@types/mime@1.3.5':
     resolution: {integrity: sha512-/pyBZWSLD2n0dcHE3hq8s8ZvcETHtEuF+3E7XVt0Ig2nvsVQXdghHVcEkIWjy9A0wKfTn97a/PSDYohKIlnP/w==}
 
+  '@types/mime@4.0.0':
+    resolution: {integrity: sha512-5eEkJZ/BLvTE3vXGKkWlyTSUVZuzj23Wj8PoyOq2lt5I3CYbiLBOPb3XmCW6QcuOibIUE6emHXHt9E/F/rCa6w==}
+    deprecated: This is a stub types definition. mime provides its own type definitions, so you do not need this installed.
+
   '@types/minimatch@3.0.5':
     resolution: {integrity: sha512-Klz949h02Gz2uZCMGwDUSDS1YBlTdDDgbWHi+81l29tQALUtvz4rAYi5uoVhE5Lagoq6DeqAUlbrHvW/mXDgdQ==}
 
@@ -2660,6 +2863,9 @@ packages:
 
   '@types/node@20.17.31':
     resolution: {integrity: sha512-quODOCNXQAbNf1Q7V+fI8WyErOCh0D5Yd31vHnKu4GkSztGQ7rlltAaqXhHhLl33tlVyUXs2386MkANSwgDn6A==}
+
+  '@types/node@22.15.14':
+    resolution: {integrity: sha512-BL1eyu/XWsFGTtDWOYULQEs4KR0qdtYfCxYAUYRoB7JP7h9ETYLgQTww6kH8Sj2C0pFGgrpM0XKv6/kbIzYJ1g==}
 
   '@types/node@22.15.2':
     resolution: {integrity: sha512-uKXqKN9beGoMdBfcaTY1ecwz6ctxuJAcUlwE55938g0ZJ8lRxwAZqRz2AJ4pzpt5dHdTPMB863UZ0ESiFUcP7A==}
@@ -6162,6 +6368,15 @@ packages:
 
   ollama-ai-provider@0.16.1:
     resolution: {integrity: sha512-0vSQVz5Y/LguyzfO4bi1JrrVGF/k2JvO8/uFR0wYmqDFp8KPp4+AhdENSynGBr1oRhMWOM4F1l6cv7UNDgRMjw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
+
+  ollama-ai-provider@1.2.0:
+    resolution: {integrity: sha512-jTNFruwe3O/ruJeppI/quoOUxG7NA6blG3ZyQj3lei4+NnJo7bi3eIRWqlVpRlu/mbzbFXeJSBuYQWF6pzGKww==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.0.0
@@ -10220,7 +10435,7 @@ snapshots:
       '@ethereumjs/tx': 4.2.0
       '@metamask/superstruct': 3.2.1
       '@noble/hashes': 1.8.0
-      '@scure/base': 1.1.9
+      '@scure/base': 1.2.5
       '@types/debug': 4.1.12
       debug: 4.4.0(supports-color@5.5.0)
       pony-cause: 2.1.11
@@ -11118,6 +11333,10 @@ snapshots:
     dependencies:
       '@types/node': 22.15.2
 
+  '@types/bignumber.js@5.0.4':
+    dependencies:
+      bignumber.js: 9.3.0
+
   '@types/bn.js@5.1.6':
     dependencies:
       '@types/node': 22.15.2
@@ -11125,7 +11344,7 @@ snapshots:
   '@types/body-parser@1.19.5':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/caseless@0.12.5': {}
 
@@ -11135,11 +11354,11 @@ snapshots:
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/cors@2.8.17':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/debug@4.1.12':
     dependencies:
@@ -11155,7 +11374,14 @@ snapshots:
 
   '@types/express-serve-static-core@4.19.6':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
+      '@types/qs': 6.9.18
+      '@types/range-parser': 1.2.7
+      '@types/send': 0.17.4
+
+  '@types/express-serve-static-core@5.0.6':
+    dependencies:
+      '@types/node': 22.15.14
       '@types/qs': 6.9.18
       '@types/range-parser': 1.2.7
       '@types/send': 0.17.4
@@ -11170,16 +11396,16 @@ snapshots:
   '@types/fs-extra@11.0.4':
     dependencies:
       '@types/jsonfile': 6.1.4
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/glob@8.1.0':
     dependencies:
       '@types/minimatch': 5.1.2
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/graceful-fs@4.1.9':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/handlebars@4.1.0':
     dependencies:
@@ -11216,7 +11442,7 @@ snapshots:
 
   '@types/jsonfile@6.1.4':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/lodash@4.17.16': {}
 
@@ -11225,6 +11451,10 @@ snapshots:
       '@types/unist': 3.0.3
 
   '@types/mime@1.3.5': {}
+
+  '@types/mime@4.0.0':
+    dependencies:
+      mime: 1.6.0
 
   '@types/minimatch@3.0.5': {}
 
@@ -11240,26 +11470,26 @@ snapshots:
 
   '@types/node-fetch@2.6.12':
     dependencies:
-      '@types/node': 18.19.87
+      '@types/node': 22.15.14
       form-data: 4.0.2
 
   '@types/node-int64@0.4.32':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/node-schedule@2.1.7':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/node-telegram-bot-api@0.61.11':
     dependencies:
-      '@types/node': 18.19.87
+      '@types/node': 22.15.2
       '@types/request': 2.48.12
       eventemitter3: 5.0.1
 
   '@types/node-telegram-bot-api@0.64.8':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
       '@types/request': 2.48.12
 
   '@types/node@18.19.87':
@@ -11269,6 +11499,10 @@ snapshots:
   '@types/node@20.17.31':
     dependencies:
       undici-types: 6.19.8
+
+  '@types/node@22.15.14':
+    dependencies:
+      undici-types: 6.21.0
 
   '@types/node@22.15.2':
     dependencies:
@@ -11302,7 +11536,7 @@ snapshots:
 
   '@types/progress-stream@2.0.5':
     dependencies:
-      '@types/node': 18.19.87
+      '@types/node': 22.15.14
 
   '@types/qs@6.9.18': {}
 
@@ -11311,7 +11545,7 @@ snapshots:
   '@types/request@2.48.12':
     dependencies:
       '@types/caseless': 0.12.5
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
       '@types/tough-cookie': 4.0.5
       form-data: 2.5.3
 
@@ -11324,12 +11558,12 @@ snapshots:
   '@types/send@0.17.4':
     dependencies:
       '@types/mime': 1.3.5
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/serve-static@1.15.7':
     dependencies:
       '@types/http-errors': 2.0.4
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
       '@types/send': 0.17.4
 
   '@types/sqlite3@5.1.0(encoding@0.1.13)':
@@ -11352,7 +11586,7 @@ snapshots:
 
   '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -14366,7 +14600,7 @@ snapshots:
   jest-util@29.7.0:
     dependencies:
       '@jest/types': 29.6.3
-      '@types/node': 22.15.2
+      '@types/node': 22.15.14
       chalk: 4.1.2
       ci-info: 3.9.0
       graceful-fs: 4.2.11
@@ -15485,6 +15719,14 @@ snapshots:
     optionalDependencies:
       zod: 3.24.1
 
+  ollama-ai-provider@1.2.0(zod@3.24.1):
+    dependencies:
+      '@ai-sdk/provider': 1.0.6
+      '@ai-sdk/provider-utils': 2.1.6(zod@3.24.1)
+      partial-json: 0.1.7
+    optionalDependencies:
+      zod: 3.24.1
+
   on-exit-leak-free@2.1.2: {}
 
   on-finished@2.4.1:
@@ -15618,11 +15860,11 @@ snapshots:
   ox@0.4.4(typescript@5.1.6)(zod@3.24.1):
     dependencies:
       '@adraffy/ens-normalize': 1.11.0
-      '@noble/curves': 1.7.0
-      '@noble/hashes': 1.6.1
-      '@scure/bip32': 1.6.0
+      '@noble/curves': 1.9.0
+      '@noble/hashes': 1.8.0
+      '@scure/bip32': 1.7.0
       '@scure/bip39': 1.5.0
-      abitype: 1.0.7(typescript@5.1.6)(zod@3.24.1)
+      abitype: 1.0.8(typescript@5.1.6)(zod@3.24.1)
       eventemitter3: 5.0.1
     optionalDependencies:
       typescript: 5.1.6
@@ -17651,8 +17893,8 @@ snapshots:
 
   webauthn-p256@0.0.10:
     dependencies:
-      '@noble/curves': 1.7.0
-      '@noble/hashes': 1.6.1
+      '@noble/curves': 1.9.0
+      '@noble/hashes': 1.8.0
 
   webidl-conversions@3.0.1: {}
 
