@@ -1,5 +1,5 @@
 import { formatTimestamp } from './messages.js';
-import type { Actor, Memory } from './types.js';
+import type { Actor, Memory } from '@elizaos/types';
 
 export const formatPosts = ({
     messages,

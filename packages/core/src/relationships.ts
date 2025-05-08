@@ -1,4 +1,4 @@
-import type { IAgentRuntime, Relationship, UUID } from './types.js';
+import type { IAgentRuntime, Relationship, UUID } from '@elizaos/types';
 
 export async function createRelationship({
     runtime,

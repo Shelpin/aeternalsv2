@@ -1,11 +1,13 @@
 import settings from './settings.js';
 import {
-    type EmbeddingModelSettings,
-    type ImageModelSettings,
     ModelClass,
     ModelProviderName,
-    type Models,
-    type ModelSettings,
+} from '@elizaos/types';
+import type {
+    EmbeddingModelSettings,
+    ImageModelSettings,
+    Models,
+    ModelSettings,
 } from './types.js';
 
 export const models: Models = {

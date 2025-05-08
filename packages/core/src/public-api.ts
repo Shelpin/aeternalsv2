@@ -2,92 +2,100 @@
 // Do not export from both ./api/types and ./types - choose one source of truth
 // For public API types, we prefer ./types as the canonical source
 
-// ✅ Explicit type re-exports from canonical source
+// Export types sourced DIRECTLY from @elizaos/types
 export type {
   IAgentRuntime,
   Client,
   Content,
   Media,
   Memory,
+  MemoryContent,
   Plugin,
-  // Additional types needed by adapter-sqlite and other packages
   IDatabaseAdapter,
-  IDatabaseCacheAdapter,
-  Account,
-  Actor,
-  Participant,
   Goal,
   GoalStatus,
-  RAGKnowledgeItem,
-  UUID,
-  Character,
+  Actor,
+  Objective,
+  Relationship,
+  Account,
+  Participant,
   ClientInstance,
   Adapter,
+  Service,
   Provider,
-  State,
-  IRAGKnowledgeManager,
-  // Types required by plugin-bootstrap
   Action,
   ActionExample,
-  HandlerCallback, // Renamed from Handler for clarity, assuming ./types
-  Objective,
-  Evaluator, // Added from ./types
-  IMemoryManager, // Export the interface
-  ICacheManager, // Added cache interface
-  // ADDED missing types used by adapter-sqlite
-  Relationship,
-  ChunkRow
-} from './types.js';
+  Evaluator,
+  EvaluationExample,
+  Handler,
+  HandlerCallback,
+  Validator,
+  State,
+  Character,
+  RAGKnowledgeItem,
+  IMemoryManager,
+  Logger,
+  FetchFunction,
+  CacheOptions,
+  ICacheManager,
+  IRAGKnowledgeManager,
+  KnowledgeItem,
+  ActionResponse,
+  CacheKeyPrefix,
+  DirectoryItem,
+  ChunkRow,
+  IDatabaseCacheAdapter,
+  IImageDescriptionService,
+  ITextGenerationService,
+  TelemetrySettings,
+  UUID
+} from '@elizaos/types';
 
-// Re-export specific value constants needed
-export { ModelProviderName, CacheStore, ModelClass, ServiceType, TokenizerType, TranscriptionProvider, ActionTimelineType, KnowledgeScope, LoggingLevel } from './types.js';
+// Export enums/constants sourced DIRECTLY from @elizaos/types
+export {
+  ModelProviderName,
+  CacheStore,
+  ModelClass,
+  ServiceType,
+  TokenizerType,
+  TranscriptionProvider,
+  ActionTimelineType,
+  KnowledgeScope,
+  LoggingLevel
+} from '@elizaos/types';
 
-// Export context utilities (correct path)
+// Export types that are TRULY LOCAL to core (defined in core/src/types.ts)
+export type {
+  CoreInternalConfig,
+  ModelSettings,
+  ImageModelSettings,
+  EmbeddingModelSettings,
+  Model,
+  Models,
+  TemplateType
+} from './types.js'; // This refers to packages/core/src/types.ts after compilation
+
+// Other exports from local files within @elizaos/core
 export { composeContext } from './context.js';
-
-// Export logger (correct path)
 export { elizaLogger } from './logger.js';
-
-// Export footer and parsing utilities (correct path)
 export { booleanFooter, messageCompletionFooter, parseJsonArrayFromText, parseBooleanFromText } from './parsing.js';
-
-// Export provider/context functionality (correct paths)
 export { embed } from './embedding.js';
 export { formatMessages } from './messages.js';
-
-// Export generation functions (assuming path)
-export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray } from './generation.js';
-// ADDED missing generation functions used by client-direct
-export { generateCaption, generateImage, generateObject } from './generation.js'; // Assuming these are in generation.js
-
-// Existing value exports
+export { generateMessageResponse, generateTrueOrFalse, generateText, generateObjectArray, generateCaption, generateImage, generateObject } from './generation.js';
 export { getGoals } from './goals.js';
 export { AgentRuntime } from './runtime.js';
 export { getModulePath } from './utils/module-path.js';
-// Corrected export paths for utilities
 export { getEnvVariable } from './settings.js';
 export { isUUID, stringToUuid } from './uuid.js';
-export { getEmbeddingZeroVector } from './embedding.js'; // Assuming this is in embedding.js
+export { getEmbeddingZeroVector } from './embedding.js';
 export { default as knowledge } from './knowledge.js';
-
-// Export MemoryManager implementation (assuming from ./memory)
 export { MemoryManager } from './memory.js';
-
-// API types
-export type { IAgentRuntimeBridge } from './api/types.js';
-export type { AgentLogLevel, IAgentLogger } from './api/types.js';
-
-// Correctly export Cache components and settings
+export type { IAgentRuntimeBridge, AgentLogLevel, IAgentLogger } from './api/types.js';
 export { CacheManager, DbCacheAdapter, FsCacheAdapter } from './cache.js';
 export { settings } from './settings.js';
-
-// Keep other placeholders if they are still needed
 export const validateCharacterConfig = (config: any) => true; // Placeholder
+export { DatabaseAdapter as CoreDatabaseAdapter } from './database.js';
 
-// ADDED DatabaseAdapter class export
-export { DatabaseAdapter } from './database.js';
-
-// Remove the duplicated/old export sections entirely
-// // --- REMOVE SECTION START ---
-// // ... (all code from the REMOVE SECTION START comment to REMOVE SECTION END comment)
-// // --- REMOVE SECTION END --- 
+// Removed the erroneous re-export blocks that caused duplicate identifiers.
+// Specifically, the block starting with `export type { Participant, Goal, ... } from './types.js';`
+// and the block `export { ModelProviderName, CacheStore, ... } from './types.js';` have been removed. 

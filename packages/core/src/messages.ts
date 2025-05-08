@@ -4,7 +4,7 @@ import type {
     Content,
     Memory,
     UUID,
-} from './types.js';
+} from '@elizaos/types';
 
 /**
  * Get details for a list of actors.

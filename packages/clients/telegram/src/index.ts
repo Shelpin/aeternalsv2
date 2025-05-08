@@ -186,19 +186,8 @@ class TelegramClient {
   }
 }
 
-// Export a singleton instance
-const telegramClient = new TelegramClient();
-
-// Also export the class for direct instantiation
+// Export the class as named export
 export { TelegramClient };
 
-// VALHALLA FIX: Check if we have a runtime and inject the client
-if (globalThis.__elizaRuntime) {
-  console.log('[VALHALLA] Found global runtime, injecting Telegram client');
-  globalThis.__elizaRuntime.clients = globalThis.__elizaRuntime.clients || {};
-  globalThis.__elizaRuntime.clients.telegram = telegramClient;
-  console.log('[VALHALLA] Telegram client mounted to runtime:', !!globalThis.__elizaRuntime.clients?.telegram);
-}
-
-// Default export is the singleton instance
-export default telegramClient; 
+// Export a new instance as the default export
+export default new TelegramClient(); 

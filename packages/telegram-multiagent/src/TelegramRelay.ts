@@ -1,5 +1,5 @@
-import { 
-  RelayMessage, 
+import {
+  RelayMessage,
   TelegramRelayConfig,
   MessageStatus,
   ElizaLogger
@@ -50,9 +50,9 @@ export class TelegramRelay {
       retryDelayMs: 5000,
       ...config
     };
-    
+
     this.logger = logger;
-    
+
     // Start queue processing immediately
     this.processQueue();
   }
@@ -64,27 +64,32 @@ export class TelegramRelay {
   private async registerAgent(): Promise<boolean> {
     try {
       this.logger.info(`Registering agent ${this.config.agentId} with relay server`);
-      
+
       // VALHALLA FIX: Add more detailed logging for the registration request
       const requestBody = {
         agent_id: this.config.agentId,
         token: this.config.authToken
       };
-      
+
       this.logger.debug(`[RELAY] Registration request: ${JSON.stringify({
         url: `${this.config.relayServerUrl}/register`,
         agent_id: this.config.agentId,
         auth_token_length: this.config.authToken?.length || 0
       })}`);
-      
+
       // VALHALLA FIX: Explicitly ensure proper headers are set
       const headers = {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.config.authToken}`
       };
-      
+
+      // Log the masked token
       this.logger.debug(`[RELAY] Registration headers: Content-Type and Authorization (${this.config.authToken?.substring(0, 6)}****) set`);
-      
+
+      // >>> NEW DEBUG LOGGING: Log the actual token being sent <<<
+      this.logger.debug(`[RELAY_AUTH_DEBUG] EXACT Auth Token Sent: [${this.config.authToken}]`);
+      // >>> END NEW DEBUG LOGGING <<<
+
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/register`,
         {
@@ -94,10 +99,10 @@ export class TelegramRelay {
         },
         8000 // 8 second timeout for registration
       );
-      
+
       // Log full response status 
       this.logger.debug(`[RELAY] Registration response status: ${response.status} ${response.statusText}`);
-      
+
       if (!response.ok) {
         let errorDetails = '';
         try {
@@ -108,41 +113,41 @@ export class TelegramRelay {
         } catch (e: unknown) {
           this.logger.error(`[RELAY] Could not read error response: ${e instanceof Error ? e.message : JSON.stringify(e)}`);
         }
-        
+
         this.logger.error(`[RELAY] Failed to register agent with status ${response.status} ${response.statusText}: ${errorDetails}`);
         return false;
       }
-      
+
       // Try to parse response
       try {
         const data = await response.json();
-        
+
         // VALHALLA FIX: Log the full response data for debugging
         this.logger.debug(`[RELAY] Registration response: ${JSON.stringify(data)}`);
-        
+
         // VALHALLA FIX: Strictly check for success property
         if (typeof data === 'object' && data !== null && 'success' in data) {
           if (!(data as any).success) {
             this.logger.error(`[RELAY] Registration failed: Server returned success=${(data as any).success}, error: ${(data as any).error || 'Unknown error'}`);
             return false;
           }
-          
+
           this.logger.info(`[RELAY] Agent ${this.config.agentId} registered successfully with response success=${(data as any).success}`);
-          
+
           // Log additional registration details if available
           if ((data as any).agent_id) {
             this.logger.info(`[RELAY] Confirmed agent ID: ${(data as any).agent_id}`);
-            
+
             // VALHALLA FIX: Verify the returned agent_id matches what we sent
             if ((data as any).agent_id !== this.config.agentId) {
               this.logger.warn(`[RELAY] Server registered a different agent ID than requested: ${(data as any).agent_id} vs ${this.config.agentId}`);
             }
           }
-          
+
           if ((data as any).expires_at) {
             this.logger.info(`[RELAY] Registration expires at: ${(data as any).expires_at}`);
           }
-          
+
           return true;
         } else {
           this.logger.error(`[RELAY] Error parsing registration response: ${typeof data === 'object' && data !== null ? JSON.stringify(data) : 'Unknown format'}`);
@@ -162,13 +167,13 @@ export class TelegramRelay {
       } else {
         this.logger.error(`[RELAY] Error registering agent: ${JSON.stringify(error)}`);
       }
-      
+
       // Check if retry is possible
       if (this.connectionAttempts < this.maxConnectionAttempts) {
         this.logger.info(`[RELAY] Registration retry ${this.connectionAttempts}/${this.maxConnectionAttempts} will be attempted shortly`);
         return false;
       }
-      
+
       this.logger.error(`[RELAY] Maximum registration attempts (${this.maxConnectionAttempts}) reached, giving up`);
       return false;
     }
@@ -181,34 +186,34 @@ export class TelegramRelay {
   async connect(): Promise<boolean> {
     // Reset connection state
     this.connected = false;
-    
+
     this.logger.info(`[RELAY] Connecting to relay server at ${this.config.relayServerUrl}`);
-    
+
     if (!this.config.agentId) {
       this.logger.error('[RELAY] No agent ID provided, cannot connect');
       return false;
     }
-    
+
     // VALHALLA FIX: Ensure agent ID is lowercase for consistency with relay server
     const agentIdForRegistration = this.config.agentId.toLowerCase();
     if (agentIdForRegistration !== this.config.agentId) {
       this.logger.info(`[RELAY] Converting agent ID to lowercase for registration: ${agentIdForRegistration}`);
       this.config.agentId = agentIdForRegistration;
     }
-    
+
     try {
       // Register with the relay
       if (!(await this.registerAgent())) {
         this.logger.error('[RELAY] Failed to register with relay server');
         return false;
       }
-      
+
       this.connected = true;
       this.connectionAttempts = 0;
-      
+
       // Start heartbeat
       this.setupPingInterval();
-      
+
       // VALHALLA FIX: Check if polling should be disabled
       const disablePolling = process.env.DISABLE_POLLING === 'true';
       if (disablePolling) {
@@ -218,9 +223,9 @@ export class TelegramRelay {
         this.startRelayPolling();
         this.logger.info('[RELAY] Polling started for updates');
       }
-      
+
       this.logger.info('[RELAY] Connected successfully');
-      
+
       return true;
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -237,10 +242,10 @@ export class TelegramRelay {
    */
   async disconnect(): Promise<void> {
     this.logger.info('[RELAY] Disconnecting from relay server');
-    
+
     this.connected = false;
     this.clearTimers();
-    
+
     // Clear all handlers
     this.messageHandlers = [];
     this.agentUpdateHandlers = [];
@@ -255,7 +260,7 @@ export class TelegramRelay {
    */
   async sendMessage(groupId: number | string, text: string): Promise<string> {
     const messageId = uuidv4();
-    
+
     // Add to queue
     this.messageQueue.push({
       id: messageId,
@@ -265,12 +270,12 @@ export class TelegramRelay {
       timestamp: Date.now(),
       status: MessageStatus.PENDING
     });
-    
+
     // Trigger queue processing if not already running
     if (!this.processingQueue) {
       this.processQueue();
     }
-    
+
     return messageId;
   }
 
@@ -361,7 +366,7 @@ export class TelegramRelay {
         return false;
       }
     }
-    
+
     try {
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/sendMessage`,
@@ -378,20 +383,20 @@ export class TelegramRelay {
           })
         }
       );
-      
+
       if (!response.ok) {
         const errorText = await response.text();
         this.logger.error(`Failed to send message: ${errorText}`);
         return false;
       }
-      
+
       const data = await response.json();
       if (typeof data === 'object' && data !== null && 'success' in data) {
         if (!(data as any).success) {
           this.logger.error(`Failed to send message: ${(data as any).error || 'Unknown error'}`);
           return false;
         }
-        
+
         this.logger.debug(`Message sent successfully: ${message.text.substring(0, 50)}...`);
         return true;
       } else {
@@ -415,7 +420,7 @@ export class TelegramRelay {
     if (this.pingInterval) {
       clearInterval(this.pingInterval);
     }
-    
+
     // VALHALLA FIX: Add initial delay before starting heartbeats
     setTimeout(() => {
       // Send initial heartbeat
@@ -426,7 +431,7 @@ export class TelegramRelay {
           this.logger.warn(`[RELAY] Initial heartbeat failed: ${JSON.stringify(error)}`);
         }
       });
-      
+
       // Set up regular heartbeat interval
       this.pingInterval = setInterval(() => {
         this.sendHeartbeat().catch((error: unknown) => {
@@ -437,7 +442,7 @@ export class TelegramRelay {
           }
         });
       }, 30000); // Every 30 seconds
-      
+
       this.logger.info('[RELAY] Heartbeat interval established');
     }, 5000); // 5 second initial delay
   }
@@ -449,7 +454,7 @@ export class TelegramRelay {
     if (!this.connected) {
       return;
     }
-    
+
     try {
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/heartbeat`,
@@ -464,19 +469,19 @@ export class TelegramRelay {
           })
         }
       );
-      
+
       if (!response.ok) {
         this.logger.warn(`Heartbeat failed: ${response.status}`);
         return;
       }
-      
+
       const data = await response.json();
       if (typeof data === 'object' && data !== null && 'success' in data) {
         if (!(data as any).success) {
           this.logger.warn(`Heartbeat failed: ${(data as any).error || 'Unknown error'}`);
           return;
         }
-        
+
         this.lastPingTime = Date.now();
         this.logger.debug('Heartbeat sent successfully');
       } else {
@@ -513,14 +518,14 @@ export class TelegramRelay {
         },
         10000 // 10-second timeout
       );
-      
+
       if (!response.ok) {
         this.logger.warn(`[RELAY] Failed to poll relay updates: ${response.status} ${response.statusText}`);
         return [];
       }
-      
+
       const data = await response.json();
-      
+
       if (typeof data === 'object' && data !== null && 'success' in data) {
         if (!(data as any).success) {
           this.logger.warn(`[RELAY] Relay update polling failed: ${(data as any).error || 'Unknown error'}`);
@@ -548,7 +553,7 @@ export class TelegramRelay {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
     }
-    
+
     this.reconnectTimeout = setTimeout(async () => {
       this.logger.info('Attempting to reconnect to relay server...');
       await this.connect();
@@ -563,12 +568,12 @@ export class TelegramRelay {
       clearInterval(this.pingInterval);
       this.pingInterval = null;
     }
-    
+
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
       this.reconnectTimeout = null;
     }
-    
+
     if (this.updatePollingInterval) {
       clearInterval(this.updatePollingInterval);
       this.updatePollingInterval = null;
@@ -589,7 +594,7 @@ export class TelegramRelay {
   ): Promise<Response> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-    
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -615,17 +620,17 @@ export class TelegramRelay {
   async getAvailableAgents(): Promise<string[]> {
     try {
       this.logger.debug(`Fetching available agents from: ${this.config.relayServerUrl}/health`);
-      
+
       const response = await this.fetchWithTimeout(
         `${this.config.relayServerUrl}/health`,
         { method: 'GET' }
       );
-      
+
       if (!response.ok) {
         this.logger.warn(`Failed to fetch available agents: ${response.status}`);
         return [];
       }
-      
+
       const data = await response.json();
       this.logger.debug(`Health response: ${JSON.stringify(data)}`);
       if (typeof data === 'object' && data !== null && 'agents_list' in data && typeof (data as any).agents_list === 'string') {
@@ -661,18 +666,18 @@ export class TelegramRelay {
       clearInterval(this.updatePollingInterval);
       this.updatePollingInterval = null;
     }
-    
+
     // Start with an immediate poll
     this.pollRelayServer();
-    
+
     // Set up interval for regular polling
     this.updatePollingInterval = setInterval(() => {
       this.pollRelayServer();
     }, 2000); // Poll every 2 seconds
-    
+
     this.logger.info('[RELAY] Started polling relay server for updates');
   }
-  
+
   /**
    * Poll the relay server for updates
    * VALHALLA FIX: Extracted method for better error handling and memory management
@@ -727,13 +732,13 @@ export class TelegramRelay {
       this.logger.debug('[RELAY] Received null message from Telegram client');
       return;
     }
-    
+
     this.logger.debug(`[RELAY] Processing update from Telegram client: ${JSON.stringify({
       message_id: message.message_id,
       from: message.from?.username || 'unknown',
       text: message.text?.substring(0, 50)
     })}`);
-    
+
     // Call all registered handlers
     for (const handler of this.messageHandlers) {
       try {

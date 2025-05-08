@@ -1,5 +1,5 @@
 import { names, uniqueNamesGenerator } from "unique-names-generator";
-import type { ActionExample, Evaluator } from './types.js';
+import type { ActionExample, Evaluator } from '@elizaos/types';
 import { stringArrayFooter } from './parsing.js';
 
 /**

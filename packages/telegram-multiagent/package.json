@@ -20,10 +20,15 @@
     "lint": "eslint src --ext .ts"
   },
   "dependencies": {
-    "@elizaos/telegram-client": "workspace:*"
+    "@elizaos/telegram-client": "workspace:*",
+    "uuid": "^9.0.1",
+    "better-sqlite3": "^9.4.3"
   },
   "devDependencies": {
-    "@elizaos/types": "workspace:*"
+    "@elizaos/types": "workspace:*",
+    "@types/uuid": "^9.0.8",
+    "@types/better-sqlite3": "^7.6.9",
+    "@types/node": "^20.11.20"
   },
   "types": "./dist/src/index.d.ts",
   "files": [

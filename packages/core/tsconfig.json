@@ -10,7 +10,6 @@
     "outDir": "./dist",
     "rootDir": "./src",
     "declaration": true,
-    "baseUrl": ".",
     "moduleResolution": "nodenext",
     "skipLibCheck": true,
     "composite": true,
@@ -18,12 +17,12 @@
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "paths": {
-      "@elizaos/types": [
-        "../types/dist"
-      ],
-      "@elizaos/types/*": [
-        "../types/dist/*"
-      ]
+      // "@elizaos/types": [
+      //   "../types/dist"
+      // ],
+      // "@elizaos/types/*": [
+      //   "../types/dist/*"
+      // ]
     }
   },
   "include": [

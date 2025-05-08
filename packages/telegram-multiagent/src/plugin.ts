@@ -1,7 +1,7 @@
 // @ts-nocheck
 
 import { IAgentRuntime as AgentRuntime, Plugin } from './types';
-import telegramClient from '@elizaos/telegram-client';
+// import telegramClient from '@elizaos/telegram-client'; // Temporarily commented out if not used in MINIMAL version
 import { TelegramRelay } from './TelegramRelay';
 import { TelegramRelayConfig } from './types';
 import { FallbackMemoryManager } from './FallbackMemoryManager';
@@ -21,142 +21,121 @@ export class TelegramMultiAgentPlugin implements Plugin {
     private memoryManager?: FallbackMemoryManager;
     private conversationManager?: ConversationManager;
     private initialized: boolean = false;
+    private telegramClient?: any;
 
     readonly name: string = 'telegram-multiagent';
 
     constructor(contextOrRuntime: MinimalPluginContext | AgentRuntime) {
-        const runtime = (contextOrRuntime as MinimalPluginContext).runtime ?? contextOrRuntime as AgentRuntime;
-        if (!runtime) throw new Error("AgentRuntime instance is required.");
-        this.runtime = runtime;
-        if (!this.runtime.logger) {
-            console.error("Runtime logger missing!");
-            this.logger = { info: console.info, warn: console.warn, error: console.error, debug: console.debug, trace: console.trace };
-        } else {
-            this.logger = this.runtime.logger;
+        console.error(">>>> CONSTRUCTOR: TelegramMultiAgentPlugin Entered <<<<");
+        try {
+            const runtime = (contextOrRuntime as MinimalPluginContext).runtime ?? contextOrRuntime as AgentRuntime;
+            console.error(">>>> CONSTRUCTOR: runtime determined <<<<", typeof runtime);
+            if (!runtime) {
+                console.error("!!! CONSTRUCTOR FATAL: AgentRuntime instance is required. THROWING. !!!");
+                throw new Error("AgentRuntime instance is required.");
+            }
+            this.runtime = runtime;
+            console.error(">>>> CONSTRUCTOR: this.runtime assigned <<<<", typeof this.runtime);
+
+            if (!this.runtime.logger) {
+                console.error("!!! CONSTRUCTOR WARN: Runtime logger missing! Using console. !!!");
+                this.logger = { info: console.info, warn: console.warn, error: console.error, debug: console.debug, trace: console.trace };
+            } else {
+                this.logger = this.runtime.logger;
+                console.error(">>>> CONSTRUCTOR: this.logger assigned from runtime.logger <<<<", typeof this.logger);
+            }
+            this.logger.info('[CONSTRUCTOR] TelegramMultiAgentPlugin: Logging via this.logger now possible.');
+
+            console.error(">>>> CONSTRUCTOR: Attempting to set agentId <<<<");
+            this.agentId = process.env.AGENT_ID || this.runtime?.getAgentId?.() || (this.runtime as any)?.character?.agentId || '<unknown_constructor>';
+            this.logger.info(`[CONSTRUCTOR_DEBUG] this.agentId resolved to: ${this.agentId} in TelegramMultiAgentPlugin constructor.`);
+            console.error(`>>>> CONSTRUCTOR: agentId set to: ${this.agentId} <<<<`);
+
+            // Temporarily comment out the early telegramClient check to isolate constructor success
+            /*
+            console.error(">>>> CONSTRUCTOR: Attempting to access this.runtime.clients.telegram <<<<");
+            this.telegramClient = (this.runtime?.clients as any)?.telegram;
+            if (!this.telegramClient || typeof this.telegramClient.sendMessage !== 'function') {
+                this.logger.warn('[CONSTRUCTOR] Telegram client NOT YET available or sendMessage is not a function.');
+            } else {
+                this.logger.info('[CONSTRUCTOR] Telegram client SEEMS available in constructor.');
+            }
+            */
+            console.error(">>>> CONSTRUCTOR: TelegramMultiAgentPlugin Exiting Successfully <<<<");
+        } catch (e: any) {
+            console.error("!!! CONSTRUCTOR CRASHED !!!", e, e.stack);
+            throw e; // Re-throw to ensure failure is propagated
         }
-        this.logger.info('[CONSTRUCTOR] TelegramMultiAgentPlugin: Constructor called');
     }
 
     async initialize(/* context?: MinimalPluginContext */): Promise<void> {
-        this.logger.info('[INITIALIZE] Plugin initialization started.');
-        this.agentId = this.runtime.agentId;
-        if (!this.agentId || this.agentId === '<unknown>') {
-            this.logger.warn(`[INITIALIZE] Agent ID is still unknown!`);
-        } else {
-            this.logger.info(`[INITIALIZE] Initializing with Agent ID: ${this.agentId}`);
+        console.log(">>>> MINIMAL TelegramMultiAgentPlugin.initialize ENTERED <<<<");
+        // Check if logger itself is valid first
+        if (!this.logger || typeof this.logger.info !== 'function') {
+            console.error("!!! MINIMAL FATAL: this.logger is invalid inside initialize() !!!");
+            // Avoid throwing here to see if the raw log above appears
+            return;
         }
-
-        try {
-            this.logger.info('[INITIALIZE] Initializing ConversationManager...');
-            this.conversationManager = new ConversationManager(this.logger);
-            this.logger.info('[INITIALIZE] ConversationManager created.');
-        } catch (error) {
-            this.logger.error('[INITIALIZE] Failed to initialize managers', error);
-        }
-
-        try {
-            this.logger.info('[INITIALIZE] Initializing Telegram client...');
-            // 1) Preferred: use TELEGRAM_BOT_TOKEN from environment
-            let token = process.env.TELEGRAM_BOT_TOKEN;
-            // 2) Try agent-specific token if generic is not set
-            if (!token && process.env.AGENT_ID) {
-                const formattedId = process.env.AGENT_ID.toUpperCase().replace(/-/g, '_');
-                const envVarName = `TELEGRAM_BOT_TOKEN_${formattedId}`;
-                token = process.env[envVarName];
-                if (token) {
-                    console.log(`[MultiAgentPlugin] Using Telegram token from ${envVarName} environment variable`);
-                }
-            }
-            // 3) Fallback: use character secrets
-            if (!token) {
-                const char = (this.runtime as any).character || {};
-                const secrets = char.secrets || {};
-                token = secrets.TELEGRAM_BOT_TOKEN;
-                if (!token) {
-                    console.error('[MultiAgentPlugin] No Telegram token found for agent, aborting client start');
-                    return;
-                }
-                console.log('[MultiAgentPlugin] Using Telegram token from character secrets');
-            }
-
-            this.botToken = substituteEnvVars(token);
-            if (!this.botToken) throw new Error('Telegram bot token substitution failed');
-            this.logger.info(`[INITIALIZE] Substituted Telegram Token: ${this.botToken.substring(0, 10)}...`);
-            // Debug: output the full token being passed to TelegramClient for verification
-            this.logger.debug(`[INITIALIZE] Token being passed to TelegramClient: ${this.botToken}`);
-
-            telegramClient.initialize(this.botToken!, this.runtime);
-            telegramClient.on('message', this.handleTelegramMessage.bind(this));
-
-            const botInfo = telegramClient.getBotInfo;
-            this.logger.info(`[INITIALIZE] Connected to Telegram as bot: ${botInfo?.username}`);
-            this.logger.info('[INITIALIZE] Telegram client initialized.');
-        } catch (error) {
-            this.logger.error('[INITIALIZE] Failed to initialize Telegram client', error);
-            throw error;
-        }
-
-        try {
-            this.logger.info('[INITIALIZE] Initializing Relay connection...');
-            const relayConfigFromPatch = (this.runtime as any).relayConfig as any;
-            if (!relayConfigFromPatch?.relayServerUrl) throw new Error('Relay config missing');
-
-            const fullRelayConfig: TelegramRelayConfig = {
-                relayServerUrl: relayConfigFromPatch.relayServerUrl,
-                authToken: relayConfigFromPatch.authToken || process.env.RELAY_AUTH_TOKEN,
-                agentId: this.agentId,
-            };
-
-            this.relay = new TelegramRelay(fullRelayConfig, this.logger);
-            await this.relay.connect();
-
-            if (typeof (this.relay as any).registerMessageHandler === 'function') {
-                (this.relay as any).registerMessageHandler(this.handleRelayMessage.bind(this));
-            } else {
-                this.logger.warn('[INITIALIZE] Could not bind Relay message handler (registerMessageHandler not found).');
-            }
-            this.logger.info('[INITIALIZE] Relay connected successfully.');
-        } catch (error) {
-            this.logger.error('[INITIALIZE] Failed to initialize Relay connection', error);
-        }
-
-        this.initialized = true;
-        this.logger.info('[INITIALIZE] Plugin initialization completed.');
+        this.logger.info(`[TGMA_MINIMAL_INIT] Minimal initialize() was called for agentId: ${this.agentId}. Timestamp: ${Date.now()}`);
+        // All other logic from the original initialize method is temporarily removed for this test.
     }
 
     private async handleTelegramMessage(message: any): Promise<void> {
-        this.logger.debug(`[HANDLER] Received message from Telegram: ${JSON.stringify(message)?.substring(0, 100)}...`);
-        if (!this.relay) return this.logger.warn('[HANDLER] Relay not init.');
-        if (!message?.chat?.id || !message?.text || !message?.from?.id) return this.logger.warn('[HANDLER] Skipping incomplete TG msg.');
+        this.logger.debug(`[HANDLER_TG] Received message from Telegram: ${JSON.stringify(message)?.substring(0, 100)}...`);
+        if (!this.relay) return this.logger.warn('[HANDLER_TG] Relay not initialized. Cannot forward message.');
+        if (!message?.chat?.id || !message?.text || !message?.from?.id) return this.logger.warn('[HANDLER_TG] Skipping incomplete Telegram message.');
+
+        if (!this.telegramClient || typeof this.telegramClient.sendMessage !== 'function') {
+            this.logger.error('[HANDLER_TG] this.telegramClient is invalid. Cannot reliably process incoming TG message for relay.');
+            return;
+        }
+
         try {
-            await this.relay.sendMessage(message.chat.id, message.text);
-            this.logger.debug(`[HANDLER] Forwarded TG message to Relay.`);
+            await this.relay.sendMessage(message.chat.id, message.text, message.from.id, message.message_id, message.from.username);
+            this.logger.debug(`[HANDLER_TG] Forwarded Telegram message to Relay.`);
         } catch (error) {
-            this.logger.error(`[HANDLER] Failed to forward TG message to Relay`, error);
+            this.logger.error(`[HANDLER_TG] Failed to forward Telegram message to Relay`, error);
         }
     }
 
     private async handleRelayMessage(message: any): Promise<void> {
-        this.logger.debug(`[HANDLER] Received message from Relay: ${JSON.stringify(message)?.substring(0, 100)}...`);
-        if (message?.sender_agent_id === this.agentId) return this.logger.debug(`[HANDLER] Skipping own msg.`);
-        if (!message?.chat?.id || !message?.text || !message?.from?.id) return this.logger.warn('[HANDLER] Skipping incomplete Relay msg.');
-        if (!this.runtime?.handleMessage) return this.logger.error('[HANDLER] Runtime missing.');
-        if (!this.conversationManager) return this.logger.warn('[HANDLER] Conv manager missing.');
+        this.logger.debug(`[HANDLER_RELAY] Received message from Relay: ${JSON.stringify(message)?.substring(0, 100)}...`);
+
+        if (message?.sender_agent_id === this.agentId) {
+            this.logger.debug(`[HANDLER_RELAY] Skipping own message received from Relay (sender_agent_id: ${message.sender_agent_id}).`);
+            return;
+        }
+        if (!message?.chat?.id || !message?.text) {
+            this.logger.warn('[HANDLER_RELAY] Skipping incomplete Relay message.');
+            return;
+        }
+        if (!this.runtime?.handleMessage) {
+            this.logger.error('[HANDLER_RELAY] Runtime or runtime.handleMessage is missing. Cannot process message.');
+            return;
+        }
+        if (!this.conversationManager) {
+            this.logger.warn('[HANDLER_RELAY] Conversation manager not initialized. Response decisions may be affected.');
+        }
+
+        if (!this.telegramClient || typeof this.telegramClient.sendMessage !== 'function') {
+            this.logger.error('[HANDLER_RELAY] this.telegramClient is invalid. Cannot send response to Telegram.');
+            return;
+        }
 
         try {
             const response = await this.runtime.handleMessage(message);
             if (response?.content?.trim()) {
-                const shouldRespond = await this.conversationManager.shouldAgentRespond?.(message.chat.id, this.agentId, message.sender_agent_id) ?? true;
+                const shouldRespond = await this.conversationManager?.shouldAgentRespond?.(message.chat.id, this.agentId, message.sender_agent_id) ?? true;
                 if (shouldRespond) {
-                    this.logger.info(`[HANDLER] Sending response to chat ${message.chat.id}`);
-                    await telegramClient.sendMessage(message.chat.id, response.content);
-                    await this.conversationManager.recordMessage?.(message.chat.id, this.agentId, response.content);
+                    this.logger.info(`[HANDLER_RELAY] Agent ${this.agentId} sending response to chat ${message.chat.id}: ${response.content.substring(0, 50)}...`);
+                    await this.telegramClient.sendMessage(message.chat.id, response.content);
+                    await this.conversationManager?.recordMessage?.(message.chat.id, this.agentId, response.content);
                 } else {
-                    this.logger.debug(`[HANDLER] Decided not to respond.`);
+                    this.logger.debug(`[HANDLER_RELAY] Agent ${this.agentId} decided not to respond to message from ${message.sender_agent_id || 'unknown sender'}.`);
                 }
             }
         } catch (error) {
-            this.logger.error('[HANDLER] Failed to handle Relay message', error);
+            this.logger.error(`[HANDLER_RELAY] Failed to handle Relay message or send response`, error);
         }
     }
 }

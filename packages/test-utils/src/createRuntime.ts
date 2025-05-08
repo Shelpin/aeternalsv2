@@ -1,4 +1,5 @@
-import { DatabaseAdapter, AgentRuntime, ModelProviderName } from '@elizaos/core';
+import { CoreDatabaseAdapter, AgentRuntime } from '@elizaos/core';
+import { ModelProviderName } from '@elizaos/types';
 import type {
     Action,
     Evaluator,
@@ -10,8 +11,9 @@ import type {
     Goal,
     RAGKnowledgeItem,
     Character,
-    UUID
-} from '@elizaos/core';
+    UUID,
+    IDatabaseAdapter
+} from '@elizaos/types';
 // import { SqlJsDatabaseAdapter } from "@elizaos/adapter-sqljs"; // Commented out - package not found
 // import { SupabaseDatabaseAdapter } from "@elizaos/adapter-supabase"; // Commented out - package not found
 // import { PGLiteDatabaseAdapter } from "@elizaos/adapter-pglite"; // Commented out - package not found
@@ -26,7 +28,7 @@ import { SERVER_URL } from './constants.js';
 import type { User } from './types.js';
 
 // Mock SQLite adapter for testing purposes
-class MockSqliteDatabaseAdapter extends DatabaseAdapter<any> {
+class MockSqliteDatabaseAdapter extends CoreDatabaseAdapter<any> {
     constructor(dbPath: string) {
         super({});
         console.log(`[MockSqliteDatabaseAdapter] Created with path: ${dbPath}`);
@@ -326,7 +328,7 @@ export async function createRuntime({
     actions?: Action[];
     providers?: Provider[];
 }) {
-    let adapter: DatabaseAdapter<any>;
+    let adapter: CoreDatabaseAdapter<any>;
     // Initialize user with a default value to ensure it's always defined
     let user: User = {
         id: zeroUuid,

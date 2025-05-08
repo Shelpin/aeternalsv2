@@ -1,5 +1,5 @@
 import { getEmbeddingModelSettings, getEndpoint } from './models.js';
-import { type IAgentRuntime, ModelProviderName } from './types.js';
+import { type IAgentRuntime, ModelProviderName } from '@elizaos/types';
 import settings from './settings.js';
 import elizaLogger from './logger.js';
 import LocalEmbeddingModelManager from './localembeddingManager.js';

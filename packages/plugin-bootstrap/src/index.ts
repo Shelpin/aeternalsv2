@@ -35,13 +35,33 @@ const elizaBootstrapPlugin: Plugin = {
     name: "@elizaos/plugin-bootstrap",
     version: "0.1.0", // Example version
 
-    // Add required initialize and shutdown methods
+    // Keep PluginContext signature to satisfy the Plugin interface
     async initialize(context: PluginContext) {
-        // TODO: Register actions, evaluators, providers using the context
-        // Example: context.runtime.registerActions(bootstrapActions);
-        // Example: context.runtime.registerEvaluators(bootstrapEvaluators);
-        // Example: context.runtime.registerProviders(bootstrapProviders);
-        context.runtime.logger.info(`Plugin ${this.name} initialized.`);
+        console.log(">>>> ENTERING bootstrapPlugin.initialize <<<<"); // RAW LOG
+
+        // Treat context AS the runtime, since that's what AgentRuntime passes
+        const runtime = context as any as PluginContext['runtime']; // Cast to runtime type
+
+        if (!runtime) {
+            console.error("!!! bootstrapPlugin.initialize: runtime (derived from context) is MISSING !!!");
+            return;
+        }
+        console.log(`>>>> bootstrapPlugin.initialize: runtime type: ${typeof runtime}`);
+
+        if (!runtime.logger) {
+            console.error("!!! bootstrapPlugin.initialize: runtime.logger is MISSING !!!");
+            console.log(`>>>> bootstrapPlugin.initialize: runtime keys: ${Object.keys(runtime).join(', ')}`);
+            return;
+        }
+        console.log(`>>>> bootstrapPlugin.initialize: runtime.logger type: ${typeof runtime.logger}`);
+
+        // Original logic using the direct runtime argument
+        runtime.logger.info(`Plugin ${this.name} initialized.`); // Use runtime.logger directly
+        console.log(">>>> bootstrapPlugin.initialize: SUCCESSFULLY LOGGED via runtime.logger <<<<");
+        // TODO: Register actions, evaluators, providers using the runtime
+        // Example: runtime.registerActions(bootstrapActions);
+        // Example: runtime.registerEvaluators(bootstrapEvaluators);
+        // Example: runtime.registerProviders(bootstrapProviders);
     },
 
     async shutdown() {

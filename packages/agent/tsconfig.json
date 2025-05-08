@@ -54,6 +54,12 @@
     },
     {
       "path": "../types"
+    },
+    {
+      "path": "../plugin-bootstrap"
+    },
+    {
+      "path": "../adapter-sqlite"
     }
   ]
 }

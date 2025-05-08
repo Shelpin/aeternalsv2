@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ModelProviderName } from './types.js';
+import { ModelProviderName } from '@elizaos/types';
 import elizaLogger from './logger.js';
 
 // TODO: TO COMPLETE

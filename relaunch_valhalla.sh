@@ -41,6 +41,19 @@ echo -e "\n${YELLOW}[3] Running consolidated clean build...${NC}"
 pnpm recursive run clean
 rm -rf node_modules
 pnpm install
+
+# --- Explicitly build core first --- 
+echo -e "   ${BLUE}Attempting explicit build of @elizaos/core...${NC}"
+pnpm -F @elizaos/core run clean 
+pnpm -F @elizaos/core run build
+if [ $? -ne 0 ]; then
+  echo -e "${RED}Explicit build of @elizaos/core failed! Check errors above.${NC}"
+  exit 1
+else
+  echo -e "   ${GREEN}Explicit build of @elizaos/core successful.${NC}"
+fi
+# --- End explicit build ---
+
 pnpm recursive run build
 if [ $? -ne 0 ]; then
   echo -e "${RED}Build failed! Check errors above.${NC}"

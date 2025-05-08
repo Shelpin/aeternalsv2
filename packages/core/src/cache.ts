@@ -5,7 +5,7 @@ import type {
     ICacheManager,
     IDatabaseCacheAdapter,
     UUID,
-} from './types.js';
+} from '@elizaos/types';
 
 export interface ICacheAdapter {
     get(key: string): Promise<string | undefined>;

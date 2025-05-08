@@ -109,30 +109,65 @@ export class AgentRuntime implements IAgentRuntime {
         // Register Plugins
         if (this.providers && Array.isArray(this.providers)) {
             this.logger.info(`Found ${this.providers.length} providers/plugins to register.`);
-            for (const plugin of this.providers) {
-                if (plugin && typeof plugin.register === 'function') {
-                    try {
-                        const pluginName = plugin.name || plugin.npmName || 'Unknown Plugin';
-                        this.logger.info(`Registering plugin: ${pluginName}`);
-                        const registrationResult = plugin.register(this); // Pass runtime instance
-                        if (registrationResult) {
-                            this.logger.info(`Successfully registered plugin: ${pluginName}`);
-                            // Optional: Await initialization if needed, per expert feedback
-                            // if (typeof plugin.initialize === 'function') {
-                            //     this.logger.info(`Initializing plugin: ${pluginName}`);
-                            //     await plugin.initialize(); 
-                            //     this.logger.info(`Initialized plugin: ${pluginName}`);
-                            // }
-                        } else {
-                            this.logger.warn(`Registration returned falsy value for plugin: ${pluginName}`);
-                        }
-                    } catch (error) {
-                        const pluginName = plugin.name || plugin.npmName || 'Unknown Plugin';
-                        this.logger.error(`Error registering plugin ${pluginName}: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
+            for (const pluginOrClass of this.providers) {
+                let pluginInstance: any = null;
+                let pluginName = 'Unknown Plugin';
+
+                try {
+                    // Check if it's a class constructor or an object with methods
+                    if (typeof pluginOrClass === 'function' && pluginOrClass.prototype && pluginOrClass.prototype.constructor === pluginOrClass) {
+                        // It's likely a class, instantiate it
+                        pluginName = pluginOrClass.name || pluginName;
+                        this.logger.debug(`Instantiating plugin class: ${pluginName}`);
+                        // Assuming constructor takes (runtime, character?)
+                        // Pass runtime context, character might be needed by some plugins
+                        pluginInstance = new pluginOrClass(this, this.character);
+                        pluginName = pluginInstance?.name || pluginName; // Get name from instance if available
+                    } else if (typeof pluginOrClass === 'object' && pluginOrClass !== null) {
+                        // It's likely already an instance or a plain object
+                        pluginInstance = pluginOrClass;
+                        pluginName = pluginInstance?.name || pluginInstance?.npmName || pluginName;
+                    } else {
+                        this.logger.warn('Encountered an invalid item in the plugins array:', pluginOrClass);
+                        continue; // Skip this invalid item
                     }
-                } else {
-                    this.logger.warn(`Provider object found but lacks a register method.`);
-                    console.log('Invalid plugin object:', plugin); // Log the object for inspection
+
+                    this.logger.info(`Processing plugin: ${pluginName}`);
+
+                    // --- Attempt Registration (if available) ---
+                    if (pluginInstance && typeof pluginInstance.register === 'function') {
+                        this.logger.debug(`Calling register() for plugin: ${pluginName}`);
+                        const registrationResult = pluginInstance.register(this);
+                        if (registrationResult) {
+                            this.logger.info(`Successfully registered plugin via register(): ${pluginName}`);
+                        } else {
+                            this.logger.warn(`register() returned falsy value for plugin: ${pluginName}`);
+                        }
+                    }
+
+                    // --- Attempt Initialization (if available) ---
+                    if (pluginInstance && typeof pluginInstance.initialize === 'function') {
+                        this.logger.info(`Calling initialize() for plugin: ${pluginName}`);
+                        this.logger.debug(`[RUNTIME_INIT_DEBUG] Before await initialize: pluginInstance exists: ${!!pluginInstance}`);
+                        this.logger.debug(`[RUNTIME_INIT_DEBUG] Before await initialize: typeof pluginInstance.initialize: ${typeof pluginInstance.initialize}`);
+                        try {
+                            // Pass the runtime instance as the context
+                            await pluginInstance.initialize(this);
+                        } catch (initError) {
+                            this.logger.error(`[RUNTIME_INIT_DEBUG] Error caught DIRECTLY from awaiting pluginInstance.initialize() for ${pluginName}:`, initError);
+                            // Re-throw or handle as needed, for now just log that we caught it here
+                            throw initError; // Re-throw to ensure it's logged by the outer catch block too
+                        }
+                        this.logger.info(`Successfully initialized plugin via initialize(): ${pluginName}`);
+                    } else if (!pluginInstance || (typeof pluginInstance.register !== 'function' && typeof pluginInstance.initialize !== 'function')) {
+                        // Log warning only if neither register nor initialize is present
+                        this.logger.warn(`Plugin ${pluginName} lacks both register() and initialize() methods.`);
+                    }
+
+                } catch (error) {
+                    this.logger.error(`Error processing plugin ${pluginName}: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
+                    // Optionally log stack trace for deeper debugging
+                    // if (error instanceof Error) console.error(error.stack);
                 }
             }
         } else {
@@ -213,108 +248,58 @@ export async function handleMessage(this: AgentRuntime, message: any) { // Added
 
     if (!text || !chatId) {
         logger.warn("handleMessage received invalid or non-text message structure. Cannot process.", { textExists: !!text, chatIdExists: !!chatId });
-        logger.debug("--- Handling message END (Invalid Structure) ---");
-        return; // Cannot proceed without text and chat ID
+        logger.debug("--- Handling message END (Invalid Message Structure) ---");
+        return;
     }
 
-    logger.info(`💬 Message received in chat ${chatId} from ${user}: ${text}`);
+    const responseText = `🤖 Echo from agent: You (${user}) said: ${text}`;
+    logger.debug("Prepared response:", responseText);
 
-    // Simple echo response for now
-    const responseText = `🤖 Echo from ${this.agentId}: You (${user}) said: ${text}`;
-    logger.debug(`Prepared response: ${responseText}`);
-
-    // --- Client Lookup and Validation --- 
-    let telegramBotClient: any = null;
     logger.debug("Attempting to locate Telegram client instance on runtime...");
-    if (Array.isArray(this.clients) && this.clients.length > 0) {
-        // Find the client object pushed during initialization by the agent startup
-        const clientInstance = this.clients.find(c =>
-            (c as any).name === '@elizaos/client-telegram' || // Check name property if exists
-            (c as any).constructor?.name === 'TelegramClient' || // Check constructor name
-            (typeof c === 'object' && c !== null && (c as any).bot) // Check if it has a .bot property
-        );
-        if (clientInstance && (clientInstance as any).bot) {
-            telegramBotClient = (clientInstance as any).bot;
-            logger.debug("Found client via this.clients lookup. Client object:", clientInstance);
-            logger.debug("Extracted .bot property:", telegramBotClient);
-        } else if (clientInstance) {
-            logger.warn('Found potential client instance via this.clients, but .bot property missing directly. Instance:', clientInstance);
-            // Add more specific checks if needed based on client structure
+
+    const globalRuntimeClients = (globalThis.__elizaRuntime as any)?.clients;
+    logger.debug(`[CLIENT_LOCATE_DEBUG] Is this.clients === globalThis.__elizaRuntime.clients? ${this.clients === globalRuntimeClients}`);
+    logger.debug(`[CLIENT_LOCATE_DEBUG] Actual length of this.clients at start of search: ${this.clients ? this.clients.length : 'null/undefined'}`);
+
+    let telegramClient: any = null;
+
+    if (this.clients && Array.isArray(this.clients) && this.clients.length > 0) {
+        telegramClient = this.clients.find(client => (client as any).name === 'telegram' || client.constructor?.name === 'TelegramClient' || (typeof (client as any).sendMessage === 'function' && typeof (client as any).start === 'function'));
+        if (telegramClient) {
+            logger.info("Telegram client instance found on this.clients.");
         } else {
-            logger.debug("No matching client found in this.clients array.");
+            logger.warn("No client matching Telegram criteria found on this.clients.");
+            logger.debug("Contents of this.clients:", JSON.stringify(this.clients.map(c => ({ name: (c as any).name, type: typeof c, constructorName: (c as any).constructor?.name }))));
         }
     } else {
         logger.debug("this.clients array is empty or not an array.");
     }
 
-    // Fallback to global patch (should be less necessary now but kept as backup)
-    if (!telegramBotClient) {
-        logger.debug("Client not found via this.clients, attempting globalThis fallback...");
-        telegramBotClient = globalThis.__elizaRuntime?.clients?.telegram?.bot;
-        if (telegramBotClient) {
-            logger.debug('Using Telegram client from globalThis.__elizaRuntime fallback.');
-        } else {
-            logger.error("❌ FATAL: Telegram client instance NOT FOUND on runtime.clients or globalThis patch.");
-            logger.debug("--- Handling message END (Client Not Found) ---");
-            return; // Cannot send response without a client
-        }
-    }
-    // --- End Client Lookup --- 
-
-    // --- Send Response via Telegram --- 
-    let sentSuccessfully = false;
-    try {
-        logger.debug(`Attempting to send response via Telegram bot client to chat ${chatId}. Client Type: ${typeof telegramBotClient}`);
-        // Ensure sendMessage exists and is a function before calling
-        if (telegramBotClient && typeof telegramBotClient.sendMessage === 'function') {
-            await telegramBotClient.sendMessage(chatId, responseText);
-            logger.info(`✅ Successfully sent response to Telegram chat ${chatId}`);
-            sentSuccessfully = true;
-        } else {
-            logger.error('❌ Failed to send response: telegramBotClient.sendMessage is not a function or client is invalid.', { clientExists: !!telegramBotClient });
-        }
-    } catch (error) {
-        logger.error(`❌ Error during telegramBotClient.sendMessage to chat ${chatId}:`, error);
-    }
-    // --- End Send Response --- 
-
-    // --- Forward to Relay (Only if Telegram send was successful) --- 
-    if (sentSuccessfully) {
-        if (typeof (this as any).forwardToRelay === 'function') {
-            logger.debug(`Attempting to forward message context to relay for agent ${this.agentId}`);
-            // Construct a payload suitable for the relay
-            const relayPayload = {
-                message: { // Simulate the message *sent* by this bot
-                    message_id: message.message_id ? `${message.message_id}-relay-${Date.now()}` : Date.now(), // Create a unique-ish ID
-                    from: {
-                        id: this.character?.telegramId || this.agentId,
-                        is_bot: true,
-                        first_name: this.character?.name || this.agentId,
-                        username: this.character?.botUsername || this.agentId
-                    },
-                    chat: {
-                        id: chatId,
-                        type: message.chat?.type || 'group'
-                    },
-                    date: Math.floor(Date.now() / 1000),
-                    text: responseText // The message content that was sent
-                    // Consider adding 'reply_to_message_id: message.message_id' if needed
-                },
-                sender_agent_id: this.agentId
-            };
-            try {
-                await (this as any).forwardToRelay(relayPayload);
-                logger.info(`📡 Successfully forwarded message context to relay.`);
-            } catch (relayError) {
-                logger.error(`❌ Error during forwardToRelay call:`, relayError);
+    if (!telegramClient && globalRuntimeClients) {
+        logger.debug("Client not found via this.clients, attempting globalThis fallback on globalRuntimeClients...");
+        if (Array.isArray(globalRuntimeClients) && globalRuntimeClients.length > 0) {
+            telegramClient = globalRuntimeClients.find(client => (client as any).name === 'telegram' || client.constructor?.name === 'TelegramClient' || (typeof (client as any).sendMessage === 'function' && typeof (client as any).start === 'function'));
+            if (telegramClient) {
+                logger.info("Telegram client instance found on globalThis.__elizaRuntime.clients (globalRuntimeClients).");
+            } else {
+                logger.warn("No client matching Telegram criteria found on globalThis.__elizaRuntime.clients (globalRuntimeClients).");
             }
-        } else {
-            logger.warn("Skipping relay: `forwardToRelay` function not found on runtime.");
         }
-    } else {
-        logger.warn("Skipping relay: Telegram message was not sent successfully.");
     }
-    // --- End Relay Forwarding --- 
 
+    if (!telegramClient || typeof telegramClient.sendMessage !== 'function') {
+        logger.error("❌ FATAL: Telegram client instance NOT FOUND on runtime.clients or globalThis patch.");
+        logger.debug("--- Handling message END (Client Not Found) ---");
+        return;
+    }
+
+    try {
+        logger.info(`Attempting to send response via client to chatID: ${chatId}`);
+        await telegramClient.sendMessage(chatId, responseText);
+        logger.info(`✅ Successfully sent response to chatID: ${chatId}`);
+    } catch (error) {
+        logger.error(`❌ Error sending message via Telegram client: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
+        // Consider logging stack trace for deeper errors: if (error instanceof Error) console.error(error.stack);
+    }
     logger.debug("--- Handling message END ---");
 } 

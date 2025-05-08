@@ -52,39 +52,77 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     // Wait for the ElizaOS runtime
     await this.waitForRuntime(10000);
 
-    // STEP 2 from "Final Ascent" plan: Direct assignment and check for telegramClient
     this.telegramClient = (this.runtime?.clients as any)?.telegram;
     if (!this.telegramClient || typeof this.telegramClient.sendMessage !== 'function') {
-      // Optional: Add more specific logging about what was missing if desired
-      // if (!this.telegramClient) this.logger.error('[PLUGIN_INIT] this.telegramClient is null/undefined.');
-      // else this.logger.error('[PLUGIN_INIT] this.telegramClient.sendMessage is not a function.');
       throw new Error('Telegram client not available during plugin initialization.');
     }
     this.logger.info('✅ Telegram client successfully assigned and validated in initialize.');
 
-    // Listen for incoming Telegram messages (from actual Telegram client)
-    // Now use this.telegramClient
     this.telegramClient.on('message', (msg: RelayMessage) => {
       this.handleDirectTelegramMessage(msg).catch(e => this.logger.error(`Handle direct TG msg error: ${e}`));
     });
 
-    // Initialize the relay server for multi-agent forwarding
-    const agentId = this.runtime?.getAgentId?.() || 'unknown'; // Reverted this line in previous step to fix build
+    const agentIdFromRuntime = this.runtime?.getAgentId?.() || 'unknown'; // Get agentId from runtime
+
+    // >>> MODIFIED LOGIC TO GET AUTH TOKEN FROM PATCHED RUNTIME <<<
+    let authoritativeAuthToken = this.config.authToken; // Default to constructor/options config
+    const globalRuntime = globalThis.__elizaRuntime as any;
+
+    // Check directly on globalRuntime.relayConfig
+    if (globalRuntime?.relayConfig?.authToken) {
+      authoritativeAuthToken = globalRuntime.relayConfig.authToken;
+      this.logger.info(`[PLUGIN_AUTH_PATCH] Successfully retrieved authToken from globalRuntime.relayConfig: [${authoritativeAuthToken?.substring(0, 6)}****]`);
+    } else {
+      this.logger.warn('[PLUGIN_AUTH_PATCH] Could not retrieve authToken from globalRuntime.relayConfig. Falling back to plugin config.');
+      this.logger.warn(`[PLUGIN_AUTH_PATCH] globalRuntime exists: ${!!globalRuntime}`);
+      if (globalRuntime) {
+        this.logger.warn(`[PLUGIN_AUTH_PATCH] globalRuntime.relayConfig exists: ${!!globalRuntime.relayConfig}`);
+        if (globalRuntime.relayConfig) {
+          this.logger.warn(`[PLUGIN_AUTH_PATCH] authToken in globalRuntime.relayConfig: [${globalRuntime.relayConfig.authToken}]`);
+        }
+      }
+    }
+    // >>> END MODIFIED LOGIC <<<
+
+    // >>> NEW: Get agentId from globalRuntime.relayConfig if available, otherwise use agentIdFromRuntime <<<
+    const finalAgentId = globalRuntime?.relayConfig?.agentId || agentIdFromRuntime;
+    if (globalRuntime?.relayConfig?.agentId) {
+      this.logger.info(`[PLUGIN_AGENT_ID_PATCH] Using agentId from globalRuntime.relayConfig: [${finalAgentId}]`);
+    } else {
+      this.logger.info(`[PLUGIN_AGENT_ID_PATCH] Using agentId from runtime.getAgentId(): [${finalAgentId}]`);
+    }
+    // >>> END NEW <<<
+
     const relayCfg: TelegramRelayConfig = {
       relayServerUrl: this.config.relayServerUrl,
-      authToken: this.config.authToken,
-      agentId,
+      authToken: authoritativeAuthToken, // Use the potentially patched token
+      agentId: finalAgentId, // Use the potentially patched agentId
       retryLimit: this.config.maxRetries,
       retryDelayMs: this.config.conversationCheckIntervalMs
     };
+
+    this.logger.debug(`[PLUGIN_INIT_DEBUG] Config being used for TelegramRelay: ${JSON.stringify(relayCfg)}`);
+    if (relayCfg) {
+      this.logger.debug(`[PLUGIN_INIT_DEBUG] AuthToken in relayCfg for TelegramRelay: [${relayCfg.authToken}]`);
+      this.logger.debug(`[PLUGIN_INIT_DEBUG] AgentId in relayCfg for TelegramRelay: [${relayCfg.agentId}]`);
+    }
+
     this.relay = new TelegramRelay(relayCfg, this.logger);
     await this.relay.connect();
     this.logger.info('✅ Relay connection established');
 
-    // Register handler for messages received from the relay server (from other bots)
     this.relay.registerMessageHandler((message: RelayMessage) => {
       this.handleRelayMessage(message).catch(e => this.logger.error(`Handle relay msg error: ${e}`));
     });
+
+    setInterval(async () => {
+      try {
+        const agents = await this.relay.getAvailableAgents();
+        this.logger.debug(`[RELAY] Current available agents: ${agents.join(', ') || 'None'}`);
+      } catch (e) {
+        this.logger.warn('[RELAY] Failed to get agent list');
+      }
+    }, 60000);
   }
 
   private async handleDirectTelegramMessage(msg: RelayMessage): Promise<void> {

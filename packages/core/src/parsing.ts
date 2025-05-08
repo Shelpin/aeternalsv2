@@ -1,4 +1,4 @@
-import type { ActionResponse } from './types.js';
+import type { ActionResponse } from '@elizaos/types';
 const jsonBlockPattern = /```json\n([\s\S]*?)\n```/;
 
 export const messageCompletionFooter = `\nResponse format should be formatted in a valid JSON block like this:

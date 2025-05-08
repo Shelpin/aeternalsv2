@@ -1,4 +1,4 @@
-import type { IAgentRuntime, State, Memory, Provider } from './types.js';
+import type { IAgentRuntime, State, Memory, Provider } from '@elizaos/types';
 
 /**
  * Formats provider outputs into a string which can be injected into the context.

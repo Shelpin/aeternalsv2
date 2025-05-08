@@ -1,13 +1,15 @@
 import { embed } from './embedding.js';
 import { splitChunks } from './generation.js';
 import elizaLogger from './logger.js';
+import type {
+    IAgentRuntime,
+    IRAGKnowledgeManager,
+    RAGKnowledgeItem,
+    UUID,
+} from '@elizaos/types';
 import {
-    type IAgentRuntime,
-    type IRAGKnowledgeManager,
-    type RAGKnowledgeItem,
-    type UUID,
     KnowledgeScope,
-} from './types.js';
+} from '@elizaos/types';
 import { stringToUuid } from './uuid.js';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';

@@ -1,4 +1,4 @@
-import type { Memory } from './types.js';
+import type { Memory } from '@elizaos/types';
 import type { IAgentRuntimeBridge } from './api/types.js';
 import elizaLogger from './logger.js';
 

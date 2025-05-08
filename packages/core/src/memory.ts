@@ -5,7 +5,7 @@ import type {
     IMemoryManager,
     Memory,
     UUID,
-} from './types.js';
+} from '@elizaos/types';
 
 const defaultMatchThreshold = 0.1;
 const defaultMatchCount = 10;
