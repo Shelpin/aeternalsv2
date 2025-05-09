@@ -37,6 +37,8 @@ export class TelegramRelay {
   private connectionAttempts: number = 0;
   private maxConnectionAttempts: number = 5;
   private updatePollingInterval: ReturnType<typeof setInterval> | null = null;
+  private lastUpdateId: number = 0;
+  private isPolling: boolean = false;
 
   /**
    * Create a new TelegramRelay
@@ -661,62 +663,82 @@ export class TelegramRelay {
    * VALHALLA FIX: Added as separate method to poll for relay updates
    */
   private startRelayPolling(): void {
-    // Clear any existing polling interval
+    this.logger.info('[RELAY] Started polling relay server for updates');
+    this.stopRelayPolling(); // Ensure no duplicate intervals
+    this.updatePollingInterval = setInterval(this.pollRelayServer, 2000); // Poll every 2 seconds
+    // Initial poll immediately
+    this.pollRelayServer().catch(err => {
+      this.logger.error('[RELAY] Initial poll failed:', err);
+    });
+  }
+
+  private stopRelayPolling(): void {
     if (this.updatePollingInterval) {
       clearInterval(this.updatePollingInterval);
       this.updatePollingInterval = null;
+      this.logger.info('[RELAY] Stopped polling relay server for updates');
     }
-
-    // Start with an immediate poll
-    this.pollRelayServer();
-
-    // Set up interval for regular polling
-    this.updatePollingInterval = setInterval(() => {
-      this.pollRelayServer();
-    }, 2000); // Poll every 2 seconds
-
-    this.logger.info('[RELAY] Started polling relay server for updates');
   }
 
-  /**
-   * Poll the relay server for updates
-   * VALHALLA FIX: Extracted method for better error handling and memory management
-   */
   private pollRelayServer: () => Promise<void> = async (): Promise<void> => {
+    if (!this.connected) {
+      this.logger.warn('[RELAY] Skipping poll, not connected.');
+      return;
+    }
+
+    const url = `${this.config.relayServerUrl}/getUpdates?agent_id=${this.config.agentId}&offset=${this.lastUpdateId + 1}`;
+    let response;
     try {
-      this.logger.debug('[RELAY] Polling relay for messages...');
-      const updates = await this.getRelayUpdates();
-      this.logger.debug(`[RELAY] Received ${updates.length} updates`);
-      for (const update of updates) {
-        for (const handler of this.messageHandlers) {
-          try {
-            handler(update);
-          } catch (error: unknown) {
-            if (error instanceof Error) {
-              this.logger.error(`[RELAY] Error in message handler: ${error.message}`);
-            } else {
-              this.logger.error(`[RELAY] Error in message handler: ${JSON.stringify(error)}`);
+      this.logger.debug('[RELAY] Polling relay for updates...', { url });
+      response = await this.fetchWithTimeout(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${this.config.authToken}`
+        }
+      }, 35000);
+
+      if (!response.ok) {
+        this.logger.warn(`[RELAY] Poll response not OK: ${response.status} ${response.statusText}`);
+        // Handle specific errors like 401 Unauthorized if needed
+        if (response.status === 401) {
+          this.logger.error('[RELAY] Poll failed with 401 Unauthorized. Check relay auth token.');
+          // Potentially stop polling or try re-registering
+          this.stopRelayPolling();
+        }
+        return;
+      }
+
+      const data = await response.json();
+
+      // >>> NEW DEBUG LOG (Step 2.1 - Raw Poll Data) <<<
+      this.logger.debug(`[RELAY_POLL_RAW_DATA] Received data: ${JSON.stringify(data)}`);
+      // >>> END NEW DEBUG LOG <<<
+
+      if (data && data.success && Array.isArray(data.messages)) {
+        if (data.messages.length > 0) {
+          this.logger.info(`[RELAY] Received ${data.messages.length} updates`);
+          data.messages.forEach((update: any) => {
+            if (update.update_id > this.lastUpdateId) {
+              this.lastUpdateId = update.update_id;
             }
-          }
+            if (update.message) {
+              this.processUpdate(update.message);
+            }
+          });
+        } else {
+          this.logger.debug('[RELAY] Received 0 updates');
         }
-      }
-      if (process.env.FORCE_GC === 'true' && global.gc) {
-        try {
-          global.gc();
-          this.logger.debug('[RELAY] Forced garbage collection after polling');
-        } catch (error: unknown) {
-          if (error instanceof Error) {
-            this.logger.error(`[RELAY] Error during forced GC: ${error.message}`);
-          } else {
-            this.logger.error(`[RELAY] Error during forced GC: ${JSON.stringify(error)}`);
-          }
-        }
-      }
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        this.logger.error(`[RELAY] Error polling relay server: ${error.message}`);
       } else {
-        this.logger.error(`[RELAY] Error polling relay server: ${JSON.stringify(error)}`);
+        this.logger.warn('[RELAY] Invalid data structure in /getUpdates response:', data);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.message?.includes('timed out')) {
+        this.logger.debug('[RELAY] Poll request timed out (expected for long polling).');
+      } else {
+        this.logger.error(`[RELAY] Error during relay poll: ${error.message}`);
+        // Log full error details for network issues
+        // console.error(error);
+        // Consider attempting reconnect on certain network errors
       }
     }
   };
@@ -727,29 +749,29 @@ export class TelegramRelay {
    * @param message The message that was received
    */
   processUpdate(message: RelayMessage): void {
-    // VALHALLA FIX: Process a single message from the Telegram client plugin
-    if (!message) {
-      this.logger.debug('[RELAY] Received null message from Telegram client');
+    if (!message || typeof message !== 'object') {
+      this.logger.warn('[RELAY] Received invalid message format in processUpdate:', message);
       return;
     }
 
-    this.logger.debug(`[RELAY] Processing update from Telegram client: ${JSON.stringify({
-      message_id: message.message_id,
-      from: message.from?.username || 'unknown',
-      text: message.text?.substring(0, 50)
-    })}`);
+    this.logger.debug(`[RELAY] Processing update for message from ${message?.from?.username || (message as any)?.sender_agent_id || 'unknown'}`);
 
-    // Call all registered handlers
-    for (const handler of this.messageHandlers) {
+    // Check if it's an agent list update (or other system message)
+    if ((message as any).type === 'system' && Array.isArray((message as any).agents)) {
+      const agentList = (message as any).agents as string[];
+      this.logger.info('[RELAY] Received agent list update:', agentList);
+      this.agentUpdateHandlers.forEach(handler => handler(agentList));
+      return;
+    }
+
+    // Process regular messages
+    this.logger.debug(`[RELAY_HANDLER_CALL] Calling ${this.messageHandlers.length} message handler(s) for message ID ${message.message_id}`);
+    this.messageHandlers.forEach(handler => {
       try {
         handler(message);
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          this.logger.error(`[RELAY] Error in message handler: ${error.message}`);
-        } else {
-          this.logger.error(`[RELAY] Error in message handler: ${JSON.stringify(error)}`);
-        }
+      } catch (handlerError) {
+        this.logger.error(`[RELAY] Error executing message handler: ${handlerError instanceof Error ? handlerError.message : JSON.stringify(handlerError)}`);
       }
-    }
+    });
   }
 }

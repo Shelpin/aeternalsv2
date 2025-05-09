@@ -186,8 +186,15 @@ class TelegramClient {
   }
 }
 
-// Export the class as named export
 export { TelegramClient };
 
-// Export a new instance as the default export
-export default new TelegramClient(); 
+// Function to create an instance
+function createTelegramClientInstance() {
+  // The constructor of TelegramClient can handle tokenOrOptions being undefined
+  // or we can decide if the agent should pass them here.
+  // For now, let constructor handle it, agent will call .initialize() with token.
+  return new TelegramClient();
+}
+
+// Export the instance creation function as the default export
+export default createTelegramClientInstance; 

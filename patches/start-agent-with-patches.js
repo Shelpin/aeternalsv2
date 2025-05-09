@@ -35,6 +35,28 @@ console.log(`🔧 Character files: ${characterFiles.join(', ') || 'None provided
 
 async function main() {
   try {
+    // +++ DIAGNOSTIC: Inspect @elizaos/client-telegram in parent patcher +++
+    let resolvedTelegramClientPath = 'Could not resolve';
+    try {
+      const resolvedUrl = await import.meta.resolve('@elizaos/client-telegram');
+      resolvedTelegramClientPath = fileURLToPath(resolvedUrl);
+      console.log(`[PATCHER_DIAGNOSTIC] import.meta.resolve('@elizaos/client-telegram') in patcher: ${resolvedTelegramClientPath}`);
+      const clientFileContent = fs.readFileSync(resolvedTelegramClientPath, 'utf8').substring(0, 300);
+      console.log(`[PATCHER_DIAGNOSTIC] Start of resolved file content:\n${clientFileContent}...`);
+    } catch (e) {
+      console.log(`[PATCHER_DIAGNOSTIC] Error resolving (import.meta.resolve)/reading @elizaos/client-telegram in patcher: ${e}`);
+    }
+    try {
+      const PatcherTelegramClientModule = await import('@elizaos/client-telegram');
+      console.log(`[PATCHER_DIAGNOSTIC] Patcher imported @elizaos/client-telegram. Default export keys: ${PatcherTelegramClientModule.default ? Object.keys(PatcherTelegramClientModule.default).join(', ') : 'N/A'}`);
+      if (PatcherTelegramClientModule.default) {
+        console.log(`[PATCHER_DIAGNOSTIC] typeof PatcherTelegramClientModule.default.initialize: ${typeof PatcherTelegramClientModule.default.initialize}`);
+      }
+    } catch (e) {
+      console.log(`[PATCHER_DIAGNOSTIC] Error importing @elizaos/client-telegram in patcher: ${e}`);
+    }
+    // +++ END DIAGNOSTIC +++
+
     // 📍 Normalize AGENT_ID from --characters argument if not set
     if (!process.env.AGENT_ID && characterFiles.length > 0) {
       const agentId = path.basename(characterFiles[0], '.json');

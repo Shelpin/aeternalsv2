@@ -686,122 +686,163 @@ export async function initializeClients(
     const clientNames = clientArg.split(',').map(name => name.trim());
 
     for (const clientName of clientNames) {
+        let actualClientInstance: ClientInstance | null = null;
         try {
-            logger.info(`Attempting to import client: ${clientName}`);
-            const agentGlobalRuntime = globalThis.__elizaRuntime as any;
-
-            const clientModule: any = await import(clientName); // Use any for clientModule to simplify access
-
-            // NEW DETAILED IMPORT LOGGING
-            logger.info(`[IMPORT_DEBUG] clientModule raw import type: ${typeof clientModule}`);
-            if (clientModule) {
-                logger.info(`[IMPORT_DEBUG] clientModule keys: ${Object.keys(clientModule).join(', ')}`);
-                logger.info(`[IMPORT_DEBUG] typeof clientModule.default: ${typeof clientModule.default}`);
-                logger.info(`[IMPORT_DEBUG] typeof clientModule.TelegramClient: ${typeof clientModule.TelegramClient}`);
+            const agentGlobalRuntime = globalThis.__elizaRuntime as any; // Define agentGlobalRuntime here
+            let clientModule: any;
+            if (clientName === '@elizaos/client-telegram') {
+                logger.info(`[SPECIAL_INIT_TG] Attempting to import client via RELATIVE PATH: ${clientName}`);
+                // Path from packages/agent/dist/index.js to packages/clients/telegram/dist/index.js
+                const relativePathToClient = '../../clients/telegram/dist/index.js';
+                logger.info(`[SPECIAL_INIT_TG] Using relative path: ${relativePathToClient}`);
+                try {
+                    clientModule = await import(relativePathToClient);
+                } catch (relPathError) {
+                    logger.error(`[SPECIAL_INIT_TG] Error importing via relative path ${relativePathToClient}: ${relPathError}`);
+                    logger.error(`[SPECIAL_INIT_TG] Will attempt import by package name as fallback.`);
+                    clientModule = await import(clientName); // Fallback to package name
+                }
+            } else {
+                logger.info(`Attempting to import client by package name: ${clientName}`);
+                clientModule = await import(clientName);
             }
-            // END NEW LOGGING
 
-            if (clientName === '@elizaos/telegram-client') {
-                logger.info(`Handling special initialization for ${clientName}`);
+            logger.info(`[IMPORT_DEBUG] clientModule raw import type: ${typeof clientModule}, keys: ${clientModule ? Object.keys(clientModule).join(', ') : 'null'}`);
 
-                let tClient = clientModule.default; // Access default export for the singleton
-
-                // DIAGNOSTIC LOGGING START
-                logger.info(`[DEBUG_CLIENT] tClient acquired. Type: ${typeof tClient}`);
-                if (tClient) {
-                    logger.info(`[DEBUG_CLIENT] tClient keys: ${Object.keys(tClient).join(', ')}`);
-                    logger.info(`[DEBUG_CLIENT] typeof tClient.initialize: ${typeof tClient.initialize}`);
-                    logger.info(`[DEBUG_CLIENT] typeof tClient.constructor: ${typeof tClient.constructor}`);
-                    if (tClient.constructor) {
-                        logger.info(`[DEBUG_CLIENT] tClient.constructor.name: ${tClient.constructor.name}`);
+            // Log the entire imported module structure AFTER import
+            try {
+                logger.info(`[DIAGNOSTIC_MODULE_CONTENT] Actual clientModule content for '${clientName}': ${JSON.stringify(clientModule, (key, value) => {
+                    if (typeof value === 'function') {
+                        return `[Function: ${value.name || 'anonymous'}]`;
                     }
-                } else {
-                    logger.warn('[DEBUG_CLIENT] tClient is null or undefined after assignment from clientModule.default');
+                    // Add a check for cyclic structures if they become an issue, though less likely for module objects.
+                    return value;
+                }, 2)}`);
+            } catch (stringifyError) {
+                logger.error(`[DIAGNOSTIC_MODULE_CONTENT] Error stringifying clientModule for '${clientName}': ${stringifyError}`);
+                // Fallback to logging keys if stringify fails (e.g. circular structures not handled by simple replacer)
+                if (clientModule && typeof clientModule === 'object') {
+                    logger.info(`[DIAGNOSTIC_MODULE_CONTENT] Fallback clientModule keys for '${clientName}': ${Object.keys(clientModule).join(', ')}`);
                 }
-                // DIAGNOSTIC LOGGING END
+            }
 
-                if (!tClient) {
-                    logger.error(`Could not access default export (expected telegramClient singleton) from ${clientName}. Attempting to create new instance.`);
-                    if (clientModule.TelegramClient) { // Access named export for the class
-                        tClient = new clientModule.TelegramClient();
+            if (clientName === '@elizaos/client-telegram') {
+                logger.info(`[SPECIAL_INIT_TG] Handling special initialization for ${clientName} (trying named export, then default factory)`);
+                // let tClientInstance: any = null; // already declared as actualClientInstance effectively
+
+                // Try NAMED EXPORT first (TelegramClient class)
+                const NamedTelegramClientClass = clientModule.TelegramClient;
+                logger.info(`[SPECIAL_INIT_TG] Accessed clientModule.TelegramClient (named export). Type: ${typeof NamedTelegramClientClass}`);
+
+                if (NamedTelegramClientClass && typeof NamedTelegramClientClass === 'function') {
+                    logger.info(`[SPECIAL_INIT_TG] clientModule.TelegramClient (named) is a function/class, attempting to instantiate.`);
+                    actualClientInstance = new NamedTelegramClientClass(); // Use actualClientInstance directly
+                    logger.info(`[SPECIAL_INIT_TG] Instantiated from named export. Type of instance: ${typeof actualClientInstance}`);
+                } else {
+                    logger.info(`[SPECIAL_INIT_TG] clientModule.TelegramClient (named) is NOT a function/class or is undefined. Type: ${typeof NamedTelegramClientClass}. Will try default export factory.`);
+
+                    const createInstanceFn = clientModule.default;
+                    logger.info(`[SPECIAL_INIT_TG] Accessed clientModule.default (factory attempt). Type: ${typeof createInstanceFn}`);
+                    if (createInstanceFn && typeof createInstanceFn === 'function') {
+                        logger.info(`[SPECIAL_INIT_TG] clientModule.default is a factory function, attempting to call it.`);
+                        actualClientInstance = createInstanceFn(); // Use actualClientInstance directly
+                        logger.info(`[SPECIAL_INIT_TG] Instance created via default factory. Type of instance: ${typeof actualClientInstance}`);
                     } else {
-                        logger.error(`Cannot find default export or TelegramClient class export in ${clientName}`);
-                        continue;
+                        logger.error(`[SPECIAL_INIT_TG] clientModule.default is NOT a function. Cannot call factory. Actual type: ${typeof createInstanceFn}`);
                     }
                 }
 
-                // Use globalThis.__elizaRuntime to access the patched getSecret method
-                const token = await (globalThis.__elizaRuntime as any)?.getSecret?.('TELEGRAM_BOT_TOKEN');
-                if (!token) {
-                    logger.error(`TELEGRAM_BOT_TOKEN not found for ${clientName}. Client cannot initialize.`);
-                    continue;
-                }
-
-                if (typeof tClient.initialize === 'function') {
-                    tClient.initialize(token, runtime);
+                if (actualClientInstance && typeof (actualClientInstance as any).initialize === 'function') {
+                    logger.info(`[SPECIAL_INIT_TG] Instance successfully created. Has initialize method. Retrieving token...`);
+                    const token = (agentGlobalRuntime as any)?.getSecret?.('TELEGRAM_BOT_TOKEN');
+                    if (token) {
+                        logger.info(`[SPECIAL_INIT_TG] Token retrieved. Calling tClientInstance.initialize().`); // tClientInstance -> actualClientInstance
+                        try {
+                            await (actualClientInstance as any).initialize(token, agentGlobalRuntime as any);
+                            logger.info(`[SPECIAL_INIT_TG] Successfully called initialize on instance.`);
+                            // actualClientInstance is already set
+                        } catch (initError) {
+                            logger.error(`[SPECIAL_INIT_TG] Error calling initialize on instance: ${initError}`);
+                            if (initError instanceof Error) logger.error(`[SPECIAL_INIT_TG] Initialize Error Stack: ${initError.stack}`);
+                            actualClientInstance = null; // Nullify on error
+                        }
+                    } else {
+                        logger.error(`[SPECIAL_INIT_TG] TELEGRAM_BOT_TOKEN not found via getSecret. Cannot initialize ${clientName}.`);
+                        actualClientInstance = null; // Nullify if no token
+                    }
+                } else if (actualClientInstance) {
+                    logger.error(`[SPECIAL_INIT_TG] Instance was created but does NOT have an initialize method. typeof initialize: ${typeof (actualClientInstance as any)?.initialize}`);
+                    actualClientInstance = null; // Nullify
                 } else {
-                    logger.error(`Imported telegramClient from ${clientName} does not have an initialize method.`);
-                    continue;
+                    logger.error(`[SPECIAL_INIT_TG] Failed to create TelegramClient instance from either named or default export.`);
+                    // actualClientInstance is already null
                 }
 
-                let actualClientInstance = tClient; // Use the tClient that was initialized
-
-                if (actualClientInstance) {
-                    logger.info(`Successfully created/retrieved actualClientInstance for ${clientName}. Type: ${typeof actualClientInstance}`);
-                    runtime.clients.push(actualClientInstance); // Client is pushed here
-
-                    // >>> NEW DEBUG LOGGING MOVED HERE <<<
-                    const globalRuntimeClients = (globalThis.__elizaRuntime as any)?.clients;
-                    logger.info(`[CLIENT_INIT_DEBUG] After pushing ${clientName}: runtime.clients length: ${runtime.clients ? runtime.clients.length : 'null/undefined'}`);
-                    logger.info(`[CLIENT_INIT_DEBUG] Is runtime.clients === globalThis.__elizaRuntime.clients? ${runtime.clients === globalRuntimeClients}`);
-                    // >>> END NEW DEBUG LOGGING <<<
-
-                    logger.info(`[VALHALLA] Telegram client mounted to runtime: ${runtime.clients.includes(actualClientInstance)}`);
-                    logger.info(`Successfully initialized ${clientName}. Client is on runtime.`);
-                } else {
-                    logger.error(`Failed to obtain actualClientInstance for ${clientName} after import and setup.`);
-                }
-
-            } else if (clientModule && typeof clientModule.start === 'function') {
+            } else if (clientModule && typeof clientModule.start === 'function') { // For other clients like direct-client
                 logger.info(`Calling start() on client module: ${clientName}`);
-                const clientInstance = await clientModule.start(
+                const clientInstanceToAssign = await clientModule.start(
                     runtime.character,
                     runtime,
                     logger,
                 );
-                if (clientInstance && clientInstance.client) {
-                    if (!(runtime as any).clients) {
-                        logger.warn(
-                            'runtime.clients was not initialized (expected proxy). Initializing as empty object.',
-                        );
-                        (runtime as any).clients = {};
-                    }
-                    ((runtime as any).clients as any)[clientName] = clientInstance.client;
-
-                    if (agentGlobalRuntime) {
-                        if (!agentGlobalRuntime.clients) {
-                            agentGlobalRuntime.clients = {};
-                        }
-                        (agentGlobalRuntime.clients as any)[clientName] = clientInstance.client;
-                        logger.info(
-                            `Set client ${clientName} on globalThis.__elizaRuntime.clients.${clientName}`,
-                        );
-                    } else {
-                        logger.warn(
-                            'globalThis.__elizaRuntime not found. Cannot set client on global runtime instance for proxy.',
-                        );
-                    }
-                    logger.info(`Successfully initialized client: ${clientName}`);
+                // The .start() method for other clients is expected to return the instance directly
+                // or an object like { client: instance }
+                if (clientInstanceToAssign && clientInstanceToAssign.client) { // If it returns { client: ... }
+                    actualClientInstance = clientInstanceToAssign.client;
+                } else if (clientInstanceToAssign) { // If it returns the instance directly
+                    actualClientInstance = clientInstanceToAssign;
                 } else {
-                    logger.error(
-                        `Client module ${clientName} did not return a valid client instance or client property.`,
-                    );
+                    actualClientInstance = null;
                 }
+
+                if (actualClientInstance) {
+                    logger.info(`Successfully initialized generic client ${clientName} via start() method.`);
+                } else {
+                    logger.error(`Generic client ${clientName} start() method did not return a valid instance.`);
+                }
+
             } else {
                 logger.error(
-                    `Client module ${clientName} does not have a recognized initialization pattern (e.g., 'start' function, or isn\'t '@elizaos/telegram-client').`,
+                    `Client module ${clientName} does not have a recognized initialization pattern (e.g., 'start' function, or isn\'t '@elizaos/client-telegram').`,
                 );
+                actualClientInstance = null; // Ensure it's null if no pattern matched
             }
+
+            // **** THIS IS THE INTENDED FINAL ASSIGNMENT LOGIC (REPLACES THE OLD BLOCK) ****
+            if (actualClientInstance) {
+                logger.info(`[ASSIGN_CLIENT] Post-initialization: actualClientInstance for ${clientName} is set. Type: ${typeof actualClientInstance}`);
+
+                if (typeof runtime.clients !== 'object' || runtime.clients === null) {
+                    logger.warn(`[ASSIGN_CLIENT] runtime.clients is NOT an object as expected (type: ${typeof runtime.clients}). This is unexpected after patching. Attempting to force.`);
+                    (runtime as any).clients = {};
+                }
+
+                const keyToAssign = clientName === '@elizaos/client-telegram' ? 'telegram' : clientName;
+                ((runtime as any).clients as any)[keyToAssign] = actualClientInstance;
+                logger.info(`[ASSIGN_CLIENT] Assigned client to runtime.clients.${keyToAssign}`);
+
+                if (agentGlobalRuntime) {
+                    if (typeof agentGlobalRuntime.clients !== 'object' || agentGlobalRuntime.clients === null) {
+                        logger.warn(`[ASSIGN_CLIENT] globalThis.__elizaRuntime.clients is NOT an object. This is unexpected after patching. Attempting to force.`);
+                        agentGlobalRuntime.clients = {};
+                    }
+                    (agentGlobalRuntime.clients as any)[keyToAssign] = actualClientInstance;
+                    logger.info(`[ASSIGN_CLIENT] Assigned client to globalThis.__elizaRuntime.clients.${keyToAssign}`);
+                    // Log the state of runtime.clients immediately after assignment
+                    try {
+                        logger.info(`[ASSIGN_CLIENT_DEBUG] runtime.clients after assignment for ${keyToAssign}: ${JSON.stringify(runtime.clients, null, 2)}`);
+                    } catch (e) {
+                        logger.warn(`[ASSIGN_CLIENT_DEBUG] Could not stringify runtime.clients: ${e.message}`);
+                        logger.info(`[ASSIGN_CLIENT_DEBUG] runtime.clients keys: ${Object.keys(runtime.clients || {}).join(', ')}`);
+                    }
+                } else {
+                    logger.warn(`[ASSIGN_CLIENT] agentGlobalRuntime (globalThis.__elizaRuntime) was not found. Cannot assign to global clients.`);
+                }
+            } else {
+                logger.warn(`[ASSIGN_CLIENT] Post-initialization: actualClientInstance for ${clientName} is NULL. No assignment to runtime clients will occur.`);
+            }
+            // **** END OF INTENDED FINAL ASSIGNMENT LOGIC ****
+
         } catch (error) {
             logger.error(`Error initializing client ${clientName}: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
             // if (error instanceof Error) logger.error(error.stack);

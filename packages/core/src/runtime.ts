@@ -237,69 +237,64 @@ export class AgentRuntime implements IAgentRuntime {
 
 // Exporting the new handleMessage function separately to avoid class syntax issues with complex logic
 // This function will be bound to the AgentRuntime instance in the constructor.
-export async function handleMessage(this: AgentRuntime, message: any) { // Added 'this' type annotation
-    const logger = this.getLogger('runtime:handleMessage'); // Use runtime logger
+export async function handleMessage(this: AgentRuntime, message: any) {
+    const logger = this.getLogger('runtime:handleMessage');
     logger.debug("--- Handling message START ---");
+    // Log the state of this.clients at the beginning of handleMessage
+    try {
+        logger.info(`[HANDLE_MSG_CLIENT_DEBUG] this.clients at start of handleMessage: ${JSON.stringify(this.clients, null, 2)}`);
+        logger.info(`[HANDLE_MSG_CLIENT_DEBUG] typeof this.clients?.telegram: ${typeof (this.clients as any)?.telegram}`);
+    } catch (e) {
+        logger.warn(`[HANDLE_MSG_CLIENT_DEBUG] Could not stringify this.clients: ${e.message}`);
+        logger.info(`[HANDLE_MSG_CLIENT_DEBUG] this.clients keys: ${Object.keys(this.clients || {}).join(', ')}`);
+        logger.info(`[HANDLE_MSG_CLIENT_DEBUG] this.clients constructor name: ${this.clients?.constructor?.name}`);
+    }
+
     logger.debug("Raw incoming message object:", JSON.stringify(message, null, 2));
 
-    const text = message?.text || message?.message?.text;
-    const user = message?.from?.username || message?.from?.first_name || message?.from?.id || 'Unknown User';
-    const chatId = message.chat?.id || message.message?.chat?.id;
-
-    if (!text || !chatId) {
-        logger.warn("handleMessage received invalid or non-text message structure. Cannot process.", { textExists: !!text, chatIdExists: !!chatId });
-        logger.debug("--- Handling message END (Invalid Message Structure) ---");
-        return;
-    }
-
-    const responseText = `🤖 Echo from agent: You (${user}) said: ${text}`;
+    let responseText = `🤖 Echo from agent: You (${message?.from?.username || message?.from?.id || 'Unknown User'}) said: ${message.text}`;
     logger.debug("Prepared response:", responseText);
 
-    logger.debug("Attempting to locate Telegram client instance on runtime...");
+    // --- MODIFIED CLIENT LOOKUP ---
+    logger.debug("Attempting to locate Telegram client instance on runtime via direct access...");
+    const telegramClient = (this.clients as any)?.telegram;
 
-    const globalRuntimeClients = (globalThis.__elizaRuntime as any)?.clients;
-    logger.debug(`[CLIENT_LOCATE_DEBUG] Is this.clients === globalThis.__elizaRuntime.clients? ${this.clients === globalRuntimeClients}`);
-    logger.debug(`[CLIENT_LOCATE_DEBUG] Actual length of this.clients at start of search: ${this.clients ? this.clients.length : 'null/undefined'}`);
-
-    let telegramClient: any = null;
-
-    if (this.clients && Array.isArray(this.clients) && this.clients.length > 0) {
-        telegramClient = this.clients.find(client => (client as any).name === 'telegram' || client.constructor?.name === 'TelegramClient' || (typeof (client as any).sendMessage === 'function' && typeof (client as any).start === 'function'));
-        if (telegramClient) {
-            logger.info("Telegram client instance found on this.clients.");
-        } else {
-            logger.warn("No client matching Telegram criteria found on this.clients.");
-            logger.debug("Contents of this.clients:", JSON.stringify(this.clients.map(c => ({ name: (c as any).name, type: typeof c, constructorName: (c as any).constructor?.name }))));
+    if (telegramClient && typeof telegramClient.sendMessage === 'function') {
+        logger.info("Telegram client instance found directly on this.clients.telegram.");
+        try {
+            logger.info(`Attempting to send response via client to chatID: ${message.chat.id}`);
+            await telegramClient.sendMessage(message.chat.id, responseText);
+            logger.info(`✅ Successfully sent response to chatID: ${message.chat.id}`);
+        } catch (error) {
+            logger.error(`❌ Error sending message via Telegram client: ${error.message}`, { stack: error.stack });
+            responseText = `⚠️ Error sending message: ${error.message}`; // Update responseText if send fails
         }
     } else {
-        logger.debug("this.clients array is empty or not an array.");
+        logger.error("❌ FATAL: Telegram client instance NOT FOUND on this.clients.telegram or it's invalid.");
+        // Fallback or alternative client logic could go here if needed
+    }
+    // --- END MODIFIED CLIENT LOOKUP ---
+
+    // Attempt to forward the response to the relay server if configured
+    // Check the globally patched runtime for forwardToRelay
+    if (globalThis.__elizaRuntime && typeof (globalThis.__elizaRuntime as any).forwardToRelay === 'function') {
+        logger.info('[FORWARD_RELAY] Attempting to forward response to relay via globalThis.__elizaRuntime.forwardToRelay');
+        await (globalThis.__elizaRuntime as any).forwardToRelay(message, {
+            type: 'agent_response',
+            originalMessage: message,
+            agentId: this.agentId,
+            chatId: message.chat?.id || message.chat_id,
+        });
+    } else {
+        logger.warn('[FORWARD_RELAY] Skipping relay forward: `forwardToRelay` function not found on globalThis.__elizaRuntime.');
     }
 
-    if (!telegramClient && globalRuntimeClients) {
-        logger.debug("Client not found via this.clients, attempting globalThis fallback on globalRuntimeClients...");
-        if (Array.isArray(globalRuntimeClients) && globalRuntimeClients.length > 0) {
-            telegramClient = globalRuntimeClients.find(client => (client as any).name === 'telegram' || client.constructor?.name === 'TelegramClient' || (typeof (client as any).sendMessage === 'function' && typeof (client as any).start === 'function'));
-            if (telegramClient) {
-                logger.info("Telegram client instance found on globalThis.__elizaRuntime.clients (globalRuntimeClients).");
-            } else {
-                logger.warn("No client matching Telegram criteria found on globalThis.__elizaRuntime.clients (globalRuntimeClients).");
-            }
-        }
-    }
-
-    if (!telegramClient || typeof telegramClient.sendMessage !== 'function') {
-        logger.error("❌ FATAL: Telegram client instance NOT FOUND on runtime.clients or globalThis patch.");
-        logger.debug("--- Handling message END (Client Not Found) ---");
-        return;
-    }
-
-    try {
-        logger.info(`Attempting to send response via client to chatID: ${chatId}`);
-        await telegramClient.sendMessage(chatId, responseText);
-        logger.info(`✅ Successfully sent response to chatID: ${chatId}`);
-    } catch (error) {
-        logger.error(`❌ Error sending message via Telegram client: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
-        // Consider logging stack trace for deeper errors: if (error instanceof Error) console.error(error.stack);
-    }
     logger.debug("--- Handling message END ---");
+    // Return a structured response, or adjust as per plugin expectations
+    return {
+        id: message.message_id,
+        chat_id: message.chat.id,
+        text: responseText, // Return the (potentially error-updated) response
+        action: responseText ? 'send' : 'none'
+    };
 } 
