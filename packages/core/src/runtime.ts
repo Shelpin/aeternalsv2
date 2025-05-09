@@ -66,6 +66,7 @@ export class AgentRuntime implements IAgentRuntime {
     public cacheManager: ICacheManager | null = null; // Use imported ICacheManager
     public clients: ClientInstance[] = [];
     public actions: Action[] = []; // ADDED actions property
+    public loadedPlugins: Plugin[] = []; // ADDED for storing initialized plugin instances
 
     // Add handleMessage property to the class definition
     handleMessage: (message: any) => Promise<void>;
@@ -109,6 +110,7 @@ export class AgentRuntime implements IAgentRuntime {
         // Register Plugins
         if (this.providers && Array.isArray(this.providers)) {
             this.logger.info(`Found ${this.providers.length} providers/plugins to register.`);
+            this.loadedPlugins = []; // Clear or initialize the list
             for (const pluginOrClass of this.providers) {
                 let pluginInstance: any = null;
                 let pluginName = 'Unknown Plugin';
@@ -133,35 +135,47 @@ export class AgentRuntime implements IAgentRuntime {
                     }
 
                     this.logger.info(`Processing plugin: ${pluginName}`);
-
-                    // --- Attempt Registration (if available) ---
-                    if (pluginInstance && typeof pluginInstance.register === 'function') {
-                        this.logger.debug(`Calling register() for plugin: ${pluginName}`);
-                        const registrationResult = pluginInstance.register(this);
-                        if (registrationResult) {
-                            this.logger.info(`Successfully registered plugin via register(): ${pluginName}`);
-                        } else {
-                            this.logger.warn(`register() returned falsy value for plugin: ${pluginName}`);
+                    if (pluginInstance) { // Ensure pluginInstance is valid before trying to use it
+                        // Assign runtime to plugin if it has a setRuntime method (like PluginComponent)
+                        if (typeof pluginInstance.setRuntime === 'function') {
+                            pluginInstance.setRuntime(this);
                         }
-                    }
 
-                    // --- Attempt Initialization (if available) ---
-                    if (pluginInstance && typeof pluginInstance.initialize === 'function') {
-                        this.logger.info(`Calling initialize() for plugin: ${pluginName}`);
-                        this.logger.debug(`[RUNTIME_INIT_DEBUG] Before await initialize: pluginInstance exists: ${!!pluginInstance}`);
-                        this.logger.debug(`[RUNTIME_INIT_DEBUG] Before await initialize: typeof pluginInstance.initialize: ${typeof pluginInstance.initialize}`);
-                        try {
-                            // Pass the runtime instance as the context
-                            await pluginInstance.initialize(this);
-                        } catch (initError) {
-                            this.logger.error(`[RUNTIME_INIT_DEBUG] Error caught DIRECTLY from awaiting pluginInstance.initialize() for ${pluginName}:`, initError);
-                            // Re-throw or handle as needed, for now just log that we caught it here
-                            throw initError; // Re-throw to ensure it's logged by the outer catch block too
+                        let registered = false;
+                        // --- Attempt Registration (if available) ---
+                        if (typeof pluginInstance.register === 'function') {
+                            this.logger.debug(`Calling register() for plugin: ${pluginName}`);
+                            const registrationResult = pluginInstance.register(this);
+                            // Consider registration successful if it doesn't throw and returns true or the instance itself
+                            if (registrationResult === true || (typeof registrationResult === 'object' && registrationResult !== null)) {
+                                registered = true;
+                                this.logger.info(`Plugin ${pluginName} registered successfully.`);
+                                if (typeof registrationResult === 'object' && registrationResult !== pluginInstance) {
+                                    pluginInstance = registrationResult; // Update instance if register returned a new one
+                                }
+                            } else {
+                                this.logger.warn(`Plugin ${pluginName} register() method did not return true or an instance. Registration may not be complete.`);
+                            }
                         }
-                        this.logger.info(`Successfully initialized plugin via initialize(): ${pluginName}`);
-                    } else if (!pluginInstance || (typeof pluginInstance.register !== 'function' && typeof pluginInstance.initialize !== 'function')) {
-                        // Log warning only if neither register nor initialize is present
-                        this.logger.warn(`Plugin ${pluginName} lacks both register() and initialize() methods.`);
+
+                        // --- Attempt Initialization (always try if method exists, especially after registration) ---
+                        if (typeof pluginInstance.initialize === 'function') {
+                            if (registered) {
+                                this.logger.info(`Calling initialize() for registered plugin: ${pluginName}.`);
+                            } else {
+                                // This case implies register was not found or failed, so we are trying initialize as a primary step.
+                                this.logger.info(`Calling initialize() for plugin: ${pluginName} (register not found or failed).`);
+                            }
+                            await pluginInstance.initialize(this); // Pass runtime context
+                            this.logger.info(`Plugin ${pluginInstance.name || pluginName} initialized.`);
+                        } else if (!registered) {
+                            // This means neither register nor initialize was found.
+                            this.logger.warn(`Plugin ${pluginName} has no register() or initialize() method.`);
+                        }
+
+                        this.loadedPlugins.push(pluginInstance as Plugin); // Store the instance
+                    } else {
+                        this.logger.error(`Failed to create or identify plugin instance for: ${pluginName}`);
                     }
 
                 } catch (error) {
@@ -252,49 +266,197 @@ export async function handleMessage(this: AgentRuntime, message: any) {
 
     logger.debug("Raw incoming message object:", JSON.stringify(message, null, 2));
 
-    let responseText = `🤖 Echo from agent: You (${message?.from?.username || message?.from?.id || 'Unknown User'}) said: ${message.text}`;
-    logger.debug("Prepared response:", responseText);
+    const incomingText = message.text;
+    const chatId = message.chat?.id || message.chat_id;
 
-    // --- MODIFIED CLIENT LOOKUP ---
-    logger.debug("Attempting to locate Telegram client instance on runtime via direct access...");
+    if (!chatId) {
+        logger.error("❌ Message does not have a valid chat.id or chat_id. Cannot process.");
+        return { id: message.message_id, chat_id: null, text: "Error: Missing chat ID.", action: 'none' };
+    }
+
+    if (!incomingText || typeof incomingText !== 'string' || incomingText.trim() === '') {
+        logger.info("ℹ️ Incoming message has no text content or is not a string. Skipping LLM call.");
+        return { id: message.message_id, chat_id: chatId, text: '', action: 'none' };
+    }
+
+    let responseText = ''; // Initialize responseText
+
+    // --- LLM Integration START ---
+    try {
+        const modelProvider = (this.modelProvider || this.getSetting('MODEL_PROVIDER') || 'openai').toLowerCase();
+        logger.info(`[LLM] Using model provider: ${modelProvider}`);
+
+        // Check for OpenAI compatible providers (OpenAI itself or DeepSeek)
+        if (modelProvider === 'openai' || modelProvider === 'deepseek') {
+            let llmApiKey: string | undefined;
+            let apiUrl: string;
+            let modelName: string;
+
+            if (modelProvider === 'openai') {
+                llmApiKey = this.getSetting('OPENAI_API_KEY');
+                apiUrl = this.getSetting('OPENAI_API_URL') || 'https://api.openai.com/v1/chat/completions';
+                modelName = this.getSetting('OPENAI_MODEL_NAME') || this.getSetting('SMALL_OPENAI_MODEL') || 'gpt-3.5-turbo';
+                if (!llmApiKey) {
+                    logger.error("❌ OpenAI API Key (OPENAI_API_KEY) not configured.");
+                    responseText = "🤖 LLM Error: OpenAI API Key not configured.";
+                }
+            } else { // deepseek
+                llmApiKey = this.getSetting('DEEPSEEK_API_KEY');
+                apiUrl = this.getSetting('DEEPSEEK_API_URL') || 'https://api.deepseek.com/v1/chat/completions'; // Default DeepSeek API URL
+                modelName = this.getSetting('DEEPSEEK_MODEL_NAME') || this.getSetting('SMALL_DEEPSEEK_MODEL') || 'deepseek-chat'; // Default DeepSeek model
+                if (!llmApiKey) {
+                    logger.error("❌ DeepSeek API Key (DEEPSEEK_API_KEY) not configured.");
+                    responseText = "🤖 LLM Error: DeepSeek API Key not configured.";
+                }
+            }
+
+            if (llmApiKey) { // Proceed only if API key is found
+                // Log the full character object to see its structure
+                logger.debug("[LLM_CHARACTER_DEBUG] this.character object:", JSON.stringify(this.character, null, 2));
+
+                // Construct a more detailed system prompt using available character fields
+                let systemPrompt = `You are ${this.character.name || "a conversational AI"}.`;
+                if (this.character.system) {
+                    systemPrompt += ` Your primary purpose and persona: ${this.character.system}`;
+                } else if (this.character.description) { // Fallback to description if system is not present
+                    systemPrompt += ` Your persona: ${this.character.description}`;
+                }
+
+                if (this.character.style?.all && Array.isArray(this.character.style.all) && this.character.style.all.length > 0) {
+                    systemPrompt += ` Your key traits and style: ${this.character.style.all.join(', ')}.`;
+                } else if (this.character.adjectives && Array.isArray(this.character.adjectives) && this.character.adjectives.length > 0) {
+                    systemPrompt += ` Your key traits: ${this.character.adjectives.join(', ')}.`;
+                } else if (this.character.traits) { // Fallback to general traits
+                    systemPrompt += ` Traits: ${JSON.stringify(this.character.traits)}.`;
+                }
+
+                if (this.character.topics && Array.isArray(this.character.topics) && this.character.topics.length > 0) {
+                    systemPrompt += ` Your main topics of interest and expertise are: ${this.character.topics.join(', ')}.`;
+                } else if (this.character.interests && Array.isArray(this.character.interests) && this.character.interests.length > 0) { // Fallback to interests
+                    systemPrompt += ` Your main topics of interest are: ${this.character.interests.join(', ')}.`;
+                } else {
+                    systemPrompt += " You are interested in general topics.";
+                }
+
+                // Specific instruction for Aeternity focus if implied by character name or topics
+                const agentNameLower = (this.character.name || "").toLowerCase();
+                const topicsLower = (this.character.topics || []).join(', ').toLowerCase();
+                if (agentNameLower.includes("aeternity") || agentNameLower.includes("ae") || topicsLower.includes("aeternity") || (this.character.system || "").toLowerCase().includes("aeternity")) {
+                    systemPrompt += " You should always try to advocate for and discuss Aeternity blockchain and its ecosystem when the conversation allows, aligning with your dedicated persona. Mention its benefits like state channels, oracles, and scalability."
+                }
+
+                systemPrompt += " Respond naturally based on this comprehensive persona.";
+
+                const userPrompt = incomingText;
+
+                logger.debug(`[LLM] System Prompt for ${modelProvider}: "${systemPrompt.substring(0, 150)}..."`);
+                logger.debug(`[LLM] User Prompt for ${modelProvider}: "${userPrompt.substring(0, 150)}..."`);
+                logger.info(`[LLM] Attempting API call to ${apiUrl} with model ${modelName}`);
+
+                const fetchFn = this.fetch || fetch;
+                const llmApiResponse = await fetchFn(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${llmApiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: modelName,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userPrompt }
+                        ],
+                        max_tokens: 150,
+                        temperature: 0.7
+                    })
+                });
+
+                if (!llmApiResponse.ok) {
+                    const errorBody = await llmApiResponse.text();
+                    logger.error(`❌ ${modelProvider.toUpperCase()} API Error: ${llmApiResponse.status} - ${errorBody}`);
+                    responseText = `🤖 LLM Error: API request failed (${llmApiResponse.status}).`;
+                } else {
+                    const data = await llmApiResponse.json();
+                    if (data.choices && data.choices.length > 0 && data.choices[0].message && data.choices[0].message.content) {
+                        responseText = data.choices[0].message.content.trim();
+                        logger.info(`[LLM] Received response from ${modelProvider.toUpperCase()}: "${responseText.substring(0, 100)}..."`);
+                    } else {
+                        logger.error(`❌ ${modelProvider.toUpperCase()} API Error: Invalid response structure.`, data);
+                        responseText = "🤖 LLM Error: Invalid response from API.";
+                    }
+                }
+            }
+            // If llmApiKey was not found for the selected provider, responseText already contains the error message.
+        } else {
+            logger.warn(`[LLM] Model provider '${modelProvider}' is not 'openai' or 'deepseek'. Falling back to echo for this provider.`);
+            responseText = `🤖 Echo (LLM provider '${modelProvider}' not configured): You (${message?.from?.username || message?.from?.id || 'Unknown User'}) said: ${incomingText}`;
+        }
+    } catch (error) {
+        logger.error(`❌ Exception during LLM call: ${error.message}`, { stack: error.stack });
+        responseText = `🤖 LLM Exception: ${error.message}`;
+    }
+    // --- LLM Integration END ---
+
+    logger.debug("Generated responseText after LLM attempt:", responseText);
+
     const telegramClient = (this.clients as any)?.telegram;
 
     if (telegramClient && typeof telegramClient.sendMessage === 'function') {
-        logger.info("Telegram client instance found directly on this.clients.telegram.");
-        try {
-            logger.info(`Attempting to send response via client to chatID: ${message.chat.id}`);
-            await telegramClient.sendMessage(message.chat.id, responseText);
-            logger.info(`✅ Successfully sent response to chatID: ${message.chat.id}`);
-        } catch (error) {
-            logger.error(`❌ Error sending message via Telegram client: ${error.message}`, { stack: error.stack });
-            responseText = `⚠️ Error sending message: ${error.message}`; // Update responseText if send fails
+        if (responseText && responseText.trim() !== '') {
+            logger.info(`Attempting to send LLM response via client to chatID: ${chatId}`);
+            try {
+                await telegramClient.sendMessage(chatId, responseText);
+                logger.info(`✅ Successfully sent LLM response to chatID: ${chatId}`);
+            } catch (error) {
+                logger.error(`❌ Error sending LLM response via Telegram client: ${error.message}`, { stack: error.stack });
+            }
+        } else {
+            logger.info("ℹ️ Empty responseText from LLM or after processing, not sending to Telegram.");
         }
     } else {
-        logger.error("❌ FATAL: Telegram client instance NOT FOUND on this.clients.telegram or it's invalid.");
-        // Fallback or alternative client logic could go here if needed
+        logger.error("❌ FATAL: Telegram client instance NOT FOUND on this.clients.telegram or it's invalid. Cannot send LLM response.");
     }
-    // --- END MODIFIED CLIENT LOOKUP ---
 
-    // Attempt to forward the response to the relay server if configured
-    // Check the globally patched runtime for forwardToRelay
-    if (globalThis.__elizaRuntime && typeof (globalThis.__elizaRuntime as any).forwardToRelay === 'function') {
-        logger.info('[FORWARD_RELAY] Attempting to forward response to relay via globalThis.__elizaRuntime.forwardToRelay');
-        await (globalThis.__elizaRuntime as any).forwardToRelay(message, {
-            type: 'agent_response',
-            originalMessage: message,
-            agentId: this.agentId,
-            chatId: message.chat?.id || message.chat_id,
-        });
+    // --- MODIFIED FORWARD TO RELAY LOGIC ---
+    // Find the telegram-multiagent plugin instance from the loaded plugins
+    const relayPlugin = this.loadedPlugins.find(p => p.name === 'telegram-multiagent' && typeof (p as any).forwardToRelay === 'function') as any;
+
+    if (relayPlugin) {
+        if (responseText && responseText.trim() !== '') { // Only forward if there was a response generated
+            logger.info(`[FORWARD_RELAY] Attempting to forward agent\'s response ("${responseText.substring(0, 50)}...") via plugin: ${relayPlugin.name}`);
+            try {
+                await relayPlugin.forwardToRelay(chatId, responseText, message);
+                logger.info(`[FORWARD_RELAY] Successfully called forwardToRelay on plugin ${relayPlugin.name}.`);
+            } catch (error) {
+                logger.error(`[FORWARD_RELAY] Error calling forwardToRelay on plugin ${relayPlugin.name}: ${error.message}`, { stack: error.stack });
+            }
+        } else {
+            logger.info("[FORWARD_RELAY] Empty responseText, not forwarding agent's response via plugin.");
+        }
     } else {
-        logger.warn('[FORWARD_RELAY] Skipping relay forward: `forwardToRelay` function not found on globalThis.__elizaRuntime.');
+        logger.warn('[FORWARD_RELAY] Skipping relay forward: telegram-multiagent plugin with forwardToRelay method not found in loadedPlugins.');
+        // Fallback to trying globalThis, though this should ideally not be needed if plugins are loaded correctly
+        if (globalThis.__elizaRuntime && typeof (globalThis.__elizaRuntime as any).forwardToRelay === 'function') {
+            logger.warn('[FORWARD_RELAY_FALLBACK] Attempting to use globalThis.__elizaRuntime.forwardToRelay as a fallback.');
+            if (responseText && responseText.trim() !== '') {
+                try {
+                    await (globalThis.__elizaRuntime as any).forwardToRelay(chatId, responseText, message);
+                    logger.info('[FORWARD_RELAY_FALLBACK] Successfully called globalThis.__elizaRuntime.forwardToRelay.');
+                } catch (error) {
+                    logger.error(`[FORWARD_RELAY_FALLBACK] Error calling globalThis.__elizaRuntime.forwardToRelay: ${error.message}`, { stack: error.stack });
+                }
+            }
+        } else {
+            logger.warn('[FORWARD_RELAY_FALLBACK] forwardToRelay also not found on globalThis.__elizaRuntime or no responseText to send.');
+        }
     }
+    // --- END MODIFIED FORWARD TO RELAY LOGIC ---
 
     logger.debug("--- Handling message END ---");
-    // Return a structured response, or adjust as per plugin expectations
     return {
         id: message.message_id,
-        chat_id: message.chat.id,
-        text: responseText, // Return the (potentially error-updated) response
-        action: responseText ? 'send' : 'none'
+        chat_id: chatId,
+        text: responseText,
+        action: responseText && responseText.trim() !== '' ? 'send' : 'none'
     };
 } 

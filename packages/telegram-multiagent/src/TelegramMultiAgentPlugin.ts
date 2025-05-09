@@ -44,7 +44,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
   register(runtime: IAgentRuntime): Plugin | boolean {
     this.setRuntime(runtime);
-    this.initialize().catch(err => this.logger.error(`Initialization error: ${err}`));
+    this.logger.info(`[TG_PLUGIN_REGISTER] Register method called for ${this.name}. Runtime set. Initialization will be handled by AgentRuntime.`);
     return this;
   }
 
@@ -127,110 +127,56 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
   private async handleDirectTelegramMessage(msg: RelayMessage): Promise<void> {
     this.logger.debug(`[TG_PLUGIN] Received direct message from Telegram: ${JSON.stringify(msg)}`);
-    // Use the class member this.telegramClient, already validated in initialize()
-    if (!this.telegramClient || typeof this.telegramClient.sendMessage !== 'function') {
-      this.logger.warn('Message ignored: telegramClient not ready.');
+
+    if (!this.runtime?.handleMessage) {
+      this.logger.warn('[TG_PLUGIN] runtime.handleMessage is not available. Ignoring direct message.');
       return;
     }
 
-    const chatId = msg.chat.id.toString();
-    const text = msg.text || '';
-    const fromUsername = msg.from.username;
-    const thisAgentId = this.runtime.getAgentId?.();
-
-    if (!msg.from.is_bot || fromUsername === thisAgentId) {
-      if (this.relay) {
-        this.logger.debug(`[TG_PLUGIN] Relaying direct message from ${fromUsername} to relay server.`);
-        await this.relay.sendMessage(chatId, text);
-      } else {
-        this.logger.warn('[TG_PLUGIN] Relay not available to send direct message.');
-      }
-    }
-
-    let agentResponse: any;
-    if (this.runtime.handleMessage) {
-      try {
-        agentResponse = await this.runtime.handleMessage(msg);
-      } catch (e) {
-        this.logger.error(`[TG_PLUGIN] Error from runtime.handleMessage for direct message: ${e}`);
-        return;
-      }
-    } else {
-      this.logger.warn('[TG_PLUGIN] runtime.handleMessage is not available.');
-      return;
-    }
-
-    const agentResponseText = agentResponse?.text || agentResponse?.message?.text || (typeof agentResponse === 'string' ? agentResponse : null);
-
-    if (agentResponseText && typeof agentResponseText === 'string' && agentResponseText.trim() !== '') {
-      this.logger.debug(`[TG_PLUGIN] Agent core responded to direct message with: "${agentResponseText}"`);
-      try {
-        await this.telegramClient.sendMessage(msg.chat.id, agentResponseText);
-        this.logger.info(`[TG_PLUGIN] Sent agent response to Telegram chat ${msg.chat.id}`);
-
-        if (this.relay) {
-          this.logger.debug(`[TG_PLUGIN] Relaying agent's own response to relay server.`);
-          await this.relay.sendMessage(chatId, agentResponseText);
-        } else {
-          this.logger.warn('[TG_PLUGIN] Relay not available to send agent response.');
-        }
-      } catch (e) {
-        this.logger.error(`[TG_PLUGIN] Error sending agent response to Telegram or relay: ${e}`);
-      }
-    } else {
-      this.logger.debug('[TG_PLUGIN] Agent core did not provide a text response to direct message.');
+    // It's important that the runtime handles the message and decides on any Telegram responses
+    // or relaying. The plugin's role is to pass the message to the runtime.
+    try {
+      // Pass the original message object from Telegram directly to the runtime.
+      // The runtime will be responsible for:
+      // 1. Generating a response (e.g., via LLM).
+      // 2. Sending that response back to the original chat via the Telegram client (available on the runtime).
+      // 3. Forwarding the message (or its response) to the relay if other agents need to see it (via forwardToRelay).
+      await this.runtime.handleMessage(msg);
+      this.logger.info(`[TG_PLUGIN] Direct message processed by runtime.handleMessage. ChatID: ${msg.chat.id}`);
+    } catch (e) {
+      this.logger.error(`[TG_PLUGIN] Error during runtime.handleMessage for direct message: ${e}`);
     }
   }
 
-  private async handleRelayMessage(msg: RelayMessage): Promise<void> {
-    this.logger.debug(`[TG_PLUGIN] Received message from Relay: ${JSON.stringify(msg)}`);
-    // Use the class member this.telegramClient, already validated in initialize()
-    if (!this.telegramClient || typeof this.telegramClient.sendMessage !== 'function') {
-      this.logger.warn('Message ignored: telegramClient not ready.');
+  private async handleRelayMessage(message: any): Promise<void> {
+    this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Raw message from relay: ${JSON.stringify(message, null, 2)}`);
+
+    const actualMessageContent = message.message || message; // Accommodate relay message structure
+    const senderAgentId = actualMessageContent.sender_agent_id;
+    const currentAgentId = this.runtime?.getAgentId?.();
+
+    this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Relay msg sender_agent_id: ${senderAgentId}, Current agentId: ${currentAgentId}`);
+
+    if (senderAgentId && senderAgentId === currentAgentId) {
+      this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Message from relay is from self (${senderAgentId}), IGNORING.`);
       return;
     }
 
-    const chatId = msg.chat.id.toString();
-    const thisAgentId = this.runtime.getAgentId?.();
+    this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Message from other agent (${senderAgentId}), passing to runtime.handleMessage.`);
 
-    if (msg.sender_agent_id && msg.sender_agent_id === thisAgentId) {
-      this.logger.debug(`[TG_PLUGIN] Ignoring relay message from self (agent: ${thisAgentId}).`);
-      return;
-    }
-
-    let agentResponse: any;
-    if (this.runtime.handleMessage) {
+    if (this.runtime && typeof this.runtime.handleMessage === 'function') {
       try {
-        const messageFromRelay = { ...msg, isFromRelay: true };
-        agentResponse = await this.runtime.handleMessage(messageFromRelay);
-      } catch (e) {
-        this.logger.error(`[TG_PLUGIN] Error from runtime.handleMessage for relay message: ${e}`);
-        return;
+        // Pass the actual message content that includes sender_agent_id etc.
+        await this.runtime.handleMessage(actualMessageContent);
+        this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] runtime.handleMessage completed for relayed message from ${senderAgentId}.`);
+        // NO FURTHER ACTION HERE - runtime.handleMessage will send its own response to Telegram
+        // and the main handleTelegramMessage (or this revised handleRelayMessage if it were to send)
+        // would be responsible for relaying *new* responses if needed.
+      } catch (error) {
+        this.logger.error(`[TG_PLUGIN_RELAY_HANDLER] Error in runtime.handleMessage for relayed message: ${error.message}`, { error });
       }
     } else {
-      this.logger.warn('[TG_PLUGIN] runtime.handleMessage is not available.');
-      return;
-    }
-
-    const agentResponseText = agentResponse?.text || agentResponse?.message?.text || (typeof agentResponse === 'string' ? agentResponse : null);
-
-    if (agentResponseText && typeof agentResponseText === 'string' && agentResponseText.trim() !== '') {
-      this.logger.debug(`[TG_PLUGIN] Agent core responded to relay message with: "${agentResponseText}"`);
-      try {
-        await this.telegramClient.sendMessage(msg.chat.id, agentResponseText);
-        this.logger.info(`[TG_PLUGIN] Sent agent response (to relay message) to Telegram chat ${msg.chat.id}`);
-
-        if (this.relay) {
-          this.logger.debug(`[TG_PLUGIN] Relaying agent's own response (to relay message) to relay server.`);
-          await this.relay.sendMessage(chatId, agentResponseText);
-        } else {
-          this.logger.warn('[TG_PLUGIN] Relay not available to send agent response (to relay message).');
-        }
-      } catch (e) {
-        this.logger.error(`[TG_PLUGIN] Error sending agent response (to relay message) to Telegram or relay: ${e}`);
-      }
-    } else {
-      this.logger.debug('[TG_PLUGIN] Agent core did not provide a text response to relay message.');
+      this.logger.warn("[TG_PLUGIN_RELAY_HANDLER] Runtime or handleMessage not available for relayed message.");
     }
   }
 
@@ -253,5 +199,24 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.logger.error(`[TG_PLUGIN] Error stopping Telegram client: ${error}`);
     }
     this.logger.info('[TG_PLUGIN] Shutdown complete.');
+  }
+
+  // This method will be called by the runtime patch
+  public async forwardToRelay(chatId: string, text: string, originalMessage?: any): Promise<void> {
+    const currentAgentId = this.runtime?.getAgentId?.();
+    if (!currentAgentId) {
+      this.logger.error('[PLUGIN_FORWARD_TO_RELAY] Cannot forward message: currentAgentId is not available from runtime.');
+      return;
+    }
+    if (this.relay) {
+      this.logger.info(`[PLUGIN_FORWARD_TO_RELAY] Plugin forwarding message from agent ${currentAgentId} to relay. ChatID: ${chatId}, Text: ${text.substring(0, 50)}...`);
+      // The currentAgentId is implicitly used by the this.relay instance as it was configured with it.
+      // The originalMessage is not directly supported by the current relay.sendMessage signature.
+      // If originalMessage context is vital for the relay server, the relay's sendMessage or its underlying HTTP call needs adjustment.
+      await this.relay.sendMessage(chatId, text);
+      this.logger.info(`[PLUGIN_FORWARD_TO_RELAY] Call to this.relay.sendMessage successful for chatID ${chatId}.`);
+    } else {
+      this.logger.warn('[PLUGIN_FORWARD_TO_RELAY] Relay client not available in plugin, cannot forward message.');
+    }
   }
 }
