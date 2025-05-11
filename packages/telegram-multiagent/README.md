@@ -2,66 +2,71 @@
 
 ![Powered by Aeternity Foundation](https://img.shields.io/badge/Powered%20by-Aeternity%20Foundation-blue)
 
-> 🌟 **This project is proudly supported by the [Aeternity Foundation](https://aeternity.foundation/)** - Advancing decentralized communication technologies through innovative AI solutions.
+> 🌟 **This project is proudly supported by the [Aeternity Foundation](https://aeternity.foundation/)** - Advancing decentralized communication technologies.
 
-Multi-agent coordination for Telegram bots in ElizaOS. This plugin enables the previously impossible: multiple ElizaOS agents that can see and respond to each other's messages in Telegram groups, creating dynamic, realistic multi-agent conversations.
+A Telegram multi-agent coordination plugin for ElizaOS that enables agents to:
+
+- See and respond to each other's messages
+- Manage shared conversations with unique IDs and participant tracking
+- Exhibit distinct personalities and realistic behaviors
 
 ## 🚀 Overview
 
-The æternals plugin solves a fundamental limitation in the Telegram API: bots cannot see other bots' messages. Through an innovative relay server architecture, this plugin enables:
+Telegram bots cannot normally see other bots' messages. This plugin works with a relay server to:
 
-- **Bot-to-Bot Visibility**: Bots can process and respond to other bots' messages
-- **Autonomous Decision Making**: Each bot independently decides whether to ignore or respond
-- **Natural Multi-Agent Conversations**: Bots can engage in group conversations with realistic turn-taking
-- **Persistent Context Management**: All conversation data is stored for continuity
+1. **Relay Messages**: Forward messages between agents
+2. **Manage Conversations**: Assign conversation IDs, track state, and persist history
+3. **Control Turn-Taking**: Enforce reply order via FIFO, round-robin, or LLM-assisted strategies
+4. **Enhance Personality**: Style messages with traits, emojis, and tone using PersonalityEnhancer
+5. **Simulate Typing**: Show typing indicators and variable delays for natural pacing
+6. **Persist Context**: Use in-memory state for speed and SQLite for durability
 
 ## ✨ Features
 
-- 🤝 **Multi-Agent Coordination**: Enables conversations between different agents in Telegram groups
-- 👀 **Inter-Bot Visibility**: Bots can see and respond to other bots' messages (overcoming Telegram API limitations)
-- 🧠 **Intelligent Decision Making**: Bots decide whether to respond based on message content and conversation context
-- ⏱️ **Turn-Taking System**: Prevents all agents from responding simultaneously
-- 🔄 **Relay Server Integration**: Central hub for message distribution between bots
-- 🚀 **Conversation Kickstarter**: Automatically initiates conversations between agents on configurable topics
-- 💾 **Persistent Memory**: Stores conversation state and context
-- ⚙️ **Runtime Patching**: Dynamically enhances ElizaOS runtime capabilities
+- 🤝 **Multi-Agent Coordination**: Enable group discussions among multiple bots
+- 👀 **Inter-Bot Visibility**: Overcome Telegram API limitations with a relay server
+- 🧠 **Intelligent Decision Making**: Decide to ignore or respond based on content and context
+- ⏱️ **Turn-Taking System**: Prevent overlapping replies with configurable strategies
+- 🔄 **Relay Server Integration**: Central hub for reliable message distribution
+- 🚀 **Conversation Kickstarter**: Configurable automatic initiation of new topics
+- 💾 **Persistent Memory**: Hybrid in-memory + SQLite storage for full conversation history
+- 🎭 **Personality Enhancer**: Apply tone, emojis, and phrasing for each agent
+- 👀 **Typing Simulation**: Realistic typing indicators and response delays
+- ⚙️ **Runtime Patching**: Dynamically extend ElizaOS runtime capabilities
 
-## 📋 Installation
+## 📦 Installation
+
+Install via pnpm or npm:
 
 ```bash
-# Using npm
-npm install @elizaos/telegram-multiagent
-
-# Using pnpm
 pnpm add @elizaos/telegram-multiagent
+# or
+npm install @elizaos/telegram-multiagent
 ```
 
-Add it directly to your character configuration file:
-
-```json
-{
-  "plugins": [
-    "@elizaos/telegram-multiagent"
-  ]
-}
-```
-
-## ⚙️ Configuration
+## 🔧 Configuration
 
 ### Character Configuration
 
-Add the plugin to your agent's character configuration:
+Add to your agent's character JSON:
 
 ```json
 {
-  "name": "YourAgent",
-  "plugins": [
-    "@elizaos/telegram-multiagent"
-  ],
+  "plugins": ["@elizaos/telegram-multiagent"],
   "clients": ["@elizaos/client-telegram"],
-  "clientConfig": {
-    "telegram": {
-      "shouldIgnoreBotMessages": false
+  "pluginConfig": {
+    "telegram-multiagent": {
+      "relayServerUrl": "http://localhost:4000",
+      "authToken": "<your-relay-token>",
+      "groupIds": ["-1001234567890"],
+      "disablePolling": false,
+      "maxRetries": 3,
+      "conversationCheckIntervalMs": 60000,
+      "dbPath": "./data/telegram-multiagent.db",
+      "kickstarterConfig": {
+        "probabilityFactor": 0.1,
+        "minIntervalMs": 300000
+      }
     }
   }
 }
@@ -69,113 +74,61 @@ Add the plugin to your agent's character configuration:
 
 ### Environment Variables
 
-Configure the plugin behavior using environment variables:
+| Variable                       | Description                                     | Default                |
+|--------------------------------|-------------------------------------------------|------------------------|
+| `AGENT_ID`                     | Unique identifier for the agent                 | (required)             |
+| `TELEGRAM_GROUP_IDS`           | Comma-separated Telegram group IDs              | (required)             |
+| `RELAY_SERVER_URL`             | URL of the relay server                         | `http://localhost:4000`|
+| `RELAY_AUTH_TOKEN`             | Authentication token for relay server           | (required)             |
+| `USE_IN_MEMORY_DB`             | Use in-memory state instead of SQLite           | `false`                |
+| `DISABLE_POLLING`              | Disable Telegram polling                        | `false`                |
 
-```bash
-# Required configurations
-export AGENT_ID="your_agent_id"
-export TELEGRAM_GROUP_IDS="-_YOUR GROUPS IDS_"
-export RELAY_SERVER_URL="http://localhost:4000"
-export RELAY_AUTH_TOKEN="your-secure-token"
+## 🔍 Quick Start
 
-# Optional configurations
-export USE_IN_MEMORY_DB="true"
-export DISABLE_POLLING="false"
-export FORCE_GC="true" 
-```
+1. **Start Relay Server**
 
-### Relay Server Setup
+   ```bash
+   cd relay-server
+   PORT=4000 RELAY_AUTH_TOKEN="<your-relay-token>" node server.js
+   ```
 
-The relay server is a central component that facilitates bot-to-bot communication:
+2. **Start Agent**
 
-```bash
-# Start the relay server
-cd relay-server
-PORT=4000 RELAY_AUTH_TOKEN="your-secure-token" node server.js
-```
+   ```bash
+   pnpm start -- --plugins="@elizaos/telegram-multiagent" \
+     --clients="@elizaos/client-telegram" --port=3000
+   ```
 
-## 🔧 Usage
+3. **Verify**
 
-The plugin works with the standard ElizaOS agent startup process:
+   - Relay health: `curl http://localhost:4000/health`
+   - Agent logs: `tail -f logs/agent.log`
 
-```bash
-# Start an agent with the telegram-multiagent plugin
-node start-agent.js --isRoot \
-  --characters=path/to/your/character.json \
-  --clients=@elizaos/client-telegram \
-  --plugins=@elizaos/telegram-multiagent \
-  --port=3000
-```
+## 📚 API Reference
 
-### Agent Personality Configuration
+### `TelegramMultiAgentPlugin`
 
-For optimal multi-agent conversation experiences, configure your agent's personality traits:
+- `register(runtime: IAgentRuntime)`: Attach plugin to ElizaOS runtime
+- `initialize()`: Set up Telegram client, relay, and sub-components
+- `shutdown()`: Disconnect relay and stop polling
+- `forwardToRelay(chatId: string, text: string)`: Forward custom messages
 
-```json
-{
-  "personality": {
-    "conversationInitiationWeight": 0.4,
-    "responseThreshold": 0.6,
-    "topicsOfInterest": ["crypto", "blockchain", "defi"]
-  }
-}
-```
+### `ConversationManager`
 
-## 🛠️ Technical Implementation
+- `handleMessage(message: RelayMessage, currentAgentId?)`: Process incoming messages
+- `shouldAgentRespond(...)`: Determine if agent should reply
+- `setTurnStrategy(strategy)`: Configure reply order
 
-The æternals plugin currently uses runtime patching to extend ElizaOS capabilities:
+### `PersonalityEnhancer`
 
-1. **Runtime Injection**: Enhances ElizaOS runtime with bot-to-bot communication support
-2. **Message Relay**: Routes messages between agents through a central relay server
-3. **Telegram Client Modification**: Patches Telegram client to process bot messages
-4. **Memory Management**: Optimizes resource usage to prevent memory leaks
-5. **Decision Logic**: Implements sophisticated response decision algorithms
+- `enhanceMessage(text, context?)`: Apply personality effects
+- `calculateResponseDelay(context?)`: Compute realistic delays
 
-Example runtime patching setup:
+## 🤝 Contributing
 
-```javascript
-// Apply runtime patches first
-node patches/apply-patches.js
+Contributions welcome! Please open issues or pull requests.
 
-// Then start agent with plugin
-node start-agent.js --plugins=@elizaos/telegram-multiagent
-```
-
-## 🔍 Monitoring
-
-Monitor your multi-agent system with the included tools:
-
-```bash
-# View all agent activity
-./monitor_agents.sh -w
-
-# Check agent health
-curl http://localhost:3000/health
-
-# Check relay server connections
-curl http://localhost:4000/health
-```
-
-## 📚 Developer Notes
-
-### Integrating with Custom Agents
-
-When building your own agents with this plugin:
-
-1. Ensure `shouldIgnoreBotMessages` is set to `false` in Telegram client config
-2. Configure conversation parameters in your character definition
-3. Connect all agents to the same relay server
-4. Use consistent group IDs across all agents
-
-### Building from Source
-
-```bash
-cd packages/telegram-multiagent
-pnpm install
-pnpm build
-```
-
-## 📜 License
+## ⚖️ License
 
 MIT
 

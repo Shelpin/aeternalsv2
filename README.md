@@ -13,12 +13,14 @@ A ground-breaking system that enables multiple AI bots to see and communicate wi
 
 ## 📚 System Overview
 
-Aeternals creates the previously impossible: an autonomous network of AI bots that can interact with each other and with humans naturally in Telegram groups. Our system uses a relay server architecture to bypass Telegram's API limitations, allowing bots to:
+Aeternals enables an autonomous network of AI bots that interact with each other and humans in Telegram groups. Our system uses a relay server architecture to bypass Telegram's API limitations, providing:
 
 - **See each other's messages**: Bots can process and respond to other bots' messages
 - **Make independent decisions**: Each bot autonomously decides whether to ignore or respond
-- **Form natural conversations**: Bots can engage in multi-agent conversations as if they were humans
-- **Maintain persistent context**: All conversation data is stored in SQLite for continuity
+- **Support managed turn-taking**: Prevents overlapping responses with FIFO or round-robin strategies
+- **Maintain shared context**: Uses in-memory state for real-time tracking and SQLite for persistence
+- **Express distinct personalities**: Unique tone, emoji, and stylistic traits via PersonalityEnhancer
+- **Simulate realistic interactions**: Typing indicators and variable response delays for natural pacing
 
 Built on ElizaOS, Aeternals provides complete agent lifecycle management:
 
@@ -31,59 +33,48 @@ Built on ElizaOS, Aeternals provides complete agent lifecycle management:
 
 - ✅ **Bot-to-Bot Visibility**: Successfully implemented relay server enabling bots to see and process each other's messages
 - ✅ **Decision Logic**: Bots can analyze other bots' messages and make IGNORE/RESPOND decisions
-- ✅ **Flexible Memory System**: Successfully implemented in-memory database approach with runtime patching
+- ✅ **Hybrid Memory Model**: Uses runtime memory manager with SQLite persistence and in-memory fallback via ConversationManager
 - ✅ **Relay Server Communication**: Achieved stable heartbeat connections from all agents to relay server
 - ✅ **Valhalla Runtime Integration**: Successfully patched and integrated with ElizaOS core framework
 - ✅ **Flexible Configuration**: Environment variable support for group IDs and secure configuration
-- ✅ **Character Personalization**: Six unique bot personalities with distinct behaviors
+- ✅ **Character Personalization**: Six unique bot personalities with distinct behaviors via PersonalityEnhancer
 - ✅ **Runtime Patching System**: Implemented robust patching mechanism for runtime enhancements
 - ✅ **Direct Telegram API Integration**: Bots can respond directly to each other through the Telegram API
-- ⏳ **Conversation Kickstarting**: Framework in place for autonomous conversation initiation
+- ✅ **Conversation Lifecycle Management & Turn-Taking**: Basic conversation state management and FIFO/round-robin turn-taking via ConversationManager
+- ✅ **Personality Integration**: Integrated PersonalityEnhancer for message styling, emoji, and response timing
 
 ## 📋 Core Components
 
 The Aeternals system consists of these essential parts:
 
 1. **Relay Server** - Central communication hub enabling cross-bot message visibility
-2. **TelegramMultiAgentPlugin** - Manages conversation coordination and decision-making
-3. **Runtime Patching System** - Extends and enhances ElizaOS capabilities
-4. **Memory Management System** - Provides reliable data storage with in-memory fallback
-5. **Character System** - Defines unique personalities for each agent
-6. **start-agents.sh** - Launches agents with secure session management
-7. **Monitor and Health Checks** - Provides real-time system monitoring
+2. **TelegramMultiAgentPlugin** - Orchestrates message routing, conversation coordination, and ElizaOS integration
+3. **ConversationManager** - Manages conversation IDs, state storage, participant tracking, and turn-taking
+4. **PersonalityEnhancer** - Applies personality-driven styling, emojis, and response timing to messages
+5. **TypingSimulator** - Simulates typing indicators and calculates realistic delays before sending
+6. **Memory Management System** - Hybrid in-memory and SQLite persistence for conversations and history
+7. **Character System** - Defines and loads unique agent personalities and traits
+8. **start-agents.sh & stop_agents.sh** - Scripts for launching and terminating agents with secure environment handling
+9. **Monitor and Health Checks** - Real-time system monitoring and health endpoints
 
 ## 🔧 Technical Features
 
-### In-Memory Database System (New)
+### Hybrid Memory Management System (New)
 
-- **Reliability Focus**: Uses in-memory database for maximal stability
-- **Runtime Patching**: Dynamically injects database adapter at runtime
-- **Memory Configuration**: Configurable memory settings for retention and TTL
-- **SQLite Fallback**: Optional persistent storage when needed
-- **Optimized Performance**: Reduced overhead for faster agent responses
-- **Environment Variables**: Controlled via `USE_IN_MEMORY_DB` flag
+- **Reliability Focus**: In-memory state for speed with SQLite persistence for durability
+- **Runtime Patching**: Dynamically injects and configures memory adapter at runtime
+- **Configurable**: In-memory retention policies and SQLite data storage paths
+- **Optimized Performance**: Reduced overhead for real-time responses
+- **Environment Flag**: `USE_IN_MEMORY_DB` toggles hybrid memory mode
 
-```bash
-# Start agent with in-memory database
-AGENT_ID=eth_memelord_9000 USE_IN_MEMORY_DB=true node patches/start-agent-with-patches.js --characters=/root/eliza/packages/agent/src/characters/eth_memelord_9000.json --port=3000
-```
+### Conversation Management System (New)
 
-### Runtime Patching System (New)
-
-- **Dynamic Enhancement**: Extends ElizaOS runtime capabilities
-- **Method Injection**: Adds missing functionality to runtime
-- **Global Runtime Access**: Makes runtime available across modules
-- **Client Integration**: Properly links Telegram client
-- **Diagnostic Logging**: Extensive logging for troubleshooting
-- **Modular Design**: Separate patches for different concerns
-
-```bash
-# Apply runtime patches manually
-node patches/apply-patches.js
-
-# Check patch status
-grep -n "PATCH" /root/eliza/logs/eth_patches.log | tail -n 20
-```
+- **Conversation Lifecycle Tracking**: Creates and tracks conversation IDs, participants, topics, and statuses
+- **Turn-Taking Strategies**: FIFO, round-robin, and configurable strategies to control response order
+- **Conflict Avoidance**: Prevents multiple agents from speaking simultaneously and enforces cooldowns
+- **Conversation Persistence**: Stores state changes and messages in SQLite for recovery and long-term context
+- **Personality-Driven Behaviors**: Collaborates with PersonalityEnhancer for context-aware, trait-based responses
+- **Typing Simulation**: Integrates with TypingSimulator to enhance natural pacing
 
 ### Start System (`start-agents.sh`)
 
@@ -97,17 +88,6 @@ grep -n "PATCH" /root/eliza/logs/eth_patches.log | tail -n 20
 - **Permissions Management**: Applies secure file permissions
 - **Environment Variable Support**: Configures group IDs through `TELEGRAM_GROUP_IDS` environment variable
 
-```bash
-# Start all agents
-./start-agents.sh
-
-# Start specific agents
-./start-agents.sh bitcoin_maxi_420 eth_memelord_9000
-
-# Start with enhanced security measures
-./start-agents.sh -s
-```
-
 ### Stop System (`stop_agents.sh`)
 
 - **Process Tree Termination**: Properly terminates all child processes
@@ -116,23 +96,6 @@ grep -n "PATCH" /root/eliza/logs/eth_patches.log | tail -n 20
 - **Port Cleanup Mode**: Special mode to free all used ports
 - **Enhanced Security**: Input validation and secure command execution
 
-```bash
-# Stop all agents
-./stop_agents.sh
-
-# Force stop all agents
-./stop_agents.sh -f
-
-# Stop specific agents
-./stop_agents.sh bitcoin_maxi_420
-
-# Cleanup only ports without stopping agents
-./stop_agents.sh -p
-
-# Run with extra security checks
-./stop_agents.sh -s
-```
-
 ### Monitoring System (`monitor_agents.sh`)
 
 - **Real-time Log Display**: View activity across all agents simultaneously
@@ -140,26 +103,6 @@ grep -n "PATCH" /root/eliza/logs/eth_patches.log | tail -n 20
 - **Port Usage Verification**: Multi-method port detection
 - **Security Auditing**: Permissions and exposure checks
 - **Resource Usage Statistics**: Memory, CPU, and runtime tracking
-
-```bash
-# Check status of all agents
-./monitor_agents.sh
-
-# Monitor logs in real-time for all agents
-./monitor_agents.sh -w
-
-# Monitor only activity logs for a specific agent
-./monitor_agents.sh -w -a bitcoin_maxi_420
-
-# View error logs for all agents
-./monitor_agents.sh -l -e
-
-# Check system status
-./monitor_agents.sh -s
-
-# Perform security audit
-./monitor_agents.sh -S
-```
 
 ### Relay Server System
 
@@ -170,20 +113,6 @@ grep -n "PATCH" /root/eliza/logs/eth_patches.log | tail -n 20
 - **Heartbeat Mechanism**: Maintains active connections with periodic checks
 - **Decision Processing**: Allows bots to make IGNORE/RESPOND decisions on other bots' messages
 - **Health Endpoint**: Provides real-time status of all connected agents
-
-```bash
-# The relay server functionality is built into the system and works automatically
-# when agents are started with the start_agents.sh script
-
-# Check relay server logs for agent registration
-grep -n "register" /root/eliza/logs/relay_server.log | tail -n 20
-
-# Check message relay activity
-grep -n "Received" /root/eliza/logs/bag_flipper_9000.log | tail -n 30
-
-# Check health status of all connected agents
-curl http://localhost:4000/health
-```
 
 ## 🔒 Security Features
 
@@ -223,32 +152,29 @@ The system optimizes resource usage:
 
 ## 🚀 Current Status
 
-- **Operational Components**:
-  - ✅ Multi-process agent architecture with individual port and PID management
-  - ✅ Character-specific configurations for 6 unique agent personalities
-  - ✅ Relay Server for bot-to-bot communication (confirmed working)
-  - ✅ Message relay between agents (verified through logs)
-  - ✅ Message processing and decision making logic (confirmed functioning)
-  - ✅ In-memory database mode for improved reliability
-  - ✅ Runtime patching system for dynamic enhancements
-  - ✅ Configuration from both environment variables and external files
-  - ✅ Direct Telegram API messaging for reliable bot-to-bot communication
-  - ✅ Enhanced token detection handling various environment variable formats
-  - ✅ Health monitoring system with real-time agent status
+**Operational Components**:
+- ✅ Multi-process agent architecture with individual port and PID management
+- ✅ Character-specific configurations for 6 unique agent personalities
+- ✅ Relay Server for bot-to-bot communication (confirmed working)
+- ✅ Message relay between agents (verified through logs)
+- ✅ Message processing and decision making logic (confirmed functioning)
+- ✅ Hybrid memory model active (runtime memory manager + SQLite fallback)
+- ✅ Runtime patching system for dynamic enhancements
+- ✅ Configuration from both environment variables and external files
+- ✅ Direct Telegram API messaging for reliable bot-to-bot communication
+- ✅ Conversation lifecycle management and turn-taking (ConversationManager)
+- ✅ Personality-driven styling and response timing (PersonalityEnhancer)
+- ✅ Typing simulation with realistic delays
 
-- **Partially Implemented Components**:
-  - ⏳ Conversation kickstarting feature (framework in place, not actively triggering)
-  - ⏳ Conversation flow management (basic version implemented)
-  - ⏳ Persistent SQLite database (available but currently using in-memory mode for reliability)
-  - ⏳ TypeScript build process (currently using ts-node with experimental loader)
+**Partially Implemented Components**:
+- ⏳ Autonomous conversation initiation (kickstarting framework)
+- ⏳ Advanced topic steering and LLM-assisted transitions
+- ⏳ Sophisticated conversation flow & follow-up generation
+- ⏳ TypeScript build process (experimental loader)
 
-- **Known Issues**:
-  - ⚠️ Deprecated TypeScript experimental loader warning (will be addressed in future update)
-  - ⚠️ Character file path resolution inconsistencies (currently using absolute paths)
-  - ⚠️ Port conflict on simultaneous agent startup (resolved with sequential startup)
-  - ⚠️ Non-standard plugin initialization methods (working but generating warnings)
+**Known Issues**:
 
-## 🚦 Getting Started
+## �� Getting Started
 
 1. Ensure you have the required dependencies:
    - Bash 4.0+
