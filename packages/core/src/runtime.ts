@@ -1,4 +1,4 @@
-import { IDatabaseAdapter, IAgentRuntime, Character, IMemoryManager, ModelProviderName, Provider, FetchFunction, State, Memory, ClientInstance, ICacheManager, Action } from "@elizaos/types";
+import { IDatabaseAdapter, IAgentRuntime, Character, IMemoryManager, ModelProviderName, Provider, FetchFunction, State, Memory, ClientInstance, ICacheManager, Action, Evaluator, HandlerCallback } from "@elizaos/types";
 import { Logger as CoreLoggerType } from '@elizaos/types';
 
 // Re-export for backward compatibility
@@ -34,6 +34,7 @@ export interface RuntimeConfig {
     embedder?: any;
     port?: number;
     imageModelProvider?: ModelProviderName;
+    imageVisionModelProvider?: ModelProviderName;
     modelProvider: ModelProviderName;
     databaseAdapter?: IDatabaseAdapter;
     logging?: boolean;
@@ -48,24 +49,26 @@ export interface RuntimeConfig {
  */
 export class AgentRuntime implements IAgentRuntime {
     agentId: string;
-    serverUrl?: string;
-    databaseAdapter?: IDatabaseAdapter;
-    logger: CoreLoggerType;
-
-    character: Character;
-    messageManager: IMemoryManager;
+    serverUrl: string;
+    databaseAdapter: IDatabaseAdapter;
+    token: string | null;
     modelProvider: ModelProviderName;
-    token?: string;
-    imageModelProvider?: ModelProviderName;
+    imageModelProvider: ModelProviderName;
+    imageVisionModelProvider: ModelProviderName;
+    character: Character;
+    providers: Provider[];
+    actions: Action[];
+    evaluators: Evaluator[] = [];
+    plugins: Provider[];
+    logger: CoreLoggerType;
+    messageManager: IMemoryManager;
     fetch?: FetchFunction;
-    providers?: Provider[];
     settings: Map<string, string>;
 
     // ADDED Missing properties
     public adapters: any[] = []; // Placeholder type
     public cacheManager: ICacheManager | null = null; // Use imported ICacheManager
     public clients: ClientInstance[] = [];
-    public actions: Action[] = []; // ADDED actions property
     public loadedPlugins: Plugin[] = []; // ADDED for storing initialized plugin instances
 
     // Add handleMessage property to the class definition
@@ -73,8 +76,8 @@ export class AgentRuntime implements IAgentRuntime {
 
     constructor(config: RuntimeConfig) {
         this.agentId = config.agentId || "agent";
-        this.serverUrl = config.serverUrl;
-        this.databaseAdapter = config.databaseAdapter;
+        this.serverUrl = config.serverUrl || "https://example.com";
+        this.databaseAdapter = config.databaseAdapter || {} as IDatabaseAdapter;
         this.logger = createLogger(`Runtime:${this.agentId}`);
 
         if (!config.character) throw new Error("Character configuration is required in RuntimeConfig");
@@ -82,10 +85,13 @@ export class AgentRuntime implements IAgentRuntime {
         this.messageManager = config.messageManager || {} as IMemoryManager;
         this.modelProvider = config.modelProvider;
         this.token = config.token;
-        this.imageModelProvider = config.imageModelProvider;
+        this.imageModelProvider = config.imageModelProvider || 'openai' as ModelProviderName;
+        this.imageVisionModelProvider = config.imageVisionModelProvider || 'openai' as ModelProviderName;
         this.fetch = config.fetch;
-        this.providers = config.plugins;
+        this.providers = config.plugins || [];
         this.settings = config.settings || new Map<string, string>();
+        this.actions = config.actions || [];
+        this.evaluators = config.evaluators || [];
 
         // --- BIND handleMessage --- 
         this.handleMessage = handleMessage.bind(this); // Ensure 'this' context is correct
@@ -229,10 +235,54 @@ export class AgentRuntime implements IAgentRuntime {
         return Promise.resolve();
     }
 
-    async evaluate(message: Memory, state?: any, didRespond?: boolean, callback?: any): Promise<string[] | null> {
-        this.logger.warn("AgentRuntime.evaluate() called but not implemented.", { messageId: message.id });
-        // TODO: Implement actual evaluation logic
-        return Promise.resolve(null);
+    async evaluate(message: Memory, state?: State, didRespond?: boolean, callback?: HandlerCallback): Promise<string[] | null> {
+        try {
+            this.logger.info(`[EVALUATOR] Starting evaluation for message: ${message.content?.text?.substring(0, 50)}...`);
+
+            // Get all evaluators that should run
+            const evaluatorsToRun = await Promise.all(
+                this.evaluators.map(async (evaluator) => {
+                    const shouldRun = evaluator.alwaysRun || await evaluator.validate(this, message, state);
+                    if (shouldRun) {
+                        this.logger.info(`[EVALUATOR] Will run evaluator: ${evaluator.name}`);
+                    }
+                    return shouldRun ? evaluator : null;
+                })
+            );
+
+            // Filter out nulls and run valid evaluators
+            const validEvaluators = evaluatorsToRun.filter((e): e is Evaluator => e !== null);
+
+            if (validEvaluators.length === 0) {
+                this.logger.info('[EVALUATOR] No evaluators to run for this message');
+                return null;
+            }
+
+            this.logger.info(`[EVALUATOR] Running ${validEvaluators.length} evaluators`);
+
+            // Run all valid evaluators
+            const results = await Promise.all(
+                validEvaluators.map(async (evaluator) => {
+                    try {
+                        this.logger.info(`[EVALUATOR] Running evaluator: ${evaluator.name}`);
+                        await evaluator.handler(this, message);
+                        this.logger.info(`[EVALUATOR] Completed evaluator: ${evaluator.name}`);
+                        return evaluator.name;
+                    } catch (error) {
+                        this.logger.error(`[EVALUATOR] Error in evaluator ${evaluator.name}: ${error instanceof Error ? error.message : String(error)}`);
+                        return null;
+                    }
+                })
+            );
+
+            // Filter out null results and return evaluator names
+            const successfulEvaluators = results.filter((name): name is string => name !== null);
+            this.logger.info(`[EVALUATOR] Completed evaluation with ${successfulEvaluators.length} successful evaluators`);
+            return successfulEvaluators;
+        } catch (error) {
+            this.logger.error(`[EVALUATOR] Error in evaluate: ${error instanceof Error ? error.message : String(error)}`);
+            return null;
+        }
     }
 
     getLogger(name: string): CoreLoggerType {
@@ -366,7 +416,7 @@ export async function handleMessage(this: AgentRuntime, message: any) {
                             { role: "system", content: systemPrompt },
                             { role: "user", content: userPrompt }
                         ],
-                        max_tokens: 150,
+                        max_tokens: 1024,
                         temperature: 0.7
                     })
                 });

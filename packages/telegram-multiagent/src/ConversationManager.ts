@@ -25,6 +25,8 @@ export class ConversationManager extends PluginComponent {
   private memoryNamespace = 'telegram-multiagent';
   private fallbackMemory: FallbackMemoryManager | null = null;
   private memoryManager: any | null = null;
+  private lastMessageTime: Map<string, number> = new Map(); // Track last message time per group
+  private readonly MESSAGE_DELAY = 15000; // 15 seconds in milliseconds
 
   /**
    * Create a new ConversationManager
@@ -264,6 +266,9 @@ export class ConversationManager extends PluginComponent {
     messageText: string
   ): Promise<ConversationStateTracking | null> {
     try {
+      // Update last message time when recording a message
+      this.lastMessageTime.set(groupId.toString(), Date.now());
+
       let state = await this.getConversationState(groupId);
       if (!state) {
         state = {
@@ -361,6 +366,15 @@ export class ConversationManager extends PluginComponent {
   ): Promise<boolean> {
     try {
       this.logger.debug(`[CONVO_MANAGER] Checking if ${agentId} should respond to message from ${fromAgentId || ''} in group ${groupId}`);
+
+      // Check if enough time has passed since the last message
+      const lastTime = this.lastMessageTime.get(groupId.toString());
+      const now = Date.now();
+      if (lastTime && (now - lastTime) < this.MESSAGE_DELAY) {
+        this.logger.debug(`[CONVO_MANAGER] Not enough time has passed since last message (${now - lastTime}ms < ${this.MESSAGE_DELAY}ms)`);
+        return false;
+      }
+
       const state = await this.getConversationState(groupId);
       if (fromAgentId === agentId) {
         this.logger.debug(`[CONVO_MANAGER] Agent ${agentId} should not respond to itself`);

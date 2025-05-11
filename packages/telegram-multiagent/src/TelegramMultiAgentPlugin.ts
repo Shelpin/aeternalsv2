@@ -1,6 +1,7 @@
 import { IAgentRuntime, Plugin, RelayMessage, TelegramMultiAgentConfig, TelegramRelayConfig, ElizaLogger } from './types.js';
 import { PluginComponent } from './PluginComponent.js';
 import { TelegramRelay } from './TelegramRelay.js';
+import { ConversationManager } from './ConversationManager.js';
 
 // Default configuration values
 const DEFAULT_CONFIG: TelegramMultiAgentConfig = {
@@ -29,22 +30,25 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private config: TelegramMultiAgentConfig;
   private relay: TelegramRelay | null = null;
   private telegramClient: any; // Added for Step 2 of "Final Ascent" plan
+  private conversationManager: ConversationManager;
 
   constructor(options?: Partial<TelegramMultiAgentConfig>) {
     const logger: ElizaLogger = {
-      trace: (...args) => console.trace(...args),
-      debug: (...args) => console.debug(...args),
-      info: (...args) => console.info(...args),
-      warn: (...args) => console.warn(...args),
-      error: (...args) => console.error(...args),
+      trace: (message, ...args) => console.trace(`[TG_PLUGIN_TRACE] ${message}`, ...args),
+      debug: (message, ...args) => console.debug(`[TG_PLUGIN_DEBUG] ${message}`, ...args),
+      info: (message, ...args) => console.log(`[TG_PLUGIN_INFO] ${message}`, ...args),
+      warn: (message, ...args) => console.warn(`[TG_PLUGIN_WARN] ${message}`, ...args),
+      error: (message, ...args) => console.error(`[TG_PLUGIN_ERROR] ${message}`, ...args),
     };
     super(logger);
     this.config = { ...DEFAULT_CONFIG, ...(options || {}) };
+    this.conversationManager = new ConversationManager(this.logger);
   }
 
   register(runtime: IAgentRuntime): Plugin | boolean {
     this.setRuntime(runtime);
     this.logger.info(`[TG_PLUGIN_REGISTER] Register method called for ${this.name}. Runtime set. Initialization will be handled by AgentRuntime.`);
+    this.conversationManager.setRuntime(runtime);
     return this;
   }
 
@@ -112,7 +116,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     this.logger.info('✅ Relay connection established');
 
     this.relay.registerMessageHandler((message: RelayMessage) => {
-      this.handleRelayMessage(message).catch(e => this.logger.error(`Handle relay msg error: ${e}`));
+      this.handleRelayMessage(message).catch(e => this.logger.error(`Handle relay msg error: ${e.message || e}`));
     });
 
     setInterval(async () => {
@@ -154,11 +158,30 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     const actualMessageContent = message.message || message; // Accommodate relay message structure
     const senderAgentId = actualMessageContent.sender_agent_id;
     const currentAgentId = this.runtime?.getAgentId?.();
+    const groupId = actualMessageContent.chat?.id?.toString();
 
-    this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Relay msg sender_agent_id: ${senderAgentId}, Current agentId: ${currentAgentId}`);
+    this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Relay msg sender_agent_id: ${senderAgentId}, Current agentId: ${currentAgentId}, GroupID: ${groupId}`);
 
     if (senderAgentId && senderAgentId === currentAgentId) {
       this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Message from relay is from self (${senderAgentId}), IGNORING.`);
+      return;
+    }
+
+    if (!groupId) {
+      this.logger.warn('[TG_PLUGIN_RELAY_HANDLER] Could not determine groupId from message, IGNORING to prevent issues with ConversationManager.');
+      return;
+    }
+
+    // Consult ConversationManager
+    const agentShouldRespond = await this.conversationManager.shouldAgentRespond(
+      groupId,
+      currentAgentId || 'unknown_current_agent',
+      senderAgentId || null,
+      actualMessageContent.text
+    );
+
+    if (!agentShouldRespond) {
+      this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] ConversationManager determined agent ${currentAgentId} should NOT respond or delay is active. Aborting response.`);
       return;
     }
 
@@ -169,6 +192,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
         // Pass the actual message content that includes sender_agent_id etc.
         await this.runtime.handleMessage(actualMessageContent);
         this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] runtime.handleMessage completed for relayed message from ${senderAgentId}.`);
+        // Record that this agent has responded (or attempted to)
+        this.conversationManager.recordMessage(groupId, currentAgentId || 'unknown_current_agent', actualMessageContent.text || '');
         // NO FURTHER ACTION HERE - runtime.handleMessage will send its own response to Telegram
         // and the main handleTelegramMessage (or this revised handleRelayMessage if it were to send)
         // would be responsible for relaying *new* responses if needed.
@@ -213,8 +238,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       // The currentAgentId is implicitly used by the this.relay instance as it was configured with it.
       // The originalMessage is not directly supported by the current relay.sendMessage signature.
       // If originalMessage context is vital for the relay server, the relay's sendMessage or its underlying HTTP call needs adjustment.
-      await this.relay.sendMessage(chatId, text);
+      await this.relay.sendMessage(chatId.toString(), text);
       this.logger.info(`[PLUGIN_FORWARD_TO_RELAY] Call to this.relay.sendMessage successful for chatID ${chatId}.`);
+
+      // After successfully forwarding to relay, also record this message send time for the ConversationManager
+      // This ensures that this agent's own relayed messages also respect the delay for its *next* potential response.
+      this.conversationManager.recordMessage(chatId.toString(), currentAgentId, text || '');
+
     } else {
       this.logger.warn('[PLUGIN_FORWARD_TO_RELAY] Relay client not available in plugin, cannot forward message.');
     }
