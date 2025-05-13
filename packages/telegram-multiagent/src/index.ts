@@ -133,10 +133,17 @@ plugin.clients = [
 console.log('[MultiAgentPlugin] Added clients array to plugin instance.');
 // ---- END ADDED LOGIC ----
 
+// Re-export types for easier consumption
+export * from './types.js';
+export { ConversationManager } from './ConversationManager.js';
+export { PersonalityEnhancer } from './PersonalityEnhancer.js';
+export { TelegramMultiAgentPlugin } from './TelegramMultiAgentPlugin.js';
+
 // Re-export TelegramRelay for external use (e.g. runtime-patch)
 export { TelegramRelay } from './TelegramRelay.js';
 
-export * from './TelegramRelay.js';
+// Make sure the conversation types are exported through index.ts
+export * from './types/conversation.js';
 
 // Verification logging to confirm initialize is now a direct property
 console.log("[TELEGRAM-MULTIAGENT] Plugin created with these properties:");

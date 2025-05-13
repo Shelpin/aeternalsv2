@@ -21,14 +21,16 @@
   },
   "dependencies": {
     "@elizaos/telegram-client": "workspace:*",
-    "uuid": "^9.0.1",
-    "better-sqlite3": "^9.4.3"
+    "@elizaos/adapter-sqlite": "workspace:*",
+    "better-sqlite3": "^9.4.3",
+    "sqlite3": "5.1.6",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@elizaos/types": "workspace:*",
-    "@types/uuid": "^9.0.8",
     "@types/better-sqlite3": "^7.6.9",
-    "@types/node": "^20.11.20"
+    "@types/node": "^20.11.20",
+    "@types/uuid": "^9.0.8"
   },
   "types": "./dist/src/index.d.ts",
   "files": [

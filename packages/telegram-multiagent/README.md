@@ -138,4 +138,38 @@ Contributions are welcome! Feel free to submit a Pull Request to enhance this pl
 
 ## 🙏 Acknowledgements
 
-Special thanks to the [Aeternity Foundation](https://aeternity.foundation/) for their support in making this project possible. The æternals plugin represents a significant advancement in multi-agent communication technologies within the ElizaOS ecosystem. 
+Special thanks to the [Aeternity Foundation](https://aeternity.foundation/) for their support in making this project possible. The æternals plugin represents a significant advancement in multi-agent communication technologies within the ElizaOS ecosystem.
+
+## 💾 Shared Database Architecture
+
+This plugin uses a **shared database approach** for conversation state management. All agent instances share a single SQLite database file to enable coordination features:
+
+- **Turn-taking**: Agents can coordinate who speaks next
+- **Conversation history**: All agents see the same conversation history
+- **Agent participation tracking**: Agents know who has participated in a conversation
+
+### Configuration
+
+The shared database is located at:
+
+```
+./data/telegram-multiagent.db  # Default location
+```
+
+You can override this with either:
+
+1. **Environment variable**: `DATABASE_PATH=/custom/path/multiagent.db`
+2. **Runtime setting**: Configure `DATABASE_PATH` in your agent settings
+
+### Benefits of Shared Database
+
+- **Consistent state**: All agents see the same conversation state
+- **Coordinated responses**: Prevents multiple agents responding at once
+- **Seamless experience**: Creates a more natural, coordinated conversation flow
+
+### Implementation Details
+
+- Each conversation is identified by a standardized ID: `telegram-${groupId}`
+- State data is stored in the `conversation_states` table
+- Message history is stored in the `messages` table
+- All queries include appropriate indexes for performance 

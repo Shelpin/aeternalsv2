@@ -4,16 +4,27 @@ import {
   ElizaLogger,
   ConversationStateTracking,
   MemoryData,
-  MemoryQuery
+  MemoryQuery,
+  RelayMessage
 } from './types.js';
 import { PluginComponent } from './PluginComponent.js';
 import { FallbackMemoryManager } from './FallbackMemoryManager.js';
 import { IMemoryManager } from './interfaces.js';
+import { ConversationState, ParticipantMap, ResponseStrategy, Memory } from './types/conversation.js';
+import { Database } from 'sqlite3';
+import * as fs from 'fs';
+import * as path from 'path';
 
 // Conversation states
-enum ConversationState {
+enum ConversationLifecycleState {
   ACTIVE = 'active',
   INACTIVE = 'inactive'
+}
+
+export enum TurnStrategy {
+  FIFO = 'FIFO',
+  ROUND_ROBIN = 'ROUND_ROBIN',
+  LLM_ASSISTED = 'LLM_ASSISTED'
 }
 
 /**
@@ -21,12 +32,23 @@ enum ConversationState {
  * using the ElizaOS memory system for persistent state tracking
  */
 export class ConversationManager extends PluginComponent {
-  private db: any | null;
+  private db: Database | null = null;
+  private dbInitialized: boolean = false;
+  private dbPath: string = '';
   private memoryNamespace = 'telegram-multiagent';
   private fallbackMemory: FallbackMemoryManager | null = null;
-  private memoryManager: any | null = null;
+  private memoryManager: IMemoryManager | null = null;
+  private directDbHelper: any = null; // Will hold ConversationDatabaseHelper instance if needed
+  private usePersistentFallback = false; // Flag to indicate if we're using direct SQLite fallback
   private lastMessageTime: Map<string, number> = new Map(); // Track last message time per group
-  private readonly MESSAGE_DELAY = 15000; // 15 seconds in milliseconds
+  private readonly MESSAGE_DELAY = 8000; // 8 seconds in milliseconds
+
+  private currentTurnStrategy: TurnStrategy = TurnStrategy.FIFO;
+
+  private states: Map<string, ConversationState> = new Map();
+
+  private sqliteHelper: any = null; // Will hold ConversationDatabaseHelper instance if needed
+  private usingSqliteFallback = false; // Flag to indicate if we're using direct SQLite fallback
 
   /**
    * Create a new ConversationManager
@@ -38,12 +60,18 @@ export class ConversationManager extends PluginComponent {
 
     this.logger.info('ConversationManager: Created');
 
-    // Create fallback memory manager
-    this.fallbackMemory = new FallbackMemoryManager();
-    this.logger.info('ConversationManager: Fallback memory manager created');
+    this.initializeFallbackMemory();
+  }
 
-    // VALHALLA FIX: Add more detailed debug log about memory manager status
-    this.logger.debug("[MEMORY] Using fallback memory manager since runtime memory manager is not available yet");
+  private async initializeFallbackMemory() {
+    try {
+      // Create a fallback memory manager for persistence
+      const FallbackMemoryManager = require('./FallbackMemoryManager').FallbackMemoryManager;
+      this.fallbackMemory = new FallbackMemoryManager(this.logger);
+      this.logger.info('ConversationManager: Fallback memory manager created');
+    } catch (error) {
+      this.logger.error('Failed to initialize fallback memory manager', error);
+    }
   }
 
   /**
@@ -53,27 +81,241 @@ export class ConversationManager extends PluginComponent {
     this.logger.info('ConversationManager: Initializing');
 
     try {
-      // VALHALLA FIX: Add specific logging for memory manager status
-      if (this.runtime) {
-        if (this.runtime.memoryManager) {
-          this.logger.info("[MEMORY] Found memory manager on runtime");
-        } else if (this.runtime.memoryManagers) {
-          this.logger.info("[MEMORY] Found memory managers collection on runtime");
-        } else {
-          this.logger.warn("[MEMORY] No memory manager found on runtime, using fallback");
-        }
-      } else {
-        this.logger.warn("[MEMORY] No runtime available, using fallback memory manager");
-      }
+      // Initialize shared database
+      await this.initDatabase();
+      this.logger.info(`[SHARED_DB] Initialized shared database for conversation management`);
 
+      // Ensure memory namespace exists for cross-agent coordination
       await this.ensureMemoryNamespaceExists();
-      this.logger.info('ConversationManager: Memory namespace initialized');
+      this.logger.info('ConversationManager: Memory namespace initialized for coordination');
+
+      // Check if we have a runtime-provided memoryManager to use
+      if (this.runtime?.memoryManager) {
+        this.logger.info(`[SHARED_DB] Using runtime memoryManager for agent ${this.runtime.getAgentId?.() || 'unknown'}`);
+      } else {
+        this.logger.warn(`[SHARED_DB] No runtime memoryManager available, using direct database access`);
+      }
     } catch (error: unknown) {
       if (error instanceof Error) {
         this.logger.warn(`ConversationManager: Error initializing memory namespace: ${error.message}`);
       } else {
         this.logger.warn(`ConversationManager: Error initializing memory namespace: ${JSON.stringify(error)}`);
       }
+    }
+  }
+
+  private async initDatabase(): Promise<void> {
+    try {
+      // Try to get database path from runtime or environment
+      this.dbPath = this.getDatabasePath();
+
+      // Ensure data directory exists
+      const dataDir = path.dirname(this.dbPath);
+      if (!fs.existsSync(dataDir)) {
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+
+      this.logger.info(`[CONVO_DB_HELPER] Initializing with database path: ${this.dbPath}`);
+
+      // Create the database connection
+      try {
+        const sqlite3 = require('sqlite3').verbose();
+        this.db = new sqlite3.Database(this.dbPath, (err: Error | null) => {
+          if (err) {
+            this.logger.error(`[CONVO_DB_HELPER] Error opening database: ${err.message}`);
+            this.dbInitialized = false;
+            return;
+          }
+          this.logger.info(`Connected to SQLite database: ${this.dbPath}`);
+
+          // Ensure schema exists
+          try {
+            this.ensureSchema();
+          } catch (schemaErr) {
+            this.logger.error(`[CONVO_DB_HELPER] Error ensuring schema: ${schemaErr}`);
+            this.dbInitialized = false;
+          }
+        });
+      } catch (sqliteErr) {
+        this.logger.error(`[CONVO_DB_HELPER] Error loading sqlite3 module: ${sqliteErr}`);
+        this.dbInitialized = false;
+        // Try to use adapter-sqlite if available through runtime
+        if (this.runtime?.databaseAdapter) {
+          this.logger.info(`[CONVO_DB_HELPER] Attempting to use runtime.databaseAdapter as fallback`);
+          try {
+            // Initialize memory manager from runtime directly if adapter is available
+            this.memoryManager = this.runtime.memoryManager;
+            this.logger.info(`[CONVO_DB_HELPER] Successfully set up memoryManager from runtime`);
+          } catch (adapterErr) {
+            this.logger.error(`[CONVO_DB_HELPER] Error using runtime.databaseAdapter: ${adapterErr}`);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error('[CONVO_DB_HELPER] Error initializing database:', error);
+      this.dbInitialized = false;
+    }
+  }
+
+  /**
+   * Try to initialize the persistent SQLite fallback
+   * This is done as the third option if memoryManager isn't available
+   */
+  private async tryInitializePersistentFallback(): Promise<void> {
+    try {
+      this.logger.info("[MEMORY_FALLBACK] Attempting to initialize persistent SQLite fallback");
+
+      // Find database path from various sources
+      const dbPath = this.getDatabasePath(); // Use helper method for consistent path resolution
+
+      // Create directory if it doesn't exist
+      const dataDir = path.dirname(dbPath);
+      if (!fs.existsSync(dataDir)) {
+        this.logger.info(`[MEMORY_FALLBACK] Creating data directory: ${dataDir}`);
+        fs.mkdirSync(dataDir, { recursive: true });
+      }
+
+      this.logger.info(`[SHARED_DB] Fallback using SHARED database for all agents at: ${dbPath}`);
+
+      // Import helper dynamically to avoid ESM issues
+      const { ConversationDatabaseHelper } = await import('./utils/ConversationDatabaseHelper.js');
+      this.sqliteHelper = new ConversationDatabaseHelper(dbPath, this.logger);
+      await this.sqliteHelper.initialize();
+
+      // Verify database connection by retrieving a sample record
+      this.logger.info("[MEMORY_FALLBACK] SQLite fallback initialized successfully");
+      this.usingSqliteFallback = true;
+    } catch (error: any) {
+      this.logger.error(`[MEMORY_FALLBACK] Error initializing persistent SQLite fallback: ${error?.message || error}`);
+      this.usingSqliteFallback = false;
+    }
+  }
+
+  /**
+   * Get the database path based on environment and runtime settings
+   * following the File-Based DB Rule
+   */
+  private getDatabasePath(): string {
+    // Default database path per File-Based DB Rule
+    let dbPath = './data/multiagent.db';
+
+    // Check runtime settings first
+    if (this.runtime) {
+      if (typeof this.runtime.getSetting === 'function') {
+        const runtimeDbPath = this.runtime.getSetting('SQLITE_FILE', '') ||
+          this.runtime.getSetting('DATABASE_PATH', '');
+        if (runtimeDbPath) {
+          dbPath = runtimeDbPath;
+          this.logger.info(`[DB_PATH] Using database path from runtime settings: ${dbPath}`);
+          return dbPath;
+        }
+      }
+
+      // Try to get agent-specific data path
+      if (this.runtime?.dataDir && typeof this.runtime.dataDir === 'string') {
+        const agentId = this.runtime.getAgentId?.() || 'agent';
+        dbPath = path.join(this.runtime.dataDir, `multiagent.db`);
+        this.logger.info(`[DB_PATH] Using agent-specific database path: ${dbPath}`);
+        return dbPath;
+      }
+    }
+
+    // Check environment variables
+    if (typeof process !== 'undefined' && process.env) {
+      const envDbPath = process.env.SQLITE_FILE || process.env.DATABASE_PATH;
+      if (envDbPath) {
+        dbPath = envDbPath;
+        this.logger.info(`[DB_PATH] Using database path from environment: ${dbPath}`);
+        return dbPath;
+      }
+
+      // Check if we're in production, development, or test environment
+      const nodeEnv = process.env.NODE_ENV || 'development';
+      if (nodeEnv === 'production' && process.env.ELIZA_DATA_DIR) {
+        dbPath = path.join(process.env.ELIZA_DATA_DIR, 'telegram-multiagent.db');
+        this.logger.info(`[DB_PATH] Using production database path: ${dbPath}`);
+        return dbPath;
+      } else if (nodeEnv === 'test') {
+        dbPath = './test/data/telegram-multiagent-test.db';
+        this.logger.info(`[DB_PATH] Using test database path: ${dbPath}`);
+        return dbPath;
+      }
+    }
+
+    // Using default path with absolute resolution
+    const resolvedPath = path.resolve(dbPath);
+    this.logger.info(`[DB_PATH] Using default database path: ${resolvedPath}`);
+    return resolvedPath;
+  }
+
+  private ensureSchema(): void {
+    if (!this.db) {
+      this.logger.error('[CONVO_DB_HELPER] Cannot ensure schema: database not initialized');
+      return;
+    }
+
+    try {
+      this.db.serialize(() => {
+        // Create conversation_states table if it doesn't exist
+        this.db.run(`
+          CREATE TABLE IF NOT EXISTS conversation_states (
+            group_id TEXT PRIMARY KEY,
+            last_speaker TEXT,
+            last_update INTEGER,
+            participants TEXT,
+            cooldown_until INTEGER,
+            topic TEXT,
+            state TEXT
+          )
+        `, (err: Error | null) => {
+          if (err) {
+            this.logger.error(`[CONVO_DB_HELPER] Error creating conversation_states table: ${err.message}`);
+            return;
+          }
+
+          // Create index on group_id if it doesn't exist
+          this.db.run(`
+            CREATE INDEX IF NOT EXISTS idx_conversation_states_group_id ON conversation_states(group_id)
+          `, (err: Error | null) => {
+            if (err) {
+              this.logger.error(`[CONVO_DB_HELPER] Error creating group_id index: ${err.message}`);
+              return;
+            }
+
+            // Create messages table if it doesn't exist
+            this.db.run(`
+              CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                group_id TEXT,
+                sender TEXT,
+                message TEXT,
+                timestamp INTEGER,
+                FOREIGN KEY (group_id) REFERENCES conversation_states (group_id)
+              )
+            `, (err: Error | null) => {
+              if (err) {
+                this.logger.error(`[CONVO_DB_HELPER] Error creating messages table: ${err.message}`);
+                return;
+              }
+
+              // Create index on group_id in messages table
+              this.db.run(`
+                CREATE INDEX IF NOT EXISTS idx_messages_group_id ON messages(group_id)
+              `, (err: Error | null) => {
+                if (err) {
+                  this.logger.error(`[CONVO_DB_HELPER] Error creating messages group_id index: ${err.message}`);
+                  return;
+                }
+
+                this.dbInitialized = true;
+                this.logger.info('[SHARED_DB] Database schema initialized successfully for shared conversation state');
+              });
+            });
+          });
+        });
+      });
+    } catch (error) {
+      this.logger.error('[CONVO_DB_HELPER] Error ensuring schema:', error);
     }
   }
 
@@ -218,96 +460,203 @@ export class ConversationManager extends PluginComponent {
    * @returns Memory manager to use
    */
   private getMemoryManager(): IMemoryManager {
-    try {
-      // Check if runtime exists
-      if (!this.runtime) {
-        this.logger.warn("Memory manager unavailable (no runtime), using fallback.");
-        if (!this.fallbackMemory) {
-          this.fallbackMemory = new FallbackMemoryManager();
-        }
-        return this.fallbackMemory;
-      }
-
-      // Check if runtime.memoryManager exists and has required methods
-      if (this.runtime.memoryManager?.createMemory && this.runtime.memoryManager.getMemories) {
-        return this.runtime.memoryManager as IMemoryManager;
-      }
-
-      // Fall back to our in-memory implementation
-      if (!this.fallbackMemory) {
-        this.logger.warn("Memory manager unavailable, creating fallback memory manager");
-        this.fallbackMemory = new FallbackMemoryManager();
-      }
-
-      this.logger.debug("Using fallback memory manager");
-      return this.fallbackMemory;
-    } catch (error: unknown) {
-      // In case of any error, use fallback
-      if (!this.fallbackMemory) {
-        this.fallbackMemory = new FallbackMemoryManager();
-      }
-
-      this.logger.warn(`Error accessing memory manager: ${error instanceof Error ? error.message : JSON.stringify(error)}, using fallback`);
-      return this.fallbackMemory;
+    // Prioritize the memoryManager instance variable if it was set from runtime
+    if (this.memoryManager) {
+      this.logger.debug("[MEMORY_GET] Using pre-assigned memory manager.");
+      return this.memoryManager;
     }
+    // Runtime check
+    if (this.runtime?.memoryManager?.createMemory && this.runtime.memoryManager.getMemories) {
+      this.logger.debug("[MEMORY_GET] Using runtime.memoryManager directly.");
+      return this.runtime.memoryManager as IMemoryManager;
+    }
+
+    // SQLite direct persistence fallback check
+    if (this.usingSqliteFallback && this.sqliteHelper) {
+      this.logger.debug("[MEMORY_GET] Using direct SQLite helper for persistent fallback.");
+      return this.getDirectSqliteAdapter();
+    }
+
+    // First time reaching this fallback path, let's evaluate options and create SQLite fallback if needed
+    if (!this.usingSqliteFallback && !this.sqliteHelper) {
+      this.tryInitializePersistentFallback();
+    }
+
+    // If we've tried to initialize direct SQLite and it's available, use it
+    if (this.usingSqliteFallback && this.sqliteHelper) {
+      this.logger.debug("[MEMORY_GET] Using newly initialized direct SQLite helper for persistent fallback.");
+      return this.getDirectSqliteAdapter();
+    }
+
+    // Final fallback to our in-memory implementation
+    if (!this.fallbackMemory) {
+      this.logger.warn("[MEMORY_GET] Fallback memory manager was null, creating new instance.");
+      this.fallbackMemory = new FallbackMemoryManager();
+    }
+    this.logger.warn("[MEMORY_GET] Using fallback memory manager (in-memory). Persistence will NOT occur.");
+    return this.fallbackMemory;
   }
 
   /**
-   * Record a message in the conversation state
-   * 
-   * @param groupId - Telegram group ID
-   * @param agentId - Agent ID (or null for human)
-   * @param messageText - Message text
-   * @returns Updated conversation state
+   * Get a memory manager adapter for the direct SQLite helper
+   * This wraps the ConversationDatabaseHelper in IMemoryManager interface
    */
-  async recordMessage(
-    groupId: string | number,
-    agentId: string | null,
-    messageText: string
-  ): Promise<ConversationStateTracking | null> {
-    try {
-      // Update last message time when recording a message
-      this.lastMessageTime.set(groupId.toString(), Date.now());
+  private getDirectSqliteAdapter(): IMemoryManager {
+    if (!this.sqliteHelper) {
+      throw new Error("Direct SQLite helper not initialized");
+    }
 
-      let state = await this.getConversationState(groupId);
-      if (!state) {
-        state = {
-          status: 'active',
-          lastMessageTimestamp: Date.now(),
-          lastSpeakerId: agentId || '',
-          messageCount: 1,
-          participants: agentId ? [agentId] : [],
-          currentTopic: '',
-          lastUpdated: Date.now()
-        };
-      } else {
-        let participants = state.participants || [];
-        if (agentId && !participants.includes(agentId)) {
-          participants = [...participants, agentId];
+    // Return an adapter that implements IMemoryManager interface
+    return {
+      createMemory: async (memoryData: MemoryData) => {
+        try {
+          const { roomId, userId, content, type } = memoryData;
+
+          // Special handling for conversation state
+          if (type?.startsWith('conversation-state-')) {
+            const groupId = type.replace('conversation-state-', '');
+            if (content.metadata) {
+              return this.sqliteHelper.saveConversationState(groupId, content.metadata);
+            }
+          }
+
+          // For regular messages
+          if (roomId && userId && content.text) {
+            return this.sqliteHelper.saveMessage(roomId, userId, content.text);
+          }
+
+          return false;
+        } catch (error: unknown) {
+          this.logger.error(`[DIRECT_DB_ADAPTER] Error in createMemory: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
+          return false;
         }
-        state = {
-          ...state,
-          status: 'active',
-          lastMessageTimestamp: Date.now(),
-          lastSpeakerId: agentId || '',
-          participants,
-          messageCount: (state.messageCount || 0) + 1,
-          lastUpdated: Date.now()
-        };
+      },
+
+      getMemories: async (query: MemoryQuery) => {
+        try {
+          const { roomId, type, count } = query;
+
+          // Special handling for conversation state
+          if (type?.startsWith('conversation-state-')) {
+            const groupId = type.replace('conversation-state-', '');
+            const state = await this.sqliteHelper.getConversationState(groupId);
+
+            if (!state) return [];
+
+            return [{
+              id: `mem-${Date.now()}`,
+              roomId,
+              userId: 'system',
+              content: {
+                text: `Conversation state for group ${groupId}`,
+                metadata: state
+              },
+              type,
+              createdAt: new Date()
+            }];
+          }
+
+          // For regular messages
+          if (roomId && !type?.startsWith('conversation-state-')) {
+            const messages = await this.sqliteHelper.getRecentMessages(roomId, count || 10);
+
+            return messages.map((msg: any) => ({
+              id: msg.id,
+              roomId: msg.groupId,
+              userId: msg.userId,
+              content: {
+                text: msg.text,
+                metadata: {
+                  timestamp: msg.timestamp
+                }
+              },
+              type: 'telegram-message',
+              createdAt: new Date(msg.timestamp)
+            }));
+          }
+
+          return [];
+        } catch (error: unknown) {
+          this.logger.error(`[DIRECT_DB_ADAPTER] Error in getMemories: ${error instanceof Error ? error.message : JSON.stringify(error)}`);
+          return [];
+        }
       }
-      const success = await this.storeConversationState(groupId, state);
-      if (success && agentId) {
-        await this.storeMessage(groupId, agentId, messageText);
-      }
-      return success ? state : null;
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        this.logger.error(`[CONVO_MANAGER] Error recording message: ${error.message}`);
-      } else {
-        this.logger.error(`[CONVO_MANAGER] Error recording message: ${JSON.stringify(error)}`);
-      }
+    };
+  }
+
+  /**
+   * Handles an incoming message to get/create conversation state and update participants/timestamps.
+   * This is a higher-level function to be called by the plugin.
+   * 
+   * @param message - The incoming RelayMessage object
+   * @param currentAgentId - The ID of the agent processing this message
+   * @returns The conversation state or null if the message is invalid
+   */
+  public async handleMessage(message: RelayMessage, currentAgentId?: string): Promise<ConversationStateTracking | null> {
+    const groupId = message.chat?.id?.toString();
+    const senderId = message.sender_agent_id || message.from?.username || message.from?.id?.toString();
+
+    if (!groupId) {
+      this.logger.warn('[CONVO_MGR_HANDLE] Message lacks chat.id, cannot process conversation state.');
       return null;
     }
+    if (!senderId) {
+      this.logger.warn('[CONVO_MGR_HANDLE] Message lacks sender information, cannot reliably update participants.');
+    }
+
+    // Ensure we have a valid agent ID, not just "agent"
+    const validCurrentAgentId = currentAgentId && currentAgentId !== 'agent' && currentAgentId !== 'unknown'
+      ? currentAgentId
+      : this.runtime?.getAgentId?.() || 'unknown';
+
+    this.logger.info(`[CONVO_MGR_HANDLE] Processing message in group ${groupId} from sender ${senderId}, current agent: ${validCurrentAgentId} (original: ${currentAgentId || 'not provided'})`);
+
+    let state = await this.getConversationState(groupId);
+
+    if (!state) {
+      this.logger.info(`[CONVO_MGR_HANDLE] No existing state for group ${groupId}, creating new one.`);
+      const participants = new Set<string>();
+      if (senderId) participants.add(senderId);
+      if (validCurrentAgentId && validCurrentAgentId !== senderId) participants.add(validCurrentAgentId);
+
+      state = {
+        status: 'active',
+        lastMessageTimestamp: Date.now(),
+        lastSpeakerId: senderId,
+        messageCount: 1,
+        participants: Array.from(participants),
+        currentTopic: '',
+        lastUpdated: Date.now()
+      };
+    } else {
+      this.logger.debug(`[CONVO_MGR_HANDLE] Existing state found for group ${groupId}. Last speaker: ${state.lastSpeakerId}`);
+      const participants = new Set(state.participants || []);
+      if (senderId) participants.add(senderId);
+      if (validCurrentAgentId && validCurrentAgentId !== senderId) participants.add(validCurrentAgentId);
+
+      state = {
+        ...state,
+        status: 'active',
+        lastMessageTimestamp: Date.now(),
+        lastSpeakerId: senderId,
+        participants: Array.from(participants),
+        messageCount: (state.messageCount || 0) + 1,
+        lastUpdated: Date.now()
+      };
+    }
+
+    const success = await this.storeConversationState(groupId, state);
+    if (!success) {
+      this.logger.error(`[CONVO_MGR_HANDLE] Failed to store updated conversation state for group ${groupId}.`);
+    } else {
+      this.logger.info(`[CONVO_MGR_HANDLE] Successfully stored updated state for group ${groupId}. Last speaker: ${state.lastSpeakerId}, Participants: ${state.participants.join(', ')}`);
+    }
+
+    if (senderId && message.text) {
+      await this.storeMessage(groupId, senderId, message.text);
+    }
+
+    return state;
   }
 
   /**
@@ -350,12 +699,91 @@ export class ConversationManager extends PluginComponent {
   }
 
   /**
+   * Record a message in the conversation state.
+   * This method is specifically for when an agent *sends* a message, to update itself as the last speaker.
+   * The primary processing of *incoming* messages should go through `handleMessage`.
+   * 
+   * @param groupId - Telegram group ID
+   * @param agentId - Agent ID of the speaker (should not be null here)
+   * @param messageText - Message text (can be a placeholder like "<agent_responded>")
+   * @returns Updated conversation state or null on failure
+   */
+  public async recordMessage(
+    groupId: string | number,
+    agentId: string, // agentId should be non-null when an agent is recording its own message
+    messageText: string
+  ): Promise<ConversationStateTracking | null> {
+    try {
+      // Update last message time with agent-specific key
+      const agentGroupKey = `${agentId}-${groupId.toString()}`;
+      this.lastMessageTime.set(agentGroupKey, Date.now());
+
+      // If using SQLite fallback, update cooldown in database
+      if (this.usingSqliteFallback && this.sqliteHelper) {
+        try {
+          await this.sqliteHelper.updateCooldown(groupId.toString(), agentId, 8000);
+          this.logger.debug(`[CONVO_MGR_RECORD] Updated cooldown in database for agent ${agentId} in group ${groupId}`);
+        } catch (dbError) {
+          this.logger.warn(`[CONVO_MGR_RECORD] Error updating database cooldown: ${dbError}. Using memory-only cooldown.`);
+        }
+      }
+
+      let state = await this.getConversationState(groupId);
+      if (!state) {
+        this.logger.warn(`[CONVO_MGR_RECORD] No state found for group ${groupId} while agent ${agentId} is recording its message. Creating new state.`);
+        state = {
+          status: 'active',
+          lastMessageTimestamp: Date.now(),
+          lastSpeakerId: agentId, // This agent is the speaker
+          messageCount: 1,
+          participants: [agentId],
+          currentTopic: '',
+          lastUpdated: Date.now()
+        };
+      } else {
+        this.logger.debug(`[CONVO_MGR_RECORD] Updating existing state for group ${groupId}: current speaker = ${state.lastSpeakerId}, new speaker = ${agentId}`);
+        // Add this agent to participants if not already included
+        const participants = new Set(state.participants || []);
+        participants.add(agentId);
+
+        state = {
+          ...state,
+          lastMessageTimestamp: Date.now(),
+          lastSpeakerId: agentId, // Update last speaker to this agent
+          participants: Array.from(participants),
+          messageCount: (state.messageCount || 0) + 1,
+          lastUpdated: Date.now()
+        };
+      }
+      const success = await this.storeConversationState(groupId, state);
+      if (success) {
+        this.logger.info(`[CONVO_MGR_RECORD] Agent ${agentId} recorded its message in group ${groupId}. State updated. Last speaker: ${agentId}`);
+        // Optionally store the actual message text if it's not a placeholder and we want agent's own messages in history
+        // For now, handleMessage stores incoming messages. recordMessage primarily updates speaker state.
+        // if (messageText !== "<agent_responded_to_direct_message>" && messageText !== "<agent_responded_to_relay_message>") {
+        //   await this.storeMessage(groupId, agentId, messageText);
+        // }
+      } else {
+        this.logger.error(`[CONVO_MGR_RECORD] Failed to store updated state for group ${groupId} after agent ${agentId} spoke.`);
+      }
+      return success ? state : null;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[CONVO_MANAGER] Error in recordMessage for agent ${agentId} in group ${groupId}: ${error.message}`);
+      } else {
+        this.logger.error(`[CONVO_MANAGER] Error in recordMessage for agent ${agentId} in group ${groupId}: ${JSON.stringify(error)}`);
+      }
+      return null;
+    }
+  }
+
+  /**
    * Determine if an agent should respond to a message
    * 
    * @param groupId - Telegram group ID
-   * @param agentId - Agent ID
+   * @param agentId - Agent ID of the potential responder
    * @param fromAgentId - ID of the agent who sent the message (or null for human)
-   * @param messageText - Text of the message
+   * @param messageText - Text of the message (optional, used for LLM or keyword checks)
    * @returns True if the agent should respond
    */
   async shouldAgentRespond(
@@ -365,208 +793,315 @@ export class ConversationManager extends PluginComponent {
     messageText?: string
   ): Promise<boolean> {
     try {
-      this.logger.debug(`[CONVO_MANAGER] Checking if ${agentId} should respond to message from ${fromAgentId || ''} in group ${groupId}`);
+      // Ensure we have a valid agent ID, not just "agent"
+      const validAgentId = agentId && agentId !== 'agent' && agentId !== 'unknown_agent_id_at_register' && agentId !== 'unknown' && agentId !== 'unknown_direct_responder'
+        ? agentId
+        : this.runtime?.getAgentId?.() || agentId;
 
-      // Check if enough time has passed since the last message
-      const lastTime = this.lastMessageTime.get(groupId.toString());
+      this.logger.debug(`[CONVO_MGR_SHOULD_RESPOND] Group ${groupId}. Current Agent: ${validAgentId} (original: ${agentId}). Sender: ${fromAgentId || 'Human/Unknown'}. Strategy: ${this.currentTurnStrategy}`);
+
+      // If using SQLite fallback, check cooldown in database first
+      if (this.usingSqliteFallback && this.sqliteHelper) {
+        try {
+          // Check if this agent is in cooldown using direct database query
+          const isInCooldown = await this.sqliteHelper.isInCooldown(groupId.toString(), validAgentId);
+          if (isInCooldown) {
+            this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} in group ${groupId} is in database cooldown. Agent defers.`);
+            return false;
+          }
+        } catch (dbError) {
+          this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND] Error checking database cooldown: ${dbError}. Falling back to in-memory cooldown check.`);
+        }
+      }
+
+      // Create a composite key for agent and group
+      const agentGroupKey = `${validAgentId}-${groupId.toString()}`;
+      const lastTimeThisAgentSpoke = this.lastMessageTime.get(agentGroupKey);
       const now = Date.now();
-      if (lastTime && (now - lastTime) < this.MESSAGE_DELAY) {
-        this.logger.debug(`[CONVO_MANAGER] Not enough time has passed since last message (${now - lastTime}ms < ${this.MESSAGE_DELAY}ms)`);
+
+      // Shorter cooldown per agent (8 seconds instead of 15)
+      const agentCooldown = 8000;
+
+      if (lastTimeThisAgentSpoke && (now - lastTimeThisAgentSpoke) < agentCooldown) {
+        this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} in group ${groupId} is in memory cooldown. Delay: ${now - lastTimeThisAgentSpoke}ms < ${agentCooldown}ms. Agent defers.`);
         return false;
       }
 
-      const state = await this.getConversationState(groupId);
-      if (fromAgentId === agentId) {
-        this.logger.debug(`[CONVO_MANAGER] Agent ${agentId} should not respond to itself`);
+      const conversationState = await this.getConversationState(groupId);
+      if (!conversationState) {
+        this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND] No conversation state found for group ${groupId}. Agent ${validAgentId} might respond by default if no other rules prevent.`);
+        return true;
+      }
+
+      if (fromAgentId === validAgentId) {
+        this.logger.debug(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} should not respond to itself.`);
         return false;
       }
 
-      let runtime: IAgentRuntime | undefined;
-      try {
-        runtime = await this.waitForRuntime();
-      } catch (error: unknown) {
-        this.logger.warn(`[CONVO_MANAGER] Error getting runtime: ${error instanceof Error ? error.message : JSON.stringify(error)}, using basic response logic`);
-        return this.basicShouldRespond(agentId, fromAgentId, messageText);
-      }
+      if (this.currentTurnStrategy === TurnStrategy.FIFO) {
+        if (conversationState.lastSpeakerId === validAgentId) {
+          this.logger.info(`[CONVO_MGR_SHOULD_RESPOND][FIFO] Agent ${validAgentId} was the last speaker in group ${groupId}. Should not respond.`);
+          return false;
+        }
+        this.logger.info(`[CONVO_MGR_SHOULD_RESPOND][FIFO] Agent ${validAgentId} was NOT the last speaker (${conversationState.lastSpeakerId}) in group ${groupId}. Allowed to respond.`);
+        return true;
+      } else if (this.currentTurnStrategy === TurnStrategy.LLM_ASSISTED) {
+        this.logger.debug(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Using LLM to determine if agent ${validAgentId} should respond.`);
+        let runtime: IAgentRuntime | undefined;
+        try {
+          runtime = await this.waitForRuntime();
+        } catch (error: unknown) {
+          this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting runtime: ${error instanceof Error ? error.message : JSON.stringify(error)}, falling back to basic response logic for LLM strategy.`);
+          return this.basicShouldRespond(validAgentId, fromAgentId, messageText, conversationState);
+        }
 
-      let character: any = undefined;
-      let agentName = agentId;
-      let persona = '';
-      let topics: string[] = [];
-      let interests: string[] = [];
-      try {
-        character = runtime && runtime.character;
-        if (character) {
-          agentName = character.name || agentId;
-          persona = character.bio || '';
-          topics = character.topics || [];
-          interests = character.interests || [];
+        let character: any = undefined;
+        let agentName = validAgentId;
+        let persona = '';
+        let topics: string[] = [];
+        let interests: string[] = [];
+        try {
+          character = runtime?.character;
+          if (character) {
+            agentName = character.name || validAgentId;
+            persona = character.bio || '';
+            topics = character.topics || [];
+            interests = character.interests || [];
+          }
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting character: ${error.message}`);
+          } else {
+            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting character: ${JSON.stringify(error)}`);
+          }
         }
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          this.logger.warn(`[CONVO_MANAGER] Error getting character: ${error.message}`);
-        } else {
-          this.logger.warn(`[CONVO_MANAGER] Error getting character: ${JSON.stringify(error)}`);
-        }
-      }
 
-      let history = '';
-      let participants: string[] = [];
-      try {
-        const memoryManager = this.getMemoryManager();
-        const recentMessages = await memoryManager.getMemories({
-          roomId: groupId.toString(),
-          type: 'telegram-message',
-          count: 5
-        });
-        if (recentMessages && recentMessages.length > 0) {
-          history = recentMessages.map((m: any) => `${m.userId}: ${m.content.text}`).join('\n');
-        }
-        if (state && state.participants) {
-          participants = state.participants;
-        }
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          this.logger.warn(`[CONVO_MANAGER] Error getting history: ${error.message}`);
-        } else {
-          this.logger.warn(`[CONVO_MANAGER] Error getting history: ${JSON.stringify(error)}`);
-        }
-      }
-
-      const prompt = `You are ${agentName}, an AI participating in a group chat.\n\nYour persona:\n${persona}\n\nYour interests: ${interests.join(', ')}\nTopics you know about: ${topics.join(', ')}\n\nCurrent group chat: Telegram group ${groupId}\nOther participants: ${participants.length > 0 ? participants.filter(p => p !== agentId).join(', ') : 'None identified yet'}\n\nRecent conversation:\n${history || 'No recent messages'}\n\nMessage just received:\nFROM: ${fromAgentId || ''}\nMESSAGE: \"${messageText || ''}\"\n\nShould you respond to this message? Consider:\n- If it's directed at you\n- If it's about a topic you're interested in\n- If you have something valuable to add\n- If it's natural for you to join the conversation at this point\n\nReply with ONLY ONE of these exact options:\n[RESPOND] - if you want to speak\n[IGNORE] - if you choose to remain silent`;
-
-      try {
-        if (runtime?.modelProvider && typeof (runtime.modelProvider as any).generateText === 'function') {
-          const result = await (runtime.modelProvider as { generateText: (opts: { prompt: string, temperature: number, maxTokens: number }) => Promise<string> }).generateText({
-            prompt,
-            temperature: 0.7,
-            maxTokens: 50
+        let history = '';
+        let participants: string[] = conversationState.participants || [];
+        try {
+          const memoryManagerToUse = this.getMemoryManager();
+          const recentMessages = await memoryManagerToUse.getMemories({
+            roomId: groupId.toString(),
+            type: 'telegram-message',
+            count: 5
           });
-          const decision = result.includes('RESPOND') ? true : false;
-          this.logger.info(`[CONVO_MANAGER] LLM response decision for ${agentId}: ${decision ? 'RESPOND' : 'IGNORE'}`);
-          return decision;
+          if (recentMessages && recentMessages.length > 0) {
+            history = recentMessages.map((m: any) => `${m.userId}: ${m.content.text}`).join('\n');
+          }
+        } catch (error: unknown) {
+          if (error instanceof Error) {
+            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting history: ${error.message}`);
+          } else {
+            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting history: ${JSON.stringify(error)}`);
+          }
         }
-      } catch (error: unknown) {
-        if (error instanceof Error) {
-          this.logger.warn(`[CONVO_MANAGER] Error generating LLM response: ${error.message}, falling back to basic logic`);
-        } else {
-          this.logger.warn(`[CONVO_MANAGER] Error generating LLM response: ${JSON.stringify(error)}, falling back to basic logic`);
+
+        const prompt = `
+          Based on the following conversation and agent information, should the agent respond?
+          
+          Agent: ${agentName}
+          Agent ID: ${validAgentId}
+          Agent Bio: ${persona}
+          Agent Interests: ${[...topics, ...interests].join(', ')}
+          
+          Conversation Participants: ${participants.join(', ')}
+          Last Speaker: ${conversationState.lastSpeakerId || 'Unknown'}
+          Current Message From: ${fromAgentId || 'Human'}
+          Message: ${messageText || 'No message text available'}
+          
+          Recent Messages:
+          ${history || 'No recent messages available'}
+          
+          Should ${agentName} respond? Answer YES or NO.
+        `;
+
+        // Use LLM to decide
+        try {
+          // This would be the code to call LLM, but for now, just use basic logic
+          this.logger.info(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Would use LLM to decide if ${validAgentId} should respond, but implementing basic logic for now.`);
+          return this.basicShouldRespond(validAgentId, fromAgentId, messageText, conversationState);
+        } catch (error) {
+          this.logger.error(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error using LLM to decide: ${error}`);
+          return this.basicShouldRespond(validAgentId, fromAgentId, messageText, conversationState);
         }
       }
-
-      return this.basicShouldRespond(agentId, fromAgentId, messageText);
     } catch (error: unknown) {
       if (error instanceof Error) {
-        this.logger.error(`[CONVO_MANAGER] Error checking if agent should respond: ${error.message}`);
+        this.logger.error(`[CONVO_MGR_SHOULD_RESPOND] Error in shouldAgentRespond: ${error.message}`);
       } else {
-        this.logger.error(`[CONVO_MANAGER] Error checking if agent should respond: ${JSON.stringify(error)}`);
+        this.logger.error(`[CONVO_MGR_SHOULD_RESPOND] Error in shouldAgentRespond: ${JSON.stringify(error)}`);
       }
-      return true;
+      return false;
     }
   }
 
   /**
-   * Basic response decision logic without using runtime
+   * Basic logic to determine if an agent should respond
+   * Used as a fallback when LLM is not available
    */
-  private basicShouldRespond(agentId: string, fromAgentId: string | null, messageText?: string): boolean {
-    // Determine if message is from a bot by checking agent ID patterns
-    const isFromBot = fromAgentId && (
-      fromAgentId.includes('Bot') ||
-      fromAgentId.includes('_') ||
-      ['linda_evangelista_88', 'vc_shark_99', 'bitcoin_maxi_420',
-        'bag_flipper_9000', 'code_samurai_77', 'eth_memelord_9000'].includes(fromAgentId)
-    );
-
-    this.logger.debug(`[CONVO_MANAGER] Is message from bot? ${isFromBot}`);
-
-    // Check if this message directly mentions this agent (simple check)
-    const isDirectedToThisAgent = messageText && (
-      messageText.toLowerCase().includes(agentId.toLowerCase())
-    );
-
-    if (isDirectedToThisAgent) {
-      this.logger.debug(`[CONVO_MANAGER] Message is directed at this agent, will respond`);
-      return true;
+  private basicShouldRespond(
+    agentId: string,
+    fromAgentId: string | null,
+    messageText?: string,
+    conversationState?: ConversationStateTracking
+  ): boolean {
+    // Don't respond to self
+    if (fromAgentId === agentId) {
+      return false;
     }
 
-    // Always use a higher probability for bot-to-bot communication to ensure interactions happen
-    if (isFromBot) {
-      // Use a probability-based approach to avoid infinite loops but ensure good conversation flow
-      // Higher probability means more responsive agents
-      const probabilityFactor = 0.4; // 40% chance to respond to other bots
-
-      // Add randomness to avoid multiple agents responding at the same time
-      const shouldRespond = Math.random() < probabilityFactor;
-      this.logger.debug(`[CONVO_MANAGER] Bot-to-bot response decision: ${shouldRespond} (probability: ${probabilityFactor})`);
-      return shouldRespond;
+    // Was this agent the last speaker?
+    if (conversationState?.lastSpeakerId === agentId) {
+      return false;
     }
 
-    // For messages from humans (not bots)
-    const responseChance = 0.3; // 30% chance to respond to human messages
-    const shouldRespond = Math.random() <= responseChance;
+    // Basic mention check
+    if (messageText) {
+      // Add type checking for runtime.character
+      const character = this.runtime?.character || {};
+      const botUsername = typeof character === 'object' && character !== null && 'username' in character
+        ? character.username as string
+        : agentId;
 
-    this.logger.debug(`[CONVO_MANAGER] Human message response probability ${responseChance}, shouldRespond=${shouldRespond}`);
+      if (messageText.includes(`@${botUsername}`) ||
+        messageText.toLowerCase().includes(agentId.toLowerCase())) {
+        return true;
+      }
+    }
 
-    return shouldRespond;
+    // Default response probability (30%)
+    return Math.random() < 0.3;
   }
 
   /**
-   * Check if a conversation is active in a group
+   * Check if it's a good time to kickstart a conversation in a group
    * 
    * @param groupId - Telegram group ID
-   * @returns True if conversation is active
-   */
-  async isConversationActive(groupId: string | number): Promise<boolean> {
-    const state = await this.getConversationState(groupId);
-    return !!state && state.status === 'active';
-  }
-
-  /**
-   * Get the timestamp of the last message in a conversation
-   * 
-   * @param groupId - Telegram group ID
-   * @returns Timestamp or 0 if no conversation
-   */
-  async getLastMessageTime(groupId: string | number): Promise<number> {
-    const state = await this.getConversationState(groupId);
-    return (state && state.lastMessageTimestamp) || 0;
-  }
-
-  /**
-   * Check if it's a good time to kickstart a conversation
-   * 
-   * @param groupId - Telegram group ID
-   * @param minIntervalMs - Minimum time between kickstarts
+   * @param minInterval - Minimum interval between kickstarts in milliseconds
    * @returns True if conversation can be kickstarted
    */
-  async canKickstartConversation(groupId: string | number, minIntervalMs: number): Promise<boolean> {
-    const state = await this.getConversationState(groupId);
+  async canKickstartConversation(
+    groupId: string | number,
+    minInterval: number = 300000
+  ): Promise<boolean> {
+    try {
+      // Get the current conversation state
+      const state = await this.getConversationState(groupId);
 
-    // If no conversation exists, we can kickstart
-    if (!state) {
+      // If no state, we can kickstart a new conversation
+      if (!state) {
+        this.logger.debug(`[KICKSTART_CHECK] No conversation state for group ${groupId}, can kickstart`);
+        return true;
+      }
+
+      // Check if the last message was too recent
+      const now = Date.now();
+      const lastMessageTime = state.lastMessageTimestamp || 0;
+      const timeSinceLastMessage = now - lastMessageTime;
+
+      if (timeSinceLastMessage < minInterval) {
+        this.logger.debug(`[KICKSTART_CHECK] Last message in group ${groupId} was too recent (${timeSinceLastMessage}ms ago), cannot kickstart`);
+        return false;
+      }
+
+      // All checks passed, we can kickstart
+      this.logger.debug(`[KICKSTART_CHECK] Can kickstart conversation in group ${groupId}`);
       return true;
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        this.logger.error(`[KICKSTART_CHECK] Error checking if conversation can be kickstarted: ${error.message}`);
+      } else {
+        this.logger.error(`[KICKSTART_CHECK] Error checking if conversation can be kickstarted: ${JSON.stringify(error)}`);
+      }
+
+      // Default to false on error
+      return false;
     }
-
-    // If conversation is inactive, we can kickstart if enough time has passed
-    if (state.status !== 'active') {
-      const lastUpdateTime = state.lastUpdated || 0;
-      const timeSinceLastUpdate = Date.now() - lastUpdateTime;
-      return timeSinceLastUpdate >= minIntervalMs;
-    }
-
-    // If conversation is active, check when the last message was sent
-    const lastMessageTime = state.lastMessageTimestamp || 0;
-    const timeSinceLastMessage = Date.now() - lastMessageTime;
-
-    // Only kickstart if enough time has passed since the last message
-    return timeSinceLastMessage >= minIntervalMs;
   }
 
-  /**
-   * Shutdown the conversation manager
-   */
-  async shutdown(): Promise<void> {
-    this.logger.info('ConversationManager: Shutting down');
-    // No resources to clean up
+  private async getConversationStateFromSqlite(groupId: string): Promise<ConversationStateTracking | null> {
+    try {
+      if (!this.sqliteHelper) {
+        this.logger.warn("[MEMORY_SQLITE] SQLite helper not initialized");
+        return null;
+      }
+
+      const state = await this.sqliteHelper.getConversationState(groupId.toString());
+
+      if (!state) {
+        return null;
+      }
+
+      // Convert database record to ConversationStateTracking format
+      return {
+        status: state.status || 'active',
+        lastSpeakerId: state.lastSpeakerId || null,
+        participants: state.participants || [],
+        lastMessageTimestamp: state.lastMessageTimestamp || Date.now(),
+        messageCount: state.messageCount || 0,
+        currentTopic: state.currentTopic || '',
+        lastUpdated: state.lastUpdated || Date.now()
+      };
+    } catch (error: any) {
+      this.logger.error(`[MEMORY_SQLITE] Error getting state from SQLite: ${error?.message || error}`);
+      return null;
+    }
+  }
+
+  private async storeConversationStateInSqlite(state: ConversationStateTracking): Promise<boolean> {
+    try {
+      if (!this.sqliteHelper) {
+        this.logger.warn("[MEMORY_SQLITE] SQLite helper not initialized");
+        return false;
+      }
+
+      // Extract groupId from stored data - it's passed as string to getConversationState
+      const groupId = this.extractGroupIdFromStateData(state);
+
+      if (!groupId) {
+        this.logger.error("[MEMORY_SQLITE] Cannot determine groupId for conversation state");
+        return false;
+      }
+
+      return await this.sqliteHelper.saveConversationState(groupId, {
+        ...state,
+        groupId
+      });
+    } catch (error: any) {
+      this.logger.error(`[MEMORY_SQLITE] Error storing state in SQLite: ${error?.message || error}`);
+      return false;
+    }
+  }
+
+  // Helper to extract groupId from memory data in a conversation
+  private extractGroupIdFromStateData(state: any): string {
+    // Try to look for the group ID in various places
+    const possibleMemorySource = state.memoryKey ||
+      state.memoryId ||
+      state.key ||
+      state.id ||
+      '';
+
+    // If it looks like "conversation-state-12345", extract the group ID
+    if (typeof possibleMemorySource === 'string' && possibleMemorySource.startsWith('conversation-state-')) {
+      return possibleMemorySource.replace('conversation-state-', '');
+    }
+
+    // Try other potential fields that might have the group ID
+    return String(state.chatId || state.roomId || state.groupId || '');
+  }
+
+  private async storeMessageInSqlite(groupId: string, agentId: string, text: string): Promise<boolean> {
+    try {
+      if (!this.sqliteHelper) {
+        this.logger.warn("[MEMORY_SQLITE] SQLite helper not initialized");
+        return false;
+      }
+
+      return await this.sqliteHelper.saveMessage(groupId.toString(), agentId, text);
+    } catch (error: any) {
+      this.logger.error(`[MEMORY_SQLITE] Error storing message in SQLite: ${error?.message || error}`);
+      return false;
+    }
   }
 }

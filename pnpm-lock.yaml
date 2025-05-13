@@ -749,6 +749,9 @@ importers:
       better-sqlite3:
         specifier: ^9.4.3
         version: 9.6.0
+      sqlite3:
+        specifier: 5.1.6
+        version: 5.1.6(encoding@0.1.13)
       uuid:
         specifier: ^9.0.1
         version: 9.0.1

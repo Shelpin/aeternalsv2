@@ -75,20 +75,18 @@ export interface MemoryQuery {
 }
 
 /**
- * Memory structure for retrieved memories
+ * Memory interface for compatibility with FallbackMemoryManager
  */
 export interface Memory {
   id: string;
-  roomId: string;
-  userId: string;
+  roomId?: string;
+  userId?: string;
+  type?: string;
+  createdAt: Date;
   content: {
     text: string;
-    facts?: unknown[];
-    goal?: string;
-    metadata?: unknown;
+    metadata?: Record<string, any>;
   };
-  createdAt: Date;
-  type?: string;
 }
 
 // Plugin interface - simplified
