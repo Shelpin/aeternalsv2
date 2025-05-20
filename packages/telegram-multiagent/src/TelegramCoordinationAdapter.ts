@@ -62,7 +62,7 @@ export interface Topic {
   keywords: string[];
   lastDiscussed: number;
   agentInterest: Record<string, number>;
-  
+
   // Additional fields for database storage
   groupId?: string;
   title?: string;
@@ -108,7 +108,7 @@ export class TelegramCoordinationAdapter {
   private lastBroadcastTime = 0;
   private readonly broadcastIntervalMs = 60000; // Every minute
   private db: SqliteDatabaseAdapter | null = null;
-  
+
   /**
    * Create a new TelegramCoordinationAdapter
    * 
@@ -127,7 +127,7 @@ export class TelegramCoordinationAdapter {
     this.runtime = runtime;
     this.logger = logger;
     this.db = dbAdapter || null;
-    
+
     // Initialize availability
     this.knownAgents[agentId] = {
       agentId,
@@ -135,13 +135,13 @@ export class TelegramCoordinationAdapter {
       lastActive: Date.now(),
       topics: []
     };
-    
+
     this.logger.info(`TelegramCoordinationAdapter: Initialized for agent ${agentId}`);
-    
+
     // First availability broadcast
     this.broadcastAvailability();
   }
-  
+
   /**
    * Helper method to safely execute SQL queries
    * @param sql SQL query string with placeholders
@@ -204,7 +204,7 @@ export class TelegramCoordinationAdapter {
       return { changes: 0 };
     }
   }
-  
+
   /**
    * Initialize the adapter and database
    */
@@ -225,7 +225,7 @@ export class TelegramCoordinationAdapter {
       this.logger.warn('TelegramCoordinationAdapter: No database adapter provided, operating in memory-only mode');
     }
   }
-  
+
   /**
    * Create a new conversation
    * 
@@ -236,10 +236,10 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return conversation.id;
     }
-    
+
     try {
       const conversationId = conversation.id || uuidv4();
-      
+
       // Insert topic first
       const topicId = uuidv4();
       const topic = {
@@ -255,7 +255,7 @@ export class TelegramCoordinationAdapter {
         completed_at: conversation.endedAt ? new Date(conversation.endedAt).toISOString() : null,
         initiator_agent_id: conversation.initiatedBy
       };
-      
+
       const insertTopicSql = `
         INSERT INTO conversation_topics (
           topic_id, group_id, title, description, status, 
@@ -263,7 +263,7 @@ export class TelegramCoordinationAdapter {
           completed_at, initiator_agent_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      
+
       this.execSQLRun(insertTopicSql, [
         topic.topic_id,
         topic.group_id,
@@ -277,7 +277,7 @@ export class TelegramCoordinationAdapter {
         topic.completed_at,
         topic.initiator_agent_id
       ]);
-      
+
       this.logger.info(`TelegramCoordinationAdapter: Created conversation with topic ID ${topicId}`);
       return conversationId;
     } catch (error: unknown) {
@@ -289,7 +289,7 @@ export class TelegramCoordinationAdapter {
       return conversation.id;
     }
   }
-  
+
   /**
    * Add a participant to a conversation
    * 
@@ -300,7 +300,7 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return;
     }
-    
+
     try {
       // Find the topic_id for this conversation 
       const topicQuery = `
@@ -311,14 +311,14 @@ export class TelegramCoordinationAdapter {
         `%${conversationId}%`,
         conversationId
       ]);
-      
+
       if (!topicResult) {
         this.logger.warn(`TelegramCoordinationAdapter: Cannot find topic for conversation ${conversationId}`);
         return;
       }
-      
+
       const topicId = topicResult.topic_id;
-      
+
       // Add participant to conversation
       const participantId = uuidv4();
       const insertParticipantSql = `
@@ -327,7 +327,7 @@ export class TelegramCoordinationAdapter {
           invitation_status, invited_at, joined_at, left_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      
+
       this.execSQLRun(insertParticipantSql, [
         participantId,
         participant.agentId,
@@ -338,7 +338,7 @@ export class TelegramCoordinationAdapter {
         new Date(participant.joinedAt).toISOString(),
         participant.leftAt ? new Date(participant.leftAt).toISOString() : null
       ]);
-      
+
       this.logger.info(`TelegramCoordinationAdapter: Added participant ${participant.agentId} to conversation ${conversationId}`);
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -348,7 +348,7 @@ export class TelegramCoordinationAdapter {
       }
     }
   }
-  
+
   /**
    * Update a participant's status
    * 
@@ -363,7 +363,7 @@ export class TelegramCoordinationAdapter {
   ): Promise<void> {
     // This method is now empty as the database is no longer used
   }
-  
+
   /**
    * Record a message in the database
    * 
@@ -373,7 +373,7 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return;
     }
-    
+
     try {
       // Find the topic_id and group_id for this conversation
       const topicQuery = `
@@ -384,12 +384,12 @@ export class TelegramCoordinationAdapter {
         `%${message.conversationId}%`,
         message.conversationId
       ]);
-      
+
       if (!topicResult) {
         this.logger.warn(`TelegramCoordinationAdapter: Cannot find topic for conversation ${message.conversationId}`);
         return;
       }
-      
+
       // Record the message
       const insertMessageSql = `
         INSERT INTO agent_message_history (
@@ -397,10 +397,10 @@ export class TelegramCoordinationAdapter {
           content, sent_at, is_to_human, is_from_human, recipient_agent_id
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
-      
+
       const isFromHuman = message.senderId.startsWith('human_') ? 1 : 0;
       const isToHuman = message.receiverId?.startsWith('human_') ? 1 : 0;
-      
+
       this.execSQLRun(insertMessageSql, [
         message.id,
         message.senderId,
@@ -412,7 +412,7 @@ export class TelegramCoordinationAdapter {
         isFromHuman,
         message.receiverId || null
       ]);
-      
+
       // Update message metrics
       const updateMetricsSql = `
         INSERT OR IGNORE INTO conversation_message_metrics (
@@ -424,9 +424,9 @@ export class TelegramCoordinationAdapter {
           human_messages = human_messages + ?,
           agent_messages = agent_messages + ?
       `;
-      
+
       const metricId = `${topicResult.topic_id}_${new Date().toISOString().split('T')[0]}`;
-      
+
       this.execSQLRun(updateMetricsSql, [
         metricId,
         topicResult.topic_id,
@@ -435,7 +435,7 @@ export class TelegramCoordinationAdapter {
         isFromHuman,
         isFromHuman ? 0 : 1
       ]);
-      
+
       this.logger.info(`TelegramCoordinationAdapter: Recorded message ${message.id} in conversation ${message.conversationId}`);
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -445,7 +445,7 @@ export class TelegramCoordinationAdapter {
       }
     }
   }
-  
+
   /**
    * End a conversation
    * 
@@ -456,7 +456,7 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return;
     }
-    
+
     try {
       // Update the conversation topic status to completed
       const updateTopicSql = `
@@ -464,13 +464,13 @@ export class TelegramCoordinationAdapter {
         SET status = 'COMPLETED', completed_at = ?
         WHERE title LIKE ? OR topic_id = ?
       `;
-      
+
       const result = this.execSQLRun(updateTopicSql, [
         new Date(endedAt).toISOString(),
         `%${conversationId}%`,
         conversationId
       ]);
-      
+
       if (result.changes === 0) {
         this.logger.warn(`TelegramCoordinationAdapter: No conversation found with ID ${conversationId}`);
       } else {
@@ -484,7 +484,7 @@ export class TelegramCoordinationAdapter {
       }
     }
   }
-  
+
   /**
    * Get a conversation by ID
    * 
@@ -495,23 +495,23 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return null;
     }
-    
+
     try {
       // Get the conversation topic
       const topicQuery = `
         SELECT * FROM conversation_topics 
         WHERE title LIKE ? OR topic_id = ?
       `;
-      
+
       const topic = this.execSQL<any>(topicQuery, [
         `%${conversationId}%`,
         conversationId
       ]);
-      
+
       if (!topic) {
         return null;
       }
-      
+
       // Get conversation participants
       const participantsQuery = `
         SELECT p.*, COUNT(m.message_id) as message_count, MAX(m.sent_at) as last_active
@@ -520,21 +520,21 @@ export class TelegramCoordinationAdapter {
         WHERE p.topic_id = ?
         GROUP BY p.agent_id
       `;
-      
+
       const participants = this.execSQLAll<any>(participantsQuery, [topic.topic_id]);
-      
+
       // Get message count
       const messageCountQuery = `
         SELECT COUNT(*) as count FROM agent_message_history
         WHERE topic_id = ?
       `;
-      
+
       const messageCountResult = this.execSQL<{ count: number }>(messageCountQuery, [topic.topic_id]);
-      
+
       if (!messageCountResult) {
         return null;
       }
-      
+
       // Map database entities to Conversation interface
       const conversation: Conversation = {
         id: conversationId,
@@ -553,7 +553,7 @@ export class TelegramCoordinationAdapter {
           lastActive: p.last_active ? new Date(p.last_active).getTime() : new Date(p.joined_at).getTime()
         }))
       };
-      
+
       return conversation;
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -564,7 +564,7 @@ export class TelegramCoordinationAdapter {
       return null;
     }
   }
-  
+
   /**
    * Get active conversations for a group
    * 
@@ -575,23 +575,23 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return [];
     }
-    
+
     try {
       // Get active topics for the group
       const topicsQuery = `
         SELECT * FROM conversation_topics 
         WHERE group_id = ? AND status = 'ACTIVE'
       `;
-      
+
       const topics = this.execSQLAll<any>(topicsQuery, [groupId]);
-      
+
       if (topics.length === 0) {
         return [];
       }
-      
+
       // Build conversations from topics
       const conversations: Conversation[] = [];
-      
+
       for (const topic of topics) {
         // Get conversation participants
         const participantsQuery = `
@@ -601,21 +601,21 @@ export class TelegramCoordinationAdapter {
           WHERE p.topic_id = ?
           GROUP BY p.agent_id
         `;
-        
+
         const participants = this.execSQLAll<any>(participantsQuery, [topic.topic_id]);
-        
+
         // Get message count
         const messageCountQuery = `
           SELECT COUNT(*) as count FROM agent_message_history
           WHERE topic_id = ?
         `;
-        
+
         const messageCountResult = this.execSQL<{ count: number }>(messageCountQuery, [topic.topic_id]);
-        
+
         if (!messageCountResult) {
           continue;
         }
-        
+
         // Map database entities to Conversation interface
         const conversation: Conversation = {
           id: topic.topic_id,
@@ -634,10 +634,10 @@ export class TelegramCoordinationAdapter {
             lastActive: p.last_active ? new Date(p.last_active).getTime() : new Date(p.joined_at).getTime()
           }))
         };
-        
+
         conversations.push(conversation);
       }
-      
+
       return conversations;
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -648,7 +648,7 @@ export class TelegramCoordinationAdapter {
       return [];
     }
   }
-  
+
   /**
    * Get recent messages from a conversation
    * 
@@ -660,23 +660,23 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return [];
     }
-    
+
     try {
       // Find the topic_id for this conversation
       const topicQuery = `
         SELECT topic_id FROM conversation_topics 
         WHERE title LIKE ? OR topic_id = ?
       `;
-      
+
       const topicResult = this.execSQL<{ topic_id: string }>(topicQuery, [
         `%${conversationId}%`,
         conversationId
       ]);
-      
+
       if (!topicResult) {
         return [];
       }
-      
+
       // Get recent messages
       const messagesQuery = `
         SELECT m.*, 
@@ -687,12 +687,12 @@ export class TelegramCoordinationAdapter {
         ORDER BY m.sent_at DESC
         LIMIT ?
       `;
-      
+
       const messages = this.execSQLAll<any>(messagesQuery, [
         topicResult.topic_id,
         limit
       ]);
-      
+
       // Map database records to Message interface
       return messages.map(m => ({
         id: m.message_id,
@@ -713,7 +713,7 @@ export class TelegramCoordinationAdapter {
       return [];
     }
   }
-  
+
   /**
    * Add or update a topic
    * 
@@ -723,21 +723,21 @@ export class TelegramCoordinationAdapter {
     if (!this.db) {
       return;
     }
-    
+
     try {
       const topicId = topic.id || uuidv4();
-      
+
       // Check if topic exists
       const existingTopicQuery = `
         SELECT topic_id FROM conversation_topics 
         WHERE topic_id = ? OR title = ?
       `;
-      
+
       const existingTopic = this.execSQL<{ topic_id: string }>(existingTopicQuery, [
         topicId,
         topic.title || topic.name // Use title if available, otherwise use name
       ]);
-      
+
       if (existingTopic) {
         // Update existing topic
         const updateTopicSql = `
@@ -746,7 +746,7 @@ export class TelegramCoordinationAdapter {
               scheduled_for = ?, initiator_agent_id = ?
           WHERE topic_id = ?
         `;
-        
+
         this.execSQLRun(updateTopicSql, [
           topic.title || topic.name,
           topic.description || null,
@@ -756,7 +756,7 @@ export class TelegramCoordinationAdapter {
           topic.initiatorId || null,
           existingTopic.topic_id
         ]);
-        
+
         this.logger.info(`TelegramCoordinationAdapter: Updated topic ${existingTopic.topic_id}`);
       } else {
         // Insert new topic
@@ -766,7 +766,7 @@ export class TelegramCoordinationAdapter {
             priority, created_at, scheduled_for, initiator_agent_id
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
-        
+
         this.execSQLRun(insertTopicSql, [
           topicId,
           topic.groupId || '',
@@ -778,7 +778,7 @@ export class TelegramCoordinationAdapter {
           topic.scheduledFor ? new Date(topic.scheduledFor).toISOString() : null,
           topic.initiatorId || null
         ]);
-        
+
         this.logger.info(`TelegramCoordinationAdapter: Created new topic ${topicId}`);
       }
     } catch (error: unknown) {
@@ -789,7 +789,7 @@ export class TelegramCoordinationAdapter {
       }
     }
   }
-  
+
   /**
    * Get topics relevant to an agent
    * 
@@ -806,7 +806,7 @@ export class TelegramCoordinationAdapter {
     // This method is now empty as the database is no longer used
     return [];
   }
-  
+
   /**
    * Get agent participation statistics
    * 
@@ -817,7 +817,7 @@ export class TelegramCoordinationAdapter {
     totalConversations: number;
     totalMessages: number;
     averageMessagesPerConversation: number;
-    topicInterests: Array<{topic: string, interestScore: number}>;
+    topicInterests: Array<{ topic: string, interestScore: number }>;
   }> {
     // This method is now empty as the database is no longer used
     return {
@@ -827,7 +827,7 @@ export class TelegramCoordinationAdapter {
       topicInterests: []
     };
   }
-  
+
   /**
    * Close the database connection
    */
@@ -835,7 +835,7 @@ export class TelegramCoordinationAdapter {
     // No need to close the connection here as the db adapter is managed externally
     this.logger.info('TelegramCoordinationAdapter: Resources released');
   }
-  
+
   /**
    * Set the personality enhancer
    * 
@@ -844,7 +844,7 @@ export class TelegramCoordinationAdapter {
   setPersonalityEnhancer(enhancer: PersonalityEnhancer): void {
     this.personalityEnhancer = enhancer;
   }
-  
+
   /**
    * Update agent status after receiving or sending a message
    * 
@@ -857,19 +857,19 @@ export class TelegramCoordinationAdapter {
       this.knownAgents[this.agentId].lastActive = Date.now();
       this.knownAgents[this.agentId].available = true;
     }
-    
+
     // Track the topic if provided
     if (topic) {
       this.trackTopic(topic);
     }
-    
+
     // Check if we should broadcast availability
     const currentTime = Date.now();
     if (currentTime - this.lastBroadcastTime > this.broadcastIntervalMs) {
       this.broadcastAvailability();
     }
   }
-  
+
   /**
    * Mark that a particular topic was discussed
    * 
@@ -877,10 +877,10 @@ export class TelegramCoordinationAdapter {
    */
   trackTopic(topic: string): void {
     // Look for existing topic entry
-    const existingIndex = this.recentTopics.findIndex(t => 
+    const existingIndex = this.recentTopics.findIndex(t =>
       t.topic.toLowerCase() === topic.toLowerCase()
     );
-    
+
     if (existingIndex >= 0) {
       // Update existing topic
       this.recentTopics[existingIndex].lastDiscussed = Date.now();
@@ -888,7 +888,7 @@ export class TelegramCoordinationAdapter {
     } else {
       // Add new topic
       const relevanceScores: Record<string, number> = {};
-      
+
       // Calculate relevance for known agents
       Object.keys(this.knownAgents).forEach((agentId: string) => {
         if (this.agentId === agentId && this.personalityEnhancer) {
@@ -900,7 +900,7 @@ export class TelegramCoordinationAdapter {
           relevanceScores[agentId] = this.estimateTopicRelevanceFromList(topic, preferredTopics);
         }
       });
-      
+
       // Add new topic entry
       this.recentTopics.push({
         topic,
@@ -908,7 +908,7 @@ export class TelegramCoordinationAdapter {
         lastDiscussed: Date.now(),
         messageCount: 1
       });
-      
+
       // Trim the list if needed
       if (this.recentTopics.length > this.maxTopicsToTrack) {
         // Sort by recency (newest first) and remove oldest
@@ -917,7 +917,7 @@ export class TelegramCoordinationAdapter {
       }
     }
   }
-  
+
   /**
    * Estimate topic relevance based on a list of preferred topics
    * 
@@ -929,14 +929,14 @@ export class TelegramCoordinationAdapter {
     if (!topic || preferredTopics.length === 0) {
       return 0.5; // Default to moderate relevance
     }
-    
+
     const topicLower = topic.toLowerCase();
     let maxRelevance = 0.2; // Minimum relevance
-    
+
     // Check for direct matches or partial matches
     for (const preferred of preferredTopics) {
       const preferredLower = preferred.toLowerCase();
-      
+
       if (topicLower === preferredLower) {
         // Direct match
         return 1.0;
@@ -947,7 +947,7 @@ export class TelegramCoordinationAdapter {
         // Check for word overlap
         const topicWords = topicLower.split(/\s+/);
         const preferredWords = preferredLower.split(/\s+/);
-        
+
         for (const word of topicWords) {
           if (word.length > 3 && preferredWords.some((pw: string) => pw.includes(word) || word.includes(pw))) {
             maxRelevance = Math.max(maxRelevance, 0.6);
@@ -955,10 +955,10 @@ export class TelegramCoordinationAdapter {
         }
       }
     }
-    
+
     return maxRelevance;
   }
-  
+
   /**
    * Get a list of available agents for a group
    * 
@@ -969,17 +969,17 @@ export class TelegramCoordinationAdapter {
   async getAvailableAgents(groupId: number, excludeAgentIds: string[] = []): Promise<string[]> {
     // Remove stale data first
     this.pruneStaleAvailability();
-    
+
     // In a real implementation, would query the coordination service
     // For now, just use the local cache
     return Object.values(this.knownAgents)
-      .filter((agent: AgentAvailability) => 
-        agent.available && 
+      .filter((agent: AgentAvailability) =>
+        agent.available &&
         !excludeAgentIds.includes(agent.agentId)
       )
       .map((agent: AgentAvailability) => agent.agentId);
   }
-  
+
   /**
    * Estimate how relevant a topic is to an agent
    * 
@@ -989,29 +989,29 @@ export class TelegramCoordinationAdapter {
    */
   async estimateTopicRelevance(agentId: string, topic: string): Promise<number> {
     // Check for cached relevance scores first
-    const existingTopic = this.recentTopics.find((t: TopicMetadata) => 
+    const existingTopic = this.recentTopics.find((t: TopicMetadata) =>
       t.topic.toLowerCase() === topic.toLowerCase()
     );
-    
+
     if (existingTopic && existingTopic.relevanceScores[agentId] !== undefined) {
       return existingTopic.relevanceScores[agentId];
     }
-    
+
     // For our own agent, use the personality enhancer
     if (agentId === this.agentId && this.personalityEnhancer) {
       return this.personalityEnhancer.calculateTopicRelevance(topic);
     }
-    
+
     // For other agents, estimate based on their preferred topics
     const agent = this.knownAgents[agentId];
     if (agent && agent.topics) {
       return this.estimateTopicRelevanceFromList(topic, agent.topics);
     }
-    
+
     // Default moderate relevance if we don't know
     return 0.5;
   }
-  
+
   /**
    * Register a new agent in the coordination system
    * 
@@ -1025,10 +1025,10 @@ export class TelegramCoordinationAdapter {
       lastActive: Date.now(),
       topics: initialTopics
     };
-    
+
     this.logger.info(`TelegramCoordinationAdapter: Registered agent ${agentId}`);
   }
-  
+
   /**
    * Mark an agent as unavailable
    * 
@@ -1040,7 +1040,7 @@ export class TelegramCoordinationAdapter {
       this.logger.debug(`TelegramCoordinationAdapter: Marked agent ${agentId} as unavailable`);
     }
   }
-  
+
   /**
    * Check if an agent is available
    * 
@@ -1050,7 +1050,7 @@ export class TelegramCoordinationAdapter {
   isAgentAvailable(agentId: string): boolean {
     return !!(this.knownAgents[agentId]?.available);
   }
-  
+
   /**
    * Broadcast agent availability to other agents
    */
@@ -1058,7 +1058,7 @@ export class TelegramCoordinationAdapter {
     try {
       // Update the broadcast time
       this.lastBroadcastTime = Date.now();
-      
+
       // Get current availability
       const availability: AgentAvailability = {
         agentId: this.agentId,
@@ -1066,10 +1066,10 @@ export class TelegramCoordinationAdapter {
         lastActive: Date.now(),
         topics: await this.getAgentPreferredTopics()
       };
-      
+
       // Update local cache
       this.knownAgents[this.agentId] = availability;
-      
+
       // FIXED: Register all known bot agents to ensure cross-communication
       // These are hardcoded agent IDs that we know exist in the system
       const knownBotIds = [
@@ -1080,7 +1080,7 @@ export class TelegramCoordinationAdapter {
         'bitcoin_maxi_420',
         'code_samurai_77'
       ];
-      
+
       // Register all known bots if they're not already registered
       for (const botId of knownBotIds) {
         if (!this.knownAgents[botId] && botId !== this.agentId) {
@@ -1088,10 +1088,10 @@ export class TelegramCoordinationAdapter {
           this.logger.info(`TelegramCoordinationAdapter: Auto-registered known agent ${botId}`);
         }
       }
-      
+
       this.logger.debug(`TelegramCoordinationAdapter: Broadcasting availability for ${this.agentId}`);
       this.logger.debug(`TelegramCoordinationAdapter: Known agents: ${Object.keys(this.knownAgents).join(', ')}`);
-      
+
       // Update availability status locally - in a real system would sync with external service
       this.pruneStaleAvailability();
     } catch (error: unknown) {
@@ -1099,14 +1099,14 @@ export class TelegramCoordinationAdapter {
       this.logger.error(`TelegramCoordinationAdapter: Error broadcasting availability: ${errorMessage}`);
     }
   }
-  
+
   /**
    * Remove stale availability data
    */
   private pruneStaleAvailability(): void {
     const now = Date.now();
     const cutoff = now - this.availabilityCutoffMs;
-    
+
     // Remove agents that haven't been active recently
     Object.keys(this.knownAgents).forEach((agentId: string) => {
       if (this.knownAgents[agentId].lastActive < cutoff) {
@@ -1115,7 +1115,7 @@ export class TelegramCoordinationAdapter {
       }
     });
   }
-  
+
   /**
    * Get agent's preferred topics based on personality
    * 
@@ -1125,13 +1125,13 @@ export class TelegramCoordinationAdapter {
     try {
       // In a real implementation, would extract from agent's personality
       // and interests defined in character data
-      
+
       // Mock implementation - in real system would be derived from agent's character
       const character = this.runtime.getCharacter();
       if (character && character.topics) {
         return character.topics.slice(0, 5); // Take up to 5 topics
       }
-      
+
       // Fallback topics based on agent ID
       const fallbackTopics: Record<string, string[]> = {
         'eth_memelord_9000': ['ethereum', 'defi', 'nfts', 'layer2', 'memes'],
@@ -1141,7 +1141,7 @@ export class TelegramCoordinationAdapter {
         'bag_flipper_9000': ['trading', 'altcoins', 'price action', 'market cycles', 'charts'],
         'code_samurai_77': ['development', 'smart contracts', 'security', 'protocols', 'architecture']
       };
-      
+
       return fallbackTopics[this.agentId] || ['cryptocurrency', 'blockchain', 'technology'];
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1160,13 +1160,13 @@ export class TelegramCoordinationAdapter {
   processMessage(chatId: number | string, text: string, sender: string, isBotMentioned: boolean): void {
     try {
       console.log(`[COORD] TelegramCoordinationAdapter: Processing message from ${sender} in chat ${chatId}: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`);
-      
+
       // Convert chatId to numeric if it's a string
       const numericChatId = typeof chatId === 'string' ? parseInt(chatId, 10) : chatId;
-      
+
       // Store the message in the database
       this.storeMessage(numericChatId, text, sender);
-      
+
       // If the bot was mentioned, update the active conversations
       if (isBotMentioned) {
         console.log(`[COORD] TelegramCoordinationAdapter: Bot was mentioned, updating conversation status`);
@@ -1186,7 +1186,7 @@ export class TelegramCoordinationAdapter {
   private storeMessage(chatId: number, text: string, sender: string): void {
     try {
       console.log(`[COORD] TelegramCoordinationAdapter: Storing message from ${sender} in chat ${chatId}`);
-      
+
       // Here we would typically store the message in a database
       // For now, just log that we're storing it
       console.log(`[COORD] TelegramCoordinationAdapter: Message stored (mock implementation)`);
@@ -1194,7 +1194,7 @@ export class TelegramCoordinationAdapter {
       console.error(`[COORD] TelegramCoordinationAdapter: Error storing message: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
-  
+
   /**
    * Update the status of a conversation
    * @param chatId The ID of the chat
@@ -1203,12 +1203,83 @@ export class TelegramCoordinationAdapter {
   private updateConversationStatus(chatId: number, status: ConversationStatus): void {
     try {
       console.log(`[COORD] TelegramCoordinationAdapter: Updating conversation status for chat ${chatId} to ${status}`);
-      
+
       // Here we would typically update the conversation status in a database
       // For now, just log that we're updating it
       console.log(`[COORD] TelegramCoordinationAdapter: Conversation status updated (mock implementation)`);
     } catch (error) {
       console.error(`[COORD] TelegramCoordinationAdapter: Error updating conversation status: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  /**
+   * Mark an agent as currently preparing a response for a specific conversation
+   * 
+   * @param groupId The Telegram group ID
+   * @param agentId The agent preparing a response
+   * @returns true if successfully marked, false if another agent is already responding
+   */
+  async markAgentAsResponding(groupId: string, agentId: string): Promise<boolean> {
+    try {
+      // First check if any agent is already responding
+      const existingResponder = await this.getRespondingAgent(groupId);
+      if (existingResponder && existingResponder !== agentId) {
+        this.logger.info(`[TG_COORD_ADAPTER] Agent ${agentId} cannot respond to group ${groupId} because ${existingResponder} is already responding`);
+        return false;
+      }
+
+      // Set this agent as the responder with a 30-second expiration
+      const expirationTime = Date.now() + 30000; // 30 seconds from now
+
+      const sql = `
+        INSERT OR REPLACE INTO agent_response_status (group_id, responding_agent_id, expiration_time)
+        VALUES (?, ?, ?)
+      `;
+
+      await this.execSQLRun(sql, [groupId, agentId, expirationTime]);
+      this.logger.info(`[TG_COORD_ADAPTER] Agent ${agentId} is now marked as responding to group ${groupId} until ${new Date(expirationTime).toISOString()}`);
+      return true;
+    } catch (error) {
+      this.logger.error(`[TG_COORD_ADAPTER] Error marking agent ${agentId} as responding to group ${groupId}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if any agent is currently preparing a response for a specific conversation
+   * 
+   * @param groupId The Telegram group ID
+   * @returns The agent ID if an agent is responding, null otherwise
+   */
+  async getRespondingAgent(groupId: string): Promise<string | null> {
+    try {
+      const currentTime = Date.now();
+
+      // First clean up expired entries
+      await this.execSQLRun(`DELETE FROM agent_response_status WHERE expiration_time < ?`, [currentTime]);
+
+      // Then check for current responder
+      const row = await this.execSQL<{ responding_agent_id: string }>(`SELECT responding_agent_id FROM agent_response_status WHERE group_id = ?`, [groupId]);
+
+      return row ? row.responding_agent_id : null;
+    } catch (error) {
+      this.logger.error(`[TG_COORD_ADAPTER] Error getting responding agent for group ${groupId}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Clear an agent as responding to a conversation
+   * 
+   * @param groupId The Telegram group ID
+   * @param agentId The agent ID (only clears if it matches current responder)
+   */
+  async clearRespondingAgent(groupId: string, agentId: string): Promise<void> {
+    try {
+      await this.execSQLRun(`DELETE FROM agent_response_status WHERE group_id = ? AND responding_agent_id = ?`, [groupId, agentId]);
+      this.logger.info(`[TG_COORD_ADAPTER] Cleared agent ${agentId} as responder for group ${groupId}`);
+    } catch (error) {
+      this.logger.error(`[TG_COORD_ADAPTER] Error clearing responding agent for group ${groupId}:`, error);
     }
   }
 } 

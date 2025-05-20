@@ -1,8 +1,0 @@
-
-> @elizaos/core@ prebuild /root/eliza/packages/core
-> rm -rf dist tsconfig.build.tsbuildinfo tsconfig.tsbuildinfo
-
-
-> @elizaos/core@ build /root/eliza/packages/core
-> tsc -b tsconfig.build.json
-

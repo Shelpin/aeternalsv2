@@ -3,6 +3,10 @@ import { PluginComponent } from './PluginComponent.js';
 import { TelegramRelay } from './TelegramRelay.js';
 import { ConversationManager } from './ConversationManager.js';
 import { PersonalityEnhancer } from './PersonalityEnhancer.js';
+import { TelegramCoordinationAdapter } from './TelegramCoordinationAdapter.js';
+import { SqliteDatabaseAdapter } from './SqliteAdapterProxy.js';
+import path from 'path';
+import fs from 'fs';
 
 // Default configuration values
 const DEFAULT_CONFIG: TelegramMultiAgentConfig = {
@@ -33,6 +37,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
   private telegramClient: any; // Added for Step 2 of "Final Ascent" plan
   private conversationManager: ConversationManager;
   private personalityEnhancer: PersonalityEnhancer;
+  private coordinationAdapter: TelegramCoordinationAdapter | null = null;
+  private dbAdapter: SqliteDatabaseAdapter | null = null;
 
   constructor(options?: Partial<TelegramMultiAgentConfig>) {
     const logger: ElizaLogger = {
@@ -44,7 +50,7 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     };
     super(logger);
     this.config = { ...DEFAULT_CONFIG, ...(options || {}) };
-    this.conversationManager = new ConversationManager(this.logger);
+    this.conversationManager = new ConversationManager(this.logger, null);
     this.personalityEnhancer = new PersonalityEnhancer('initial_placeholder_agent_id', null, this.logger);
   }
 
@@ -59,6 +65,37 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
     this.logger.info(`[TG_PLUGIN_REGISTER] Register method called for ${this.name}. Runtime agent ID: ${runtimeAgentId}, Global config agent ID: ${globalConfigAgentId}, Using: ${effectiveAgentId}`);
 
+    // Initialize database adapter
+    try {
+      // Get database path from environment or config
+      const dbPath = this.getDatabasePath();
+
+      // Create database directory if it doesn't exist
+      const dbDir = path.dirname(dbPath);
+      if (!fs.existsSync(dbDir)) {
+        fs.mkdirSync(dbDir, { recursive: true });
+      }
+
+      // Initialize SQLite adapter
+      this.dbAdapter = new SqliteDatabaseAdapter(dbPath);
+      this.logger.info(`[TG_PLUGIN_REGISTER] SQLite adapter initialized with database path: ${dbPath}`);
+
+      // Create coordination adapter
+      this.coordinationAdapter = new TelegramCoordinationAdapter(
+        effectiveAgentId,
+        runtime,
+        this.logger,
+        this.dbAdapter
+      );
+      this.logger.info(`[TG_PLUGIN_REGISTER] TelegramCoordinationAdapter created for agent ${effectiveAgentId}`);
+
+      // Set the coordination adapter in the conversation manager
+      this.conversationManager.setCoordinationAdapter(this.coordinationAdapter);
+      this.logger.info(`[TG_PLUGIN_REGISTER] ConversationManager configured with TelegramCoordinationAdapter`);
+    } catch (error) {
+      this.logger.error(`[TG_PLUGIN_REGISTER] Error initializing database adapters:`, error);
+    }
+
     // Pass runtime to ConversationManager for shared database access
     this.conversationManager.setRuntime(runtime);
     this.logger.info(`[SHARED_DB] ConversationManager runtime set for agent ${effectiveAgentId} using SHARED database`);
@@ -72,7 +109,35 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       this.personalityEnhancer.setRuntime(runtime);
     }
 
+    // Register the coordination adapter in the plugin context for other components to access
+    if (typeof runtime.registerPluginContext === 'function') {
+      runtime.registerPluginContext('telegramCoordinationAdapter', this.coordinationAdapter);
+      this.logger.info(`[TG_PLUGIN_REGISTER] Registered TelegramCoordinationAdapter in plugin context`);
+    }
+
     return this;
+  }
+
+  /**
+   * Get the database path from environment variables or config
+   */
+  private getDatabasePath(): string {
+    // Try environment variables first
+    if (process.env.DATABASE_PATH) {
+      return process.env.DATABASE_PATH;
+    }
+
+    if (process.env.SQLITE_FILE) {
+      return process.env.SQLITE_FILE;
+    }
+
+    // Then try config
+    if (this.config.dbPath) {
+      return this.config.dbPath;
+    }
+
+    // Default path
+    return path.resolve('./data/telegram-multiagent.db');
   }
 
   public async initialize(): Promise<void> {
@@ -87,6 +152,20 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
     this.telegramClient.on('message', (msg: RelayMessage) => {
       this.handleDirectTelegramMessage(msg).catch(e => this.logger.error(`Handle direct TG msg error: ${e}`));
     });
+
+    // Initialize coordination adapter if available
+    if (this.coordinationAdapter) {
+      try {
+        await this.coordinationAdapter.initialize();
+        this.logger.info('✅ TelegramCoordinationAdapter initialized successfully');
+      } catch (error) {
+        this.logger.error('❌ Failed to initialize TelegramCoordinationAdapter:', error);
+      }
+    }
+
+    // Initialize conversation manager
+    await this.conversationManager.initialize();
+    this.logger.info('✅ ConversationManager initialized');
 
     // Determine the most reliable agent ID to use
     const globalRuntime = globalThis.__elizaRuntime as any;
@@ -174,6 +253,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       return;
     }
 
+    // Get coordinationAdapter if not already available
+    if (!this.coordinationAdapter) {
+      if (this.runtime && typeof this.runtime.getPluginContext === 'function') {
+        this.coordinationAdapter = this.runtime.getPluginContext('telegramCoordinationAdapter') as TelegramCoordinationAdapter;
+        if (!this.coordinationAdapter) {
+          this.logger.warn('[TG_PLUGIN][DIRECT] TelegramCoordinationAdapter not available in plugin context');
+        }
+      } else {
+        this.logger.warn('[TG_PLUGIN][DIRECT] runtime.getPluginContext is not available');
+      }
+    }
+
     // 1. Update/get conversation state using the new handleMessage
     const conversationState = await this.conversationManager.handleMessage(msg, currentAgentId);
     if (!conversationState) {
@@ -192,7 +283,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       groupId,
       currentAgentId,
       senderId, // Sender of the direct message
-      msg.text
+      msg.text,
+      msg // Pass the full message object
     );
 
     if (!agentShouldRespond) {
@@ -202,6 +294,13 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
 
     if (!this.runtime?.handleMessage) {
       this.logger.warn('[TG_PLUGIN][DIRECT] runtime.handleMessage is not available. Ignoring direct message despite CM approval.');
+
+      // Clear responding status since we're not going to respond
+      if (this.coordinationAdapter) {
+        await this.coordinationAdapter.clearRespondingAgent(groupId, currentAgentId);
+        this.logger.info(`[TG_PLUGIN][DIRECT] Cleared responding status for agent ${currentAgentId} in group ${groupId} due to missing runtime.handleMessage.`);
+      }
+
       return;
     }
 
@@ -212,8 +311,20 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       if (currentAgentId && msg.text) { // Ensure there was text to respond to
         await this.conversationManager.recordMessage(groupId, currentAgentId, "<agent_responded_to_direct_message>"); // Record agent's action
       }
+
+      // Clear responding status now that we've sent a message
+      if (this.coordinationAdapter) {
+        await this.coordinationAdapter.clearRespondingAgent(groupId, currentAgentId);
+        this.logger.info(`[TG_PLUGIN][DIRECT] Cleared responding status for agent ${currentAgentId} in group ${groupId} after sending response.`);
+      }
     } catch (e: any) {
       this.logger.error(`[TG_PLUGIN][DIRECT] Error during runtime.handleMessage for direct message: ${e.message || e}`);
+
+      // Clear responding status since we encountered an error
+      if (this.coordinationAdapter) {
+        await this.coordinationAdapter.clearRespondingAgent(groupId, currentAgentId);
+        this.logger.info(`[TG_PLUGIN][DIRECT] Cleared responding status for agent ${currentAgentId} in group ${groupId} due to error.`);
+      }
     }
   }
 
@@ -246,6 +357,18 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       return;
     }
 
+    // Get coordinationAdapter if not already available
+    if (!this.coordinationAdapter) {
+      if (this.runtime && typeof this.runtime.getPluginContext === 'function') {
+        this.coordinationAdapter = this.runtime.getPluginContext('telegramCoordinationAdapter') as TelegramCoordinationAdapter;
+        if (!this.coordinationAdapter) {
+          this.logger.warn('[TG_PLUGIN_RELAY_HANDLER] TelegramCoordinationAdapter not available in plugin context');
+        }
+      } else {
+        this.logger.warn('[TG_PLUGIN_RELAY_HANDLER] runtime.getPluginContext is not available');
+      }
+    }
+
     // 1. Update/get conversation state using the new handleMessage
     // Pass currentAgentId so it can be added to participants if not already there
     const conversationState = await this.conversationManager.handleMessage(actualMessageContent, currentAgentId);
@@ -260,7 +383,8 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
       groupId,
       currentAgentId,
       senderAgentId || null, // Sender of the relay message
-      actualMessageContent.text
+      actualMessageContent.text,
+      actualMessageContent // Pass the full message object
     );
 
     if (!agentShouldRespond) {
@@ -283,11 +407,29 @@ export class TelegramMultiAgentPlugin extends PluginComponent implements Plugin 
           await this.conversationManager.recordMessage(groupId, currentAgentId, "<agent_responded_to_relay_message>");
         }
 
+        // Clear responding status now that we've sent a message
+        if (this.coordinationAdapter) {
+          await this.coordinationAdapter.clearRespondingAgent(groupId.toString(), currentAgentId);
+          this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Cleared responding status for agent ${currentAgentId} in group ${groupId} after sending response.`);
+        }
+
       } catch (error: any) {
         this.logger.error(`[TG_PLUGIN_RELAY_HANDLER] Error in runtime.handleMessage for relayed message: ${error.message}`, { error });
+
+        // Clear responding status since we encountered an error
+        if (this.coordinationAdapter) {
+          await this.coordinationAdapter.clearRespondingAgent(groupId.toString(), currentAgentId);
+          this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Cleared responding status for agent ${currentAgentId} in group ${groupId} due to error.`);
+        }
       }
     } else {
       this.logger.warn("[TG_PLUGIN_RELAY_HANDLER] Runtime or handleMessage not available for relayed message.");
+
+      // Clear responding status since we can't respond
+      if (this.coordinationAdapter) {
+        await this.coordinationAdapter.clearRespondingAgent(groupId.toString(), currentAgentId);
+        this.logger.info(`[TG_PLUGIN_RELAY_HANDLER] Cleared responding status for agent ${currentAgentId} in group ${groupId} due to missing runtime.handleMessage.`);
+      }
     }
   }
 

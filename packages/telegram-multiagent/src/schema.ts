@@ -85,6 +85,14 @@ CREATE TABLE IF NOT EXISTS "agent_message_history" (
     FOREIGN KEY ("recipient_agent_id") REFERENCES "accounts"("id")
 );
 
+-- Table: agent_response_status
+CREATE TABLE IF NOT EXISTS "agent_response_status" (
+    "group_id" TEXT PRIMARY KEY,
+    "responding_agent_id" TEXT NOT NULL,
+    "expiration_time" INTEGER NOT NULL,
+    "created_at" INTEGER DEFAULT (strftime('%s', 'now'))
+);
+
 -- Index: agent_telegram_assignments_agent_group_idx
 CREATE UNIQUE INDEX IF NOT EXISTS "agent_telegram_assignments_agent_group_idx" 
     ON "agent_telegram_assignments" ("agent_id", "group_id");
@@ -112,4 +120,8 @@ CREATE INDEX IF NOT EXISTS "agent_message_history_group_idx"
 -- Index: agent_message_history_topic_idx
 CREATE INDEX IF NOT EXISTS "agent_message_history_topic_idx"
     ON "agent_message_history" ("topic_id", "sent_at");
+
+-- Index: agent_response_status_expiration
+CREATE INDEX IF NOT EXISTS "agent_response_status_expiration"
+    ON "agent_response_status" ("expiration_time");
 `; 

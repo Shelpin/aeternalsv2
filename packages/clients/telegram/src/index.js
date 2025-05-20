@@ -1,10 +1,4 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.TelegramClient = void 0;
-const node_telegram_bot_api_1 = __importDefault(require("node-telegram-bot-api"));
+import TelegramBot from 'node-telegram-bot-api';
 /**
  * Telegram client for ElizaOS
  *
@@ -19,22 +13,31 @@ class TelegramClient {
     /**
      * Initialize the Telegram client with a bot token
      */
-    constructor(token) {
-        if (token) {
-            this.initialize(token);
+    constructor(tokenOrOptions) {
+        if (!tokenOrOptions) {
+            return;
+        }
+        if (typeof tokenOrOptions === 'string') {
+            this.initialize(tokenOrOptions);
+        }
+        else {
+            const { botToken, runtime } = tokenOrOptions;
+            this.initialize(botToken, runtime);
         }
     }
     /**
      * Initialize the client with a token
      */
     initialize(token, runtime) {
+        // EXPERT DIAGNOSTIC LOG
+        console.log(`[DEBUG] TelegramClient initialize() called with token: ${token ? token.substring(0, 5) : 'NULL'}...`);
         if (!token) {
             console.error('[TELEGRAM] No token provided for Telegram client');
             return;
         }
         try {
             this.token = token;
-            this.bot = new node_telegram_bot_api_1.default(token, { polling: true });
+            this.bot = new TelegramBot(token, { polling: true });
             // Set up message handler
             this.bot.on('message', (message) => {
                 console.log(`[TELEGRAM] Received message: ${JSON.stringify(message, null, 2)}`);
@@ -49,13 +52,20 @@ class TelegramClient {
                 });
             });
             // Get bot info
-            this.bot.getMe().then(info => {
+            this.bot.getMe().then((info) => {
                 this.botInfo = info;
                 console.log(`[TELEGRAM] Bot initialized: ${info.username}`);
-            }).catch(error => {
+            }).catch((error) => {
                 console.error(`[TELEGRAM] Error getting bot info: ${error}`);
             });
             console.log(`[TELEGRAM] Client initialized with token: ${token.substring(0, 5)}...`);
+            // EXPERT DIAGNOSTIC LOG
+            if (this.bot?.isPolling()) {
+                console.warn('[POLLING ACTIVE] Telegram bot is polling right after initialization!');
+            }
+            else {
+                console.log('[POLLING INACTIVE] Telegram bot created but not polling right after initialization.');
+            }
             // VALHALLA FIX: Ensure the client is injected into the runtime
             if (runtime) {
                 // Ensure clients object exists
@@ -130,16 +140,32 @@ class TelegramClient {
     get getBotInfo() {
         return this.botInfo;
     }
+    /**
+     * Stop the Telegram bot polling and cleanup
+     */
+    stop() {
+        if (this.bot) {
+            try {
+                this.bot.stopPolling();
+                console.log('[TELEGRAM] Bot polling stopped');
+            }
+            catch (error) {
+                console.error('[TELEGRAM] Error stopping bot polling:', error);
+            }
+        }
+        else {
+            console.warn('[TELEGRAM] stop() called but bot is not initialized');
+        }
+    }
 }
-exports.TelegramClient = TelegramClient;
-// Export a singleton instance
-const telegramClient = new TelegramClient();
-// VALHALLA FIX: Check if we have a runtime and inject the client
-if (globalThis.__elizaRuntime) {
-    console.log('[VALHALLA] Found global runtime, injecting Telegram client');
-    globalThis.__elizaRuntime.clients = globalThis.__elizaRuntime.clients || {};
-    globalThis.__elizaRuntime.clients.telegram = telegramClient;
-    console.log('[VALHALLA] Telegram client mounted to runtime:', !!globalThis.__elizaRuntime.clients?.telegram);
+export { TelegramClient };
+// Function to create an instance
+function createTelegramClientInstance() {
+    // The constructor of TelegramClient can handle tokenOrOptions being undefined
+    // or we can decide if the agent should pass them here.
+    // For now, let constructor handle it, agent will call .initialize() with token.
+    return new TelegramClient();
 }
-// Default export is the singleton instance
-exports.default = telegramClient;
+// Export the instance creation function as the default export
+export default createTelegramClientInstance;
+//# sourceMappingURL=index.js.map

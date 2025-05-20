@@ -8,12 +8,12 @@ import {
   RelayMessage
 } from './types.js';
 import { PluginComponent } from './PluginComponent.js';
-import { FallbackMemoryManager } from './FallbackMemoryManager.js';
 import { IMemoryManager } from './interfaces.js';
 import { ConversationState, ParticipantMap, ResponseStrategy, Memory } from './types/conversation.js';
 import { Database } from 'sqlite3';
 import * as fs from 'fs';
 import * as path from 'path';
+import { TelegramCoordinationAdapter } from './TelegramCoordinationAdapter.js';
 
 // Conversation states
 enum ConversationLifecycleState {
@@ -36,42 +36,41 @@ export class ConversationManager extends PluginComponent {
   private dbInitialized: boolean = false;
   private dbPath: string = '';
   private memoryNamespace = 'telegram-multiagent';
-  private fallbackMemory: FallbackMemoryManager | null = null;
   private memoryManager: IMemoryManager | null = null;
   private directDbHelper: any = null; // Will hold ConversationDatabaseHelper instance if needed
   private usePersistentFallback = false; // Flag to indicate if we're using direct SQLite fallback
-  private lastMessageTime: Map<string, number> = new Map(); // Track last message time per group
-  private readonly MESSAGE_DELAY = 8000; // 8 seconds in milliseconds
+  private lastMessageTime: Map<string, number> = new Map(); // Track last message time per group-agent combo
+  // Global cooldown tracking
+  private lastGlobalMessageTime: Map<string, number> = new Map(); // Track last message time per group (global)
+
+  // Cooldown configuration
+  private readonly AGENT_COOLDOWN_MS = 20000; // 20 seconds in milliseconds (increased from 8)
+  private readonly GLOBAL_COOLDOWN_MS = 12000; // 12 seconds global cooldown between ANY message
+  private readonly HUMAN_MESSAGE_GLOBAL_COOLDOWN_MS = 3000; // Short cooldown after human message
 
   private currentTurnStrategy: TurnStrategy = TurnStrategy.FIFO;
 
-  private states: Map<string, ConversationState> = new Map();
+  private states: Map<string, ConversationStateTracking> = new Map();
 
   private sqliteHelper: any = null; // Will hold ConversationDatabaseHelper instance if needed
   private usingSqliteFallback = false; // Flag to indicate if we're using direct SQLite fallback
+
+  // Coordination adapter for shared database state
+  private coordinationAdapter: TelegramCoordinationAdapter | null = null;
 
   /**
    * Create a new ConversationManager
    * 
    * @param logger - Logger instance
    */
-  constructor(logger: ElizaLogger) {
+  constructor(logger: ElizaLogger, runtime: IAgentRuntime | null) {
     super(logger);
 
-    this.logger.info('ConversationManager: Created');
-
-    this.initializeFallbackMemory();
-  }
-
-  private async initializeFallbackMemory() {
-    try {
-      // Create a fallback memory manager for persistence
-      const FallbackMemoryManager = require('./FallbackMemoryManager').FallbackMemoryManager;
-      this.fallbackMemory = new FallbackMemoryManager(this.logger);
-      this.logger.info('ConversationManager: Fallback memory manager created');
-    } catch (error) {
-      this.logger.error('Failed to initialize fallback memory manager', error);
+    if (runtime) {
+      this.setRuntime(runtime);
     }
+
+    this.logger.info('ConversationManager: Created');
   }
 
   /**
@@ -95,12 +94,39 @@ export class ConversationManager extends PluginComponent {
       } else {
         this.logger.warn(`[SHARED_DB] No runtime memoryManager available, using direct database access`);
       }
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        this.logger.warn(`ConversationManager: Error initializing memory namespace: ${error.message}`);
-      } else {
-        this.logger.warn(`ConversationManager: Error initializing memory namespace: ${JSON.stringify(error)}`);
+
+      // Load TelegramCoordinationAdapter dynamically if provided via dependency injection
+      if (!this.coordinationAdapter && this.runtime) {
+        this.logger.info('ConversationManager: Getting TelegramCoordinationAdapter from plugin context...');
+        try {
+          // Try to get TelegramCoordinationAdapter from plugin context
+          if (typeof this.runtime.getPluginContext === 'function') {
+            this.coordinationAdapter = this.runtime.getPluginContext('telegramCoordinationAdapter') as TelegramCoordinationAdapter;
+            if (this.coordinationAdapter) {
+              this.logger.info('ConversationManager: Successfully obtained TelegramCoordinationAdapter from plugin context');
+            } else {
+              this.logger.warn('ConversationManager: TelegramCoordinationAdapter not found in plugin context');
+            }
+          } else {
+            this.logger.warn('ConversationManager: runtime.getPluginContext is not a function');
+          }
+        } catch (error) {
+          this.logger.error('ConversationManager: Error getting TelegramCoordinationAdapter from plugin context:', error);
+        }
       }
+
+      // If no coordination adapter was provided or found in context, log error
+      if (!this.coordinationAdapter) {
+        this.logger.error('ConversationManager: TelegramCoordinationAdapter is required but was not provided or found in context');
+        this.logger.warn('ConversationManager: Falling back to in-memory state only (no persistence)');
+      } else {
+        // Initialize the adapter
+        await this.coordinationAdapter.initialize();
+        this.logger.info('ConversationManager: Successfully initialized TelegramCoordinationAdapter');
+      }
+    } catch (error: any) {
+      this.logger.error('ConversationManager: Error during initialization:', error);
+      this.logger.warn('ConversationManager: Using in-memory state only (no persistence)');
     }
   }
 
@@ -460,41 +486,71 @@ export class ConversationManager extends PluginComponent {
    * @returns Memory manager to use
    */
   private getMemoryManager(): IMemoryManager {
-    // Prioritize the memoryManager instance variable if it was set from runtime
-    if (this.memoryManager) {
-      this.logger.debug("[MEMORY_GET] Using pre-assigned memory manager.");
-      return this.memoryManager;
-    }
-    // Runtime check
-    if (this.runtime?.memoryManager?.createMemory && this.runtime.memoryManager.getMemories) {
-      this.logger.debug("[MEMORY_GET] Using runtime.memoryManager directly.");
+    // First try to use a runtime-provided memory manager
+    if (this.runtime?.memoryManager) {
+      this.logger.debug(`[CONVO_MGR_GET_MEMORY] Using runtime memoryManager`);
       return this.runtime.memoryManager as IMemoryManager;
     }
 
-    // SQLite direct persistence fallback check
-    if (this.usingSqliteFallback && this.sqliteHelper) {
-      this.logger.debug("[MEMORY_GET] Using direct SQLite helper for persistent fallback.");
-      return this.getDirectSqliteAdapter();
+    // Next try the coordination adapter
+    if (this.coordinationAdapter) {
+      this.logger.debug(`[CONVO_MGR_GET_MEMORY] Using coordinationAdapter as memory manager`);
+      return {
+        createMemory: async (data: MemoryData) => {
+          // Convert to a format the coordination adapter can use
+          try {
+            const message = {
+              id: data.id || generateUUID(),
+              conversationId: data.roomId || 'unknown-conversation',
+              senderId: data.userId || 'unknown-sender',
+              content: data.content?.text || JSON.stringify(data.content),
+              sentAt: Date.now(),
+              isFollowUp: false
+            };
+            await this.coordinationAdapter?.recordMessage(message);
+            return { id: message.id };
+          } catch (error) {
+            this.logger.error(`[CONVO_MGR_GET_MEMORY] Error storing memory with adapter: ${error}`);
+            return { success: false };
+          }
+        },
+        getMemories: async (query: MemoryQuery) => {
+          try {
+            const messages = await this.coordinationAdapter?.getRecentMessages(query.roomId || 'unknown', query.count || 10);
+            return messages?.map(msg => ({
+              id: msg.id,
+              type: 'telegram-message',
+              roomId: query.roomId || 'unknown',
+              userId: msg.senderId,
+              content: { text: msg.content },
+              timestamp: msg.sentAt,
+              metadata: {}
+            })) || [];
+          } catch (error) {
+            this.logger.error(`[CONVO_MGR_GET_MEMORY] Error getting memories with adapter: ${error}`);
+            return [];
+          }
+        }
+      } as IMemoryManager;
     }
 
-    // First time reaching this fallback path, let's evaluate options and create SQLite fallback if needed
-    if (!this.usingSqliteFallback && !this.sqliteHelper) {
-      this.tryInitializePersistentFallback();
-    }
+    // As last resort, try direct SQLite access
+    try {
+      if (!this.memoryManager) {
+        this.logger.warn(`[CONVO_MGR_GET_MEMORY] No memory manager available, using direct SQLite adapter`);
+        this.memoryManager = this.getDirectSqliteAdapter();
+      }
+      return this.memoryManager;
+    } catch (error) {
+      this.logger.error(`[CONVO_MGR_GET_MEMORY] Error getting memory manager: ${error}`);
 
-    // If we've tried to initialize direct SQLite and it's available, use it
-    if (this.usingSqliteFallback && this.sqliteHelper) {
-      this.logger.debug("[MEMORY_GET] Using newly initialized direct SQLite helper for persistent fallback.");
-      return this.getDirectSqliteAdapter();
+      // Return a no-op memory manager
+      this.logger.warn(`[CONVO_MGR_GET_MEMORY] Using in-memory fallback`);
+      return {
+        createMemory: async () => ({ id: generateUUID() }),
+        getMemories: async () => []
+      } as IMemoryManager;
     }
-
-    // Final fallback to our in-memory implementation
-    if (!this.fallbackMemory) {
-      this.logger.warn("[MEMORY_GET] Fallback memory manager was null, creating new instance.");
-      this.fallbackMemory = new FallbackMemoryManager();
-    }
-    this.logger.warn("[MEMORY_GET] Using fallback memory manager (in-memory). Persistence will NOT occur.");
-    return this.fallbackMemory;
   }
 
   /**
@@ -699,14 +755,12 @@ export class ConversationManager extends PluginComponent {
   }
 
   /**
-   * Record a message in the conversation state.
-   * This method is specifically for when an agent *sends* a message, to update itself as the last speaker.
-   * The primary processing of *incoming* messages should go through `handleMessage`.
+   * Record a message sent by an agent in this conversation
    * 
    * @param groupId - Telegram group ID
-   * @param agentId - Agent ID of the speaker (should not be null here)
-   * @param messageText - Message text (can be a placeholder like "<agent_responded>")
-   * @returns Updated conversation state or null on failure
+   * @param agentId - Agent ID that sent the message
+   * @param messageText - Text of the message that was sent
+   * @returns Updated conversation state
    */
   public async recordMessage(
     groupId: string | number,
@@ -714,55 +768,64 @@ export class ConversationManager extends PluginComponent {
     messageText: string
   ): Promise<ConversationStateTracking | null> {
     try {
-      // Update last message time with agent-specific key
-      const agentGroupKey = `${agentId}-${groupId.toString()}`;
-      this.lastMessageTime.set(agentGroupKey, Date.now());
-
-      // If using SQLite fallback, update cooldown in database
-      if (this.usingSqliteFallback && this.sqliteHelper) {
-        try {
-          await this.sqliteHelper.updateCooldown(groupId.toString(), agentId, 8000);
-          this.logger.debug(`[CONVO_MGR_RECORD] Updated cooldown in database for agent ${agentId} in group ${groupId}`);
-        } catch (dbError) {
-          this.logger.warn(`[CONVO_MGR_RECORD] Error updating database cooldown: ${dbError}. Using memory-only cooldown.`);
-        }
-      }
-
+      // Get or create conversation state
       let state = await this.getConversationState(groupId);
       if (!state) {
-        this.logger.warn(`[CONVO_MGR_RECORD] No state found for group ${groupId} while agent ${agentId} is recording its message. Creating new state.`);
         state = {
           status: 'active',
           lastMessageTimestamp: Date.now(),
-          lastSpeakerId: agentId, // This agent is the speaker
-          messageCount: 1,
-          participants: [agentId],
-          currentTopic: '',
+          lastSpeakerId: '',
+          messageCount: 0,
+          participants: [],
           lastUpdated: Date.now()
-        };
-      } else {
-        this.logger.debug(`[CONVO_MGR_RECORD] Updating existing state for group ${groupId}: current speaker = ${state.lastSpeakerId}, new speaker = ${agentId}`);
-        // Add this agent to participants if not already included
-        const participants = new Set(state.participants || []);
-        participants.add(agentId);
-
-        state = {
-          ...state,
-          lastMessageTimestamp: Date.now(),
-          lastSpeakerId: agentId, // Update last speaker to this agent
-          participants: Array.from(participants),
-          messageCount: (state.messageCount || 0) + 1,
-          lastUpdated: Date.now()
-        };
+        } as ConversationStateTracking;
       }
+
+      // Ensure this agent is in the participants list
+      if (!state.participants.includes(agentId)) {
+        state.participants.push(agentId);
+      }
+
+      // Update state fields
+      state.lastSpeakerId = agentId;
+      state.lastMessageTimestamp = Date.now();
+      state.lastUpdated = Date.now();
+      state.messageCount++;
+
+      // Store message
+      await this.storeMessage(groupId, agentId, messageText);
+
+      // Store updated state
       const success = await this.storeConversationState(groupId, state);
+
+      // Update cooldown tracking
+      const groupKey = `global-${groupId.toString()}`;
+      const agentGroupKey = `${agentId}-${groupId.toString()}`;
+
+      // Update both global and agent-specific cooldown timestamps
+      this.lastGlobalMessageTime.set(groupKey, Date.now());
+      this.lastMessageTime.set(agentGroupKey, Date.now());
+
+      this.logger.info(`[CONVO_MGR_RECORD] Updated cooldown timers - Global for group ${groupId} and agent-specific for ${agentId}`);
+
       if (success) {
-        this.logger.info(`[CONVO_MGR_RECORD] Agent ${agentId} recorded its message in group ${groupId}. State updated. Last speaker: ${agentId}`);
-        // Optionally store the actual message text if it's not a placeholder and we want agent's own messages in history
-        // For now, handleMessage stores incoming messages. recordMessage primarily updates speaker state.
-        // if (messageText !== "<agent_responded_to_direct_message>" && messageText !== "<agent_responded_to_relay_message>") {
-        //   await this.storeMessage(groupId, agentId, messageText);
-        // }
+        // Store in coordination adapter if available
+        if (this.coordinationAdapter) {
+          try {
+            const message = {
+              id: generateUUID(),
+              conversationId: typeof state.lastUpdated === 'number' ? state.lastUpdated.toString() : generateUUID(),
+              senderId: agentId,
+              content: messageText,
+              sentAt: Date.now(),
+              isFollowUp: false
+            };
+            await this.coordinationAdapter.recordMessage(message);
+            this.logger.info(`[CONVO_MGR_RECORD] Successfully stored message in coordination adapter for group ${groupId} from agent ${agentId}`);
+          } catch (error) {
+            this.logger.error(`[CONVO_MGR_RECORD] Failed to store message in coordination adapter: ${error}`);
+          }
+        }
       } else {
         this.logger.error(`[CONVO_MGR_RECORD] Failed to store updated state for group ${groupId} after agent ${agentId} spoke.`);
       }
@@ -790,7 +853,8 @@ export class ConversationManager extends PluginComponent {
     groupId: string | number,
     agentId: string,
     fromAgentId: string | null,
-    messageText?: string
+    messageText?: string,
+    message?: any // Optional message parameter to receive the full message object
   ): Promise<boolean> {
     try {
       // Ensure we have a valid agent ID, not just "agent"
@@ -800,131 +864,139 @@ export class ConversationManager extends PluginComponent {
 
       this.logger.debug(`[CONVO_MGR_SHOULD_RESPOND] Group ${groupId}. Current Agent: ${validAgentId} (original: ${agentId}). Sender: ${fromAgentId || 'Human/Unknown'}. Strategy: ${this.currentTurnStrategy}`);
 
-      // If using SQLite fallback, check cooldown in database first
-      if (this.usingSqliteFallback && this.sqliteHelper) {
-        try {
-          // Check if this agent is in cooldown using direct database query
-          const isInCooldown = await this.sqliteHelper.isInCooldown(groupId.toString(), validAgentId);
-          if (isInCooldown) {
-            this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} in group ${groupId} is in database cooldown. Agent defers.`);
-            return false;
-          }
-        } catch (dbError) {
-          this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND] Error checking database cooldown: ${dbError}. Falling back to in-memory cooldown check.`);
-        }
-      }
-
-      // Create a composite key for agent and group
-      const agentGroupKey = `${validAgentId}-${groupId.toString()}`;
-      const lastTimeThisAgentSpoke = this.lastMessageTime.get(agentGroupKey);
-      const now = Date.now();
-
-      // Shorter cooldown per agent (8 seconds instead of 15)
-      const agentCooldown = 8000;
-
-      if (lastTimeThisAgentSpoke && (now - lastTimeThisAgentSpoke) < agentCooldown) {
-        this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} in group ${groupId} is in memory cooldown. Delay: ${now - lastTimeThisAgentSpoke}ms < ${agentCooldown}ms. Agent defers.`);
-        return false;
-      }
-
-      const conversationState = await this.getConversationState(groupId);
-      if (!conversationState) {
-        this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND] No conversation state found for group ${groupId}. Agent ${validAgentId} might respond by default if no other rules prevent.`);
-        return true;
-      }
-
+      // Don't respond to your own messages
       if (fromAgentId === validAgentId) {
         this.logger.debug(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} should not respond to itself.`);
         return false;
       }
 
+      // NEW: Check if this message is a direct reply to this agent
+      if (message && message.reply_to_message) {
+        // Extract the bot username from character config or fall back to agent ID
+        const character = this.runtime?.character || {};
+        const botUsername = typeof character === 'object' && character !== null && 'username' in character
+          ? character.username as string
+          : `${validAgentId}_bot`;
+
+        const replyToUsername = message.reply_to_message.from?.username;
+
+        // Check if this is a reply to this agent
+        if (replyToUsername && (
+          replyToUsername === botUsername ||
+          replyToUsername === `${validAgentId}_bot` ||
+          replyToUsername.startsWith(validAgentId)
+        )) {
+          this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Direct reply to agent ${validAgentId}. Prioritizing response.`);
+
+          // NEW: Check if another agent is already responding before claiming priority
+          if (this.coordinationAdapter) {
+            const currentResponder = await this.coordinationAdapter.getRespondingAgent(groupId.toString());
+            if (currentResponder && currentResponder !== validAgentId) {
+              this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${currentResponder} is already responding to group ${groupId}. Despite being a direct reply, agent ${validAgentId} will defer.`);
+              return false;
+            }
+
+            // Mark this agent as responding
+            const marked = await this.coordinationAdapter.markAgentAsResponding(groupId.toString(), validAgentId);
+            if (!marked) {
+              this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Failed to mark agent ${validAgentId} as responding to group ${groupId}, likely due to race condition. Deferring.`);
+              return false;
+            }
+
+            this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} marked as responding to direct reply in group ${groupId}.`);
+          }
+
+          return true; // Override other checks for direct replies
+        }
+
+        // If it's a reply to another agent, this agent should defer
+        if (replyToUsername && replyToUsername !== botUsername && replyToUsername.includes('_bot')) {
+          this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Message is a reply to another agent ${replyToUsername}. Agent ${validAgentId} defers.`);
+          return false;
+        }
+      }
+
+      // NEW: Check if any agent is already responding to this group
+      if (this.coordinationAdapter) {
+        const currentResponder = await this.coordinationAdapter.getRespondingAgent(groupId.toString());
+        if (currentResponder) {
+          if (currentResponder === validAgentId) {
+            this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} is already marked as responding to group ${groupId}.`);
+            return true; // This agent already has responding status
+          } else {
+            this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${currentResponder} is already responding to group ${groupId}. Agent ${validAgentId} defers.`);
+            return false;
+          }
+        }
+      }
+
+      // First, check global cooldown for the entire conversation
+      const groupKey = `global-${groupId.toString()}`;
+      const lastGlobalMessageTimestamp = this.lastGlobalMessageTime.get(groupKey);
+      const now = Date.now();
+
+      // If the message is from human, use a shorter cooldown
+      const isFromHuman = !fromAgentId || fromAgentId.startsWith('human_');
+      const effectiveGlobalCooldown = isFromHuman ? this.HUMAN_MESSAGE_GLOBAL_COOLDOWN_MS : this.GLOBAL_COOLDOWN_MS;
+
+      if (lastGlobalMessageTimestamp && (now - lastGlobalMessageTimestamp) < effectiveGlobalCooldown) {
+        const timeElapsed = now - lastGlobalMessageTimestamp;
+        this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Global cooldown in effect for group ${groupId}. ${timeElapsed}ms elapsed, needed ${effectiveGlobalCooldown}ms. Agent ${validAgentId} defers.`);
+        return false;
+      }
+
+      // Then check agent-specific cooldown
+      const agentGroupKey = `${validAgentId}-${groupId.toString()}`;
+      const lastTimeThisAgentSpoke = this.lastMessageTime.get(agentGroupKey);
+
+      if (lastTimeThisAgentSpoke && (now - lastTimeThisAgentSpoke) < this.AGENT_COOLDOWN_MS) {
+        const timeElapsed = now - lastTimeThisAgentSpoke;
+        this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Agent ${validAgentId} in group ${groupId} is in cooldown. ${timeElapsed}ms elapsed, needed ${this.AGENT_COOLDOWN_MS}ms. Agent defers.`);
+        return false;
+      }
+
+      // Attempt to get conversation state
+      const conversationState = await this.getConversationState(groupId);
+      if (!conversationState) {
+        this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND] No conversation state found for group ${groupId}. Agent ${validAgentId} might respond by default if no other rules prevent.`);
+
+        // Check default response criteria
+        const shouldRespond = this.basicShouldRespond(validAgentId, fromAgentId, messageText);
+
+        // If agent decides to respond, mark it as responding
+        if (shouldRespond && this.coordinationAdapter) {
+          const marked = await this.coordinationAdapter.markAgentAsResponding(groupId.toString(), validAgentId);
+          if (!marked) {
+            this.logger.info(`[CONVO_MGR_SHOULD_RESPOND] Failed to mark agent ${validAgentId} as responding to group ${groupId}, likely due to race condition. Deferring.`);
+            return false;
+          }
+        }
+
+        return shouldRespond;
+      }
+
+      // Check turn-taking strategy
       if (this.currentTurnStrategy === TurnStrategy.FIFO) {
         if (conversationState.lastSpeakerId === validAgentId) {
           this.logger.info(`[CONVO_MGR_SHOULD_RESPOND][FIFO] Agent ${validAgentId} was the last speaker in group ${groupId}. Should not respond.`);
           return false;
         }
         this.logger.info(`[CONVO_MGR_SHOULD_RESPOND][FIFO] Agent ${validAgentId} was NOT the last speaker (${conversationState.lastSpeakerId}) in group ${groupId}. Allowed to respond.`);
+
+        // Before responding, mark this agent as the current responder
+        if (this.coordinationAdapter) {
+          const marked = await this.coordinationAdapter.markAgentAsResponding(groupId.toString(), validAgentId);
+          if (!marked) {
+            this.logger.info(`[CONVO_MGR_SHOULD_RESPOND][FIFO] Failed to mark agent ${validAgentId} as responding to group ${groupId}, likely due to race condition. Deferring.`);
+            return false;
+          }
+        }
+
         return true;
-      } else if (this.currentTurnStrategy === TurnStrategy.LLM_ASSISTED) {
-        this.logger.debug(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Using LLM to determine if agent ${validAgentId} should respond.`);
-        let runtime: IAgentRuntime | undefined;
-        try {
-          runtime = await this.waitForRuntime();
-        } catch (error: unknown) {
-          this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting runtime: ${error instanceof Error ? error.message : JSON.stringify(error)}, falling back to basic response logic for LLM strategy.`);
-          return this.basicShouldRespond(validAgentId, fromAgentId, messageText, conversationState);
-        }
-
-        let character: any = undefined;
-        let agentName = validAgentId;
-        let persona = '';
-        let topics: string[] = [];
-        let interests: string[] = [];
-        try {
-          character = runtime?.character;
-          if (character) {
-            agentName = character.name || validAgentId;
-            persona = character.bio || '';
-            topics = character.topics || [];
-            interests = character.interests || [];
-          }
-        } catch (error: unknown) {
-          if (error instanceof Error) {
-            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting character: ${error.message}`);
-          } else {
-            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting character: ${JSON.stringify(error)}`);
-          }
-        }
-
-        let history = '';
-        let participants: string[] = conversationState.participants || [];
-        try {
-          const memoryManagerToUse = this.getMemoryManager();
-          const recentMessages = await memoryManagerToUse.getMemories({
-            roomId: groupId.toString(),
-            type: 'telegram-message',
-            count: 5
-          });
-          if (recentMessages && recentMessages.length > 0) {
-            history = recentMessages.map((m: any) => `${m.userId}: ${m.content.text}`).join('\n');
-          }
-        } catch (error: unknown) {
-          if (error instanceof Error) {
-            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting history: ${error.message}`);
-          } else {
-            this.logger.warn(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error getting history: ${JSON.stringify(error)}`);
-          }
-        }
-
-        const prompt = `
-          Based on the following conversation and agent information, should the agent respond?
-          
-          Agent: ${agentName}
-          Agent ID: ${validAgentId}
-          Agent Bio: ${persona}
-          Agent Interests: ${[...topics, ...interests].join(', ')}
-          
-          Conversation Participants: ${participants.join(', ')}
-          Last Speaker: ${conversationState.lastSpeakerId || 'Unknown'}
-          Current Message From: ${fromAgentId || 'Human'}
-          Message: ${messageText || 'No message text available'}
-          
-          Recent Messages:
-          ${history || 'No recent messages available'}
-          
-          Should ${agentName} respond? Answer YES or NO.
-        `;
-
-        // Use LLM to decide
-        try {
-          // This would be the code to call LLM, but for now, just use basic logic
-          this.logger.info(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Would use LLM to decide if ${validAgentId} should respond, but implementing basic logic for now.`);
-          return this.basicShouldRespond(validAgentId, fromAgentId, messageText, conversationState);
-        } catch (error) {
-          this.logger.error(`[CONVO_MGR_SHOULD_RESPOND][LLM_ASSISTED] Error using LLM to decide: ${error}`);
-          return this.basicShouldRespond(validAgentId, fromAgentId, messageText, conversationState);
-        }
       }
+
+      // Rest of the existing logic...
+      return this.basicShouldRespond(validAgentId, fromAgentId, messageText, conversationState);
     } catch (error: unknown) {
       if (error instanceof Error) {
         this.logger.error(`[CONVO_MGR_SHOULD_RESPOND] Error in shouldAgentRespond: ${error.message}`);
@@ -1103,5 +1175,13 @@ export class ConversationManager extends PluginComponent {
       this.logger.error(`[MEMORY_SQLITE] Error storing message in SQLite: ${error?.message || error}`);
       return false;
     }
+  }
+
+  /**
+   * Set the coordination adapter explicitly (useful for dependency injection)
+   */
+  setCoordinationAdapter(adapter: TelegramCoordinationAdapter): void {
+    this.coordinationAdapter = adapter;
+    this.logger.info('ConversationManager: TelegramCoordinationAdapter explicitly set');
   }
 }
